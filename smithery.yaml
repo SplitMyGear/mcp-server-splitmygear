@@ -1,0 +1,21 @@
+startCommand:
+  type: http
+  url: https://mcp-server-splitmygear.vercel.app/api/mcp
+  headers:
+    - name: Content-Type
+      value: application/json
+  configSchema:
+    type: object
+    properties:
+      apiKey:
+        type: string
+        description: "Optional SplitMyGear API key for authenticated tools (booking, messaging). Browse and search work without one."
+    required: []
+  configHeadersFunction: |
+    (config) => {
+      const headers = {};
+      if (config.apiKey) {
+        headers['x-api-key'] = config.apiKey;
+      }
+      return headers;
+    }

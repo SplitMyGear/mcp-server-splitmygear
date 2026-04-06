@@ -1,0 +1,306 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SplitMyGear MCP Server",
+    "description": "MCP (Model Context Protocol) server for SplitMyGear - AI-first rental platform. This server exposes tools that AI agents can use to interact with the SplitMyGear platform.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "SplitMyGear",
+      "url": "https://splitmygear.com"
+    },
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://your-domain.com/api/mcp",
+      "description": "Production server"
+    },
+    {
+      "url": "http://localhost:3000/api/mcp",
+      "description": "Development server"
+    }
+  ],
+  "paths": {
+    "/api/mcp": {
+      "post": {
+        "summary": "MCP Server endpoint",
+        "description": "Main MCP server endpoint that handles JSON-RPC requests for tools and resources",
+        "operationId": "handleMcpRequest",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpRequest"
+              },
+              "examples": {
+                "listTools": {
+                  "summary": "List available tools",
+                  "value": {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/list",
+                    "params": {}
+                  }
+                },
+                "searchListings": {
+                  "summary": "Search for listings",
+                  "value": {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {
+                      "name": "search_listings",
+                      "arguments": {
+                        "location": "Seattle",
+                        "category": "camping"
+                      }
+                    }
+                  }
+                },
+                "createBooking": {
+                  "summary": "Create a booking",
+                  "value": {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {
+                      "name": "create_booking",
+                      "arguments": {
+                        "listingId": "listing-123",
+                        "checkIn": "2024-06-01",
+                        "checkOut": "2024-06-03",
+                        "guests": 2,
+                        "userId": "user-456"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "Invalid API key"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "Rate limit exceeded. Maximum 20 requests per minute."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "Internal Server Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      },
+      "get": {
+        "summary": "MCP Server info endpoint",
+        "description": "Returns server capabilities and available tools",
+        "operationId": "getServerInfo",
+        "responses": {
+          "200": {
+            "description": "Server information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "example": "splitmygear-mcp"
+                    },
+                    "version": {
+                      "type": "string",
+                      "example": "1.0.0"
+                    },
+                    "description": {
+                      "type": "string",
+                      "example": "MCP Server for SplitMyGear - AI-first rental platform"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "summary": "CORS preflight",
+        "description": "Handles CORS preflight requests",
+        "operationId": "handleCors",
+        "responses": {
+          "200": {
+            "description": "CORS headers",
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "*"
+              },
+              "Access-Control-Allow-Methods": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "GET, POST, OPTIONS"
+              },
+              "Access-Control-Allow-Headers": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "Content-Type, Authorization, x-api-key"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT token from Supabase authentication"
+      },
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "API key for service-to-service communication"
+      }
+    },
+    "schemas": {
+      "McpRequest": {
+        "type": "object",
+        "required": ["jsonrpc", "id", "method"],
+        "properties": {
+          "jsonrpc": {
+            "type": "string",
+            "const": "2.0",
+            "description": "JSON-RPC version"
+          },
+          "id": {
+            "type": "integer",
+            "description": "Request identifier"
+          },
+          "method": {
+            "type": "string",
+            "enum": ["tools/list", "tools/call", "resources/list", "resources/read"],
+            "description": "MCP method to invoke"
+          },
+          "params": {
+            "type": "object",
+            "description": "Method parameters"
+          }
+        }
+      },
+      "McpResponse": {
+        "type": "object",
+        "properties": {
+          "jsonrpc": {
+            "type": "string",
+            "const": "2.0"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "result": {
+            "type": "object",
+            "description": "Method result"
+          },
+          "error": {
+            "$ref": "#/components/schemas/JsonRpcError"
+          }
+        }
+      },
+      "JsonRpcError": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Listing Tools",
+      "description": "Tools for searching and viewing listings"
+    },
+    {
+      "name": "Booking Tools",
+      "description": "Tools for creating and managing bookings"
+    },
+    {
+      "name": "Resources",
+      "description": "Static resources provided by the server"
+    }
+  ]
+}
