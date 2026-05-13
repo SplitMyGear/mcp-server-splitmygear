@@ -1,11 +1,11 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "SplitMyGear MCP Server",
-    "description": "MCP (Model Context Protocol) server for SplitMyGear - AI-first rental platform. This server exposes tools that AI agents can use to interact with the SplitMyGear platform.",
+    "title": "Splitt MCP Server",
+    "description": "MCP (Model Context Protocol) server for Splitt - AI-first rental platform. This server exposes tools that AI agents can use to interact with the Splitt platform.",
     "version": "1.0.0",
     "contact": {
-      "name": "SplitMyGear",
+      "name": "Splitt",
       "url": "https://splitmygear.com"
     },
     "license": {
@@ -164,7 +164,7 @@
                     },
                     "description": {
                       "type": "string",
-                      "example": "MCP Server for SplitMyGear - AI-first rental platform"
+                      "example": "MCP Server for Splitt - AI-first rental platform"
                     }
                   }
                 }

@@ -1,4 +1,4 @@
-# SplitMyGear MCP Server - Tool Reference
+# Splitt MCP Server - Tool Reference
 
 This document describes all available MCP tools and their parameters.
 

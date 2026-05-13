@@ -1,12 +1,12 @@
 {
   "dxt_version": "0.1",
-  "name": "SplitMyGear",
-  "display_name": "SplitMyGear — Outdoor Gear Rental",
+  "name": "Splitt",
+  "display_name": "Splitt \u2014 Outdoor Gear Rental",
   "version": "1.0.0",
-  "description": "Search, browse, and book outdoor gear rentals on SplitMyGear. Supports natural language search, availability checks, pricing analysis, AI-generated listing descriptions, experiences, and more.",
-  "long_description": "The SplitMyGear MCP server gives AI agents full access to the SplitMyGear outdoor gear rental platform. Browse 8 gear categories (camping, hiking, water sports, snow sports, climbing, cycling, fishing, photography), search with natural language, check availability, view pricing, and book gear or outdoor experiences. Vendors can generate AI-powered listing descriptions and get competitive pricing insights. Authenticated users can manage bookings and conversations. All access requires an API key (no public tier).",
+  "description": "Search, browse, and book outdoor gear rentals on Splitt. Supports natural language search, availability checks, pricing analysis, AI-generated listing descriptions, experiences, and more.",
+  "long_description": "The Splitt MCP server gives AI agents full access to the Splitt outdoor gear rental platform. Browse 8 gear categories (camping, hiking, water sports, snow sports, climbing, cycling, fishing, photography), search with natural language, check availability, view pricing, and book gear or outdoor experiences. Vendors can generate AI-powered listing descriptions and get competitive pricing insights. Authenticated users can manage bookings and conversations. All access requires an API key (no public tier).",
   "author": {
-    "name": "SplitMyGear",
+    "name": "Splitt",
     "url": "https://splitmygear.com"
   },
   "repository": {
@@ -21,30 +21,84 @@
     "url": "https://mcp-server-splitmygear.vercel.app/api/mcp"
   },
   "tools": [
-    { "name": "search_listings", "description": "Search for gear with filters or natural language" },
-    { "name": "get_listing_details", "description": "Get full details for a specific listing" },
-    { "name": "check_availability", "description": "Check if a listing is available for dates" },
-    { "name": "get_similar_listings", "description": "Find similar gear using semantic similarity" },
-    { "name": "get_personalized_recommendations", "description": "Get gear recommendations based on history" },
-    { "name": "create_booking", "description": "Create a gear rental booking" },
-    { "name": "cancel_booking", "description": "Cancel a booking with optional refund" },
-    { "name": "get_booking_status", "description": "Get the status of a booking" },
-    { "name": "suggest_listing_price", "description": "Get AI-powered price suggestions for a gear category" },
-    { "name": "analyze_competitor_pricing", "description": "Compare a listing against local competitors" },
-    { "name": "generate_listing_description", "description": "Generate an AI listing description from keywords" },
-    { "name": "improve_listing_title", "description": "Optimize a listing title for SEO" },
-    { "name": "search_experiences", "description": "Browse outdoor adventures and tours" },
-    { "name": "get_experience_details", "description": "Get full info and schedules for an experience" },
-    { "name": "book_experience", "description": "Book spots on an experience" },
-    { "name": "send_message", "description": "Send a message to a renter or vendor" },
-    { "name": "get_conversations", "description": "List your active conversations" },
-    { "name": "generate_ai_message_draft", "description": "Draft a professional message using AI" }
+    {
+      "name": "search_listings",
+      "description": "Search for gear with filters or natural language"
+    },
+    {
+      "name": "get_listing_details",
+      "description": "Get full details for a specific listing"
+    },
+    {
+      "name": "check_availability",
+      "description": "Check if a listing is available for dates"
+    },
+    {
+      "name": "get_similar_listings",
+      "description": "Find similar gear using semantic similarity"
+    },
+    {
+      "name": "get_personalized_recommendations",
+      "description": "Get gear recommendations based on history"
+    },
+    {
+      "name": "create_booking",
+      "description": "Create a gear rental booking"
+    },
+    {
+      "name": "cancel_booking",
+      "description": "Cancel a booking with optional refund"
+    },
+    {
+      "name": "get_booking_status",
+      "description": "Get the status of a booking"
+    },
+    {
+      "name": "suggest_listing_price",
+      "description": "Get AI-powered price suggestions for a gear category"
+    },
+    {
+      "name": "analyze_competitor_pricing",
+      "description": "Compare a listing against local competitors"
+    },
+    {
+      "name": "generate_listing_description",
+      "description": "Generate an AI listing description from keywords"
+    },
+    {
+      "name": "improve_listing_title",
+      "description": "Optimize a listing title for SEO"
+    },
+    {
+      "name": "search_experiences",
+      "description": "Browse outdoor adventures and tours"
+    },
+    {
+      "name": "get_experience_details",
+      "description": "Get full info and schedules for an experience"
+    },
+    {
+      "name": "book_experience",
+      "description": "Book spots on an experience"
+    },
+    {
+      "name": "send_message",
+      "description": "Send a message to a renter or vendor"
+    },
+    {
+      "name": "get_conversations",
+      "description": "List your active conversations"
+    },
+    {
+      "name": "generate_ai_message_draft",
+      "description": "Draft a professional message using AI"
+    }
   ],
   "user_config": {
     "api_key": {
       "type": "string",
       "title": "API Key (required)",
-      "description": "Your SplitMyGear API key, sent as the x-api-key header. Required for all access — the server has no public tier and rejects unauthenticated requests.",
+      "description": "Your Splitt API key, sent as the x-api-key header. Required for all access — the server has no public tier and rejects unauthenticated requests.",
       "required": true,
       "secret": true
     }
