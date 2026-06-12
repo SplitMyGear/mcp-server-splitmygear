@@ -1,9 +1,6 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
 export interface AuthResult {
   success: boolean;
   userId?: string;
@@ -14,20 +11,26 @@ export interface AuthResult {
 export async function authMiddleware(request: NextRequest): Promise<AuthResult> {
   const authHeader = request.headers.get('authorization');
   const apiKey = request.headers.get('x-api-key');
+  // Read env per-request so tests and rotation behave; Vercel sets these once.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-  const publicEndpoints = ['/api/mcp'];
-  const isPublicEndpoint = publicEndpoints.some((ep) => request.nextUrl.pathname.startsWith(ep));
-
-  // Public endpoints allow unauthenticated access (role = 'public')
-  // Auth is optional — it unlocks additional capabilities (bookings, messaging, etc.)
-  if (isPublicEndpoint && !apiKey && !authHeader) {
-    return { success: true, role: 'public' };
+  // DENY BY DEFAULT (security lockdown 2026-06-12): this server wields a
+  // Supabase service-role key and a Stripe secret — there is no safe
+  // 'public' tier. Every request must present the operator API key or a
+  // valid Supabase bearer token. If auth is unconfigured we fail CLOSED.
+  const operatorKey = process.env.MCP_API_KEY;
+  if (!operatorKey) {
+    return { success: false, error: 'Server auth not configured' };
+  }
+  if (apiKey && apiKey === operatorKey) {
+    return { success: true, role: 'admin' };
+  }
+  if (!apiKey && !authHeader) {
+    return { success: false, error: 'No authentication provided' };
   }
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    if (isPublicEndpoint) {
-      return { success: true, role: 'public' };
-    }
     return { success: false, error: 'Supabase configuration missing' };
   }
 
