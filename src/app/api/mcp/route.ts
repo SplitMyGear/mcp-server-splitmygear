@@ -11,13 +11,19 @@ import { messagingTools } from '@/tools/messaging';
 import { authMiddleware } from '@/middleware/auth';
 import { rateLimiter } from '@/middleware/rate-limit';
 
-const server = new McpServer({
-  name: 'splitmygear-mcp',
-  version: '1.0.0',
-  description: 'MCP Server for SplitMyGear - AI-first rental platform',
-});
+// A FRESH server + transport is built per request (see handleRequest). The
+// previous module-singleton + stateful transport never completed the
+// initialize handshake on serverless ("Server not initialized"), making the
+// server unusable. buildServer() registers all tools on a new instance each
+// time so requests are fully independent and stateless.
+function buildServer(): McpServer {
+  const server = new McpServer({
+    name: 'splitmygear-mcp',
+    version: '1.0.0',
+    description: 'MCP Server for SplitMyGear - AI-first rental platform',
+  });
 
-server.tool(
+  server.tool(
   'search_listings',
   {
     location: z.string().optional().describe('City or neighborhood to search in'),
@@ -318,7 +324,8 @@ server.resource(
   }
 );
 
-const serverInstance = server;
+  return server;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -348,18 +355,15 @@ async function handleRequest(request: NextRequest) {
       });
     }
 
+    // Stateless: a brand-new server + transport per request (no session id),
+    // with JSON responses enabled so a single POST completes the
+    // initialize/tools-call round-trip without a persistent SSE session.
+    const server = buildServer();
     const transport = new WebStandardStreamableHTTPServerTransport({
-      sessionIdGenerator: () => crypto.randomUUID(),
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true,
     });
-
-    try {
-      await server.connect(transport);
-    } catch (e: any) {
-      if (!e.message?.includes('Already connected')) {
-        throw e;
-      }
-    }
-
+    await server.connect(transport);
     return transport.handleRequest(request);
   } catch (error) {
     console.error('MCP Server Error:', error);

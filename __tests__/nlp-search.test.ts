@@ -36,7 +36,7 @@ describe('NLP Search Verification', () => {
     expect(aiService.parseSearchQuery).toHaveBeenCalledWith(complexQuery);
     
     // It SHOULD extract location and price and use them in query
-    expect(supabase.ilike).toHaveBeenCalledWith('location', '%Seattle%');
-    expect(supabase.lte).toHaveBeenCalledWith('pricePerDay', 50);
+    expect((supabase as any).ilike).toHaveBeenCalledWith('location', '%Seattle%');
+    expect((supabase as any).lte).toHaveBeenCalledWith('pricePerDay', 50);
   });
 });
