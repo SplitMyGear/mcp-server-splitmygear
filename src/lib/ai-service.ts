@@ -1,19 +1,10 @@
-import OpenAI from 'openai';
 import { SearchFilters } from './supabase';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY || 'MISSING_KEY',
-  baseURL: 'https://openrouter.ai/api/v1',
-  defaultHeaders: {
-    'HTTP-Referer': 'https://splitmygear.com',
-    'X-Title': 'SplitMyGear MCP',
-  },
-});
+import { getAIClient, isAIConfigured, chatModel, embeddingModel } from './ai-client';
 
 export const aiService = {
   async parseSearchQuery(query: string): Promise<Partial<SearchFilters>> {
-    if (!process.env.OPENROUTER_API_KEY) {
-      console.warn('OPENROUTER_API_KEY is not set. Natural language search will use simple keyword matching.');
+    if (!isAIConfigured()) {
+      console.warn('No AI provider key set. Natural language search will use simple keyword matching.');
       return {};
     }
     const today = new Date().toISOString().split('T')[0];
@@ -39,8 +30,8 @@ export const aiService = {
     `;
 
     try {
-      const response = await openai.chat.completions.create({
-        model: 'meta-llama/llama-3.3-70b-instruct:free',
+      const response = await getAIClient().chat.completions.create({
+        model: chatModel(),
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: query },
@@ -59,13 +50,13 @@ export const aiService = {
   },
 
   async generateEmbedding(text: string): Promise<number[]> {
-    if (!process.env.OPENROUTER_API_KEY) {
-      console.warn('OPENROUTER_API_KEY is not set. Embedding-based search is disabled.');
+    if (!isAIConfigured()) {
+      console.warn('No AI provider key set. Embedding-based search is disabled.');
       return [];
     }
     try {
-      const response = await openai.embeddings.create({
-        model: 'text-embedding-3-small',
+      const response = await getAIClient().embeddings.create({
+        model: embeddingModel(),
         input: text,
       });
 

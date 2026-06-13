@@ -1,8 +1,4 @@
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'MISSING_KEY',
-});
+import { getAIClient, isAIConfigured, chatModel } from '../lib/ai-client';
 
 export const contentTools = {
   async generateListingDescription(
@@ -10,7 +6,7 @@ export const contentTools = {
     category: string,
     keywords: string[]
   ): Promise<string> {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!isAIConfigured()) {
       return 'AI Content Generation is disabled (missing API key).';
     }
 
@@ -31,8 +27,8 @@ export const contentTools = {
     `;
 
     try {
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+      const response = await getAIClient().chat.completions.create({
+        model: chatModel(),
         messages: [{ role: 'user', content: prompt }],
       });
 
@@ -44,7 +40,7 @@ export const contentTools = {
   },
 
   async improveListingTitle(currentTitle: string): Promise<string> {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!isAIConfigured()) {
       return currentTitle;
     }
 
@@ -60,8 +56,8 @@ export const contentTools = {
     `;
 
     try {
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+      const response = await getAIClient().chat.completions.create({
+        model: chatModel(),
         messages: [{ role: 'user', content: prompt }],
       });
 
