@@ -1,12 +1,15 @@
-import { supabase, Experience, ExperienceSchedule } from '@/lib/supabase';
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
 
 /**
- * `bookExperience` calls the backend REST API forwarding the caller's JWT
- * (SPLIT-226 / M4) — the backend owns auth, capacity/availability, pricing and
- * payment. The read tools (search/details) remain direct Supabase reads for now
- * (migrating those to GET /experiences is tracked as a follow-up).
+ * Experience tools are thin clients of the backend REST API (SPLIT-226). The
+ * read tools (search/details) hit the public GET /experiences endpoints — the
+ * canonical, moderation-filtered source — instead of a direct service-role
+ * Supabase read against a schema that diverged from the real entity. The write
+ * tool (bookExperience) forwards the caller's JWT (M4): the backend owns auth,
+ * capacity, pricing and payment.
  */
+
+type ExperienceRecord = Record<string, unknown>;
 
 const AUTH_REQUIRED =
   'Authentication required: call with a user Bearer token (obtained from POST /api/v1/users/login).';
@@ -15,53 +18,58 @@ function toMessage(error: unknown, fallback: string): string {
   return error instanceof BackendApiError ? error.message : fallback;
 }
 
+function queryString(params: Record<string, string | undefined>): string {
+  const usp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v) usp.set(k, v);
+  }
+  const s = usp.toString();
+  return s ? `?${s}` : '';
+}
+
 export const experienceTools = {
-  async searchExperiences(filters: { location?: string; category?: string }): Promise<Experience[]> {
-    let query = supabase
-      .from('experience')
-      .select('*')
-      .eq('status', 'published');
-
-    if (filters.location) {
-      query = query.ilike('location', `%${filters.location}%`);
-    }
-
-    if (filters.category) {
-      query = query.eq('category', filters.category);
-    }
-
-    const { data, error } = await query.limit(50);
-
-    if (error) {
-      console.error('Search experiences error:', error);
+  async searchExperiences(filters: { location?: string; category?: string }): Promise<ExperienceRecord[]> {
+    try {
+      const result = await backendRequest<{ success: boolean; experiences: ExperienceRecord[] }>(
+        'GET',
+        `/experiences${queryString({ location: filters.location, category: filters.category, limit: '50' })}`,
+      );
+      return Array.isArray(result?.experiences) ? result.experiences : [];
+    } catch (error) {
+      console.error('Search experiences error:', toMessage(error, 'unknown'));
       return [];
     }
-
-    return data || [];
   },
 
-  async getExperienceDetails(experienceId: string): Promise<{ experience: Experience; schedules: ExperienceSchedule[] } | null> {
-    const { data: experience, error: expError } = await supabase
-      .from('experience')
-      .select('*')
-      .eq('id', experienceId)
-      .single();
+  async getExperienceDetails(
+    experienceId: string,
+  ): Promise<{ experience: ExperienceRecord; schedules: ExperienceRecord[] } | null> {
+    try {
+      const detail = await backendRequest<{ success: boolean; experience: ExperienceRecord }>(
+        'GET',
+        `/experiences/${experienceId}`,
+      );
+      if (!detail?.experience) return null;
 
-    if (expError || !experience) {
+      // Schedules are a separate public endpoint; an empty/failed schedules
+      // fetch must not null out the whole detail response.
+      let schedules: ExperienceRecord[] = [];
+      try {
+        const sched = await backendRequest<{ success: boolean; schedules: ExperienceRecord[] }>(
+          'GET',
+          `/experiences/${experienceId}/schedules`,
+        );
+        schedules = Array.isArray(sched?.schedules) ? sched.schedules : [];
+      } catch {
+        schedules = [];
+      }
+
+      return { experience: detail.experience, schedules };
+    } catch (error) {
+      // 404 (or any error) → not found, matching the previous null contract.
+      if (!(error instanceof BackendApiError)) console.error('Get experience details error:', error);
       return null;
     }
-
-    const { data: schedules } = await supabase
-      .from('experience_schedule')
-      .select('*')
-      .eq('experienceId', experienceId)
-      .eq('status', 'available')
-      .gte('date', new Date().toISOString().split('T')[0]);
-
-    return {
-      experience,
-      schedules: schedules || [],
-    };
   },
 
   async bookExperience(params: {
