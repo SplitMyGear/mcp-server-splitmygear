@@ -1,5 +1,5 @@
 import { supabase, Conversation, Message } from '@/lib/supabase';
-import OpenAI from 'openai';
+import { getAIClient, isAIConfigured, chatModel } from '@/lib/ai-client';
 
 // Defense in depth (M6): values interpolated into a PostgREST .or() filter
 // string must be UUIDs. The route layer now UUID-validates ids and supplies a
@@ -11,10 +11,6 @@ function assertUuid(value: string, field: string): void {
     throw new Error(`Invalid ${field}: expected a UUID`);
   }
 }
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'MISSING_KEY',
-});
 
 export const messagingTools = {
   async sendMessage(
@@ -117,7 +113,7 @@ export const messagingTools = {
     userRole: 'renter' | 'vendor',
     tone: string = 'professional'
   ): Promise<string> {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!isAIConfigured()) {
       return 'AI drafting is disabled.';
     }
 
@@ -131,8 +127,8 @@ export const messagingTools = {
     `;
 
     try {
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+      const response = await getAIClient().chat.completions.create({
+        model: chatModel(),
         messages: [{ role: 'user', content: prompt }],
       });
 
