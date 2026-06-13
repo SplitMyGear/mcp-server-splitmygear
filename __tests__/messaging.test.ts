@@ -60,21 +60,26 @@ describe('Messaging Tools', () => {
 
   describe('sendMessage', () => {
     it('should send a message in existing conversation', async () => {
-      const result = await messagingTools.sendMessage('u1', 'u2', 'hello', 'c1');
+      const result = await messagingTools.sendMessage('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', 'hello', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc');
       expect(result.success).toBe(true);
       expect(result.message).toBeDefined();
     });
 
     it('should find existing conversation if none provided', async () => {
-      const result = await messagingTools.sendMessage('u1', 'u2', 'hello');
+      const result = await messagingTools.sendMessage('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', 'hello');
       expect(result.success).toBe(true);
       expect(supabase.from).toHaveBeenCalledWith('conversation');
+    });
+
+    it('rejects non-UUID ids (M6 filter-injection guard)', async () => {
+      const result = await messagingTools.sendMessage('not-a-uuid); drop', '22222222-2222-4222-8222-222222222222', 'hi');
+      expect(result.success).toBe(false);
     });
   });
 
   describe('getConversations', () => {
     it('should return user conversations', async () => {
-      const results = await messagingTools.getConversations('u1');
+      const results = await messagingTools.getConversations('11111111-1111-4111-8111-111111111111');
       expect(results).toHaveLength(1);
     });
   });

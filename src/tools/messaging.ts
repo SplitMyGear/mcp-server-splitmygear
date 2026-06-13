@@ -1,6 +1,17 @@
 import { supabase, Conversation, Message } from '@/lib/supabase';
 import OpenAI from 'openai';
 
+// Defense in depth (M6): values interpolated into a PostgREST .or() filter
+// string must be UUIDs. The route layer now UUID-validates ids and supplies a
+// server-derived senderId, but guarding here too means the raw query can never
+// be coerced into an injected filter.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function assertUuid(value: string, field: string): void {
+  if (!UUID_RE.test(value)) {
+    throw new Error(`Invalid ${field}: expected a UUID`);
+  }
+}
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || 'MISSING_KEY',
 });
@@ -13,6 +24,9 @@ export const messagingTools = {
     conversationId?: string
   ): Promise<{ success: boolean; message?: Message; error?: string }> {
     try {
+      assertUuid(senderId, 'senderId');
+      assertUuid(recipientId, 'recipientId');
+      if (conversationId) assertUuid(conversationId, 'conversationId');
       let convId = conversationId;
 
       if (!convId) {
@@ -68,6 +82,7 @@ export const messagingTools = {
   },
 
   async getConversations(userId: string): Promise<Conversation[]> {
+    assertUuid(userId, 'userId');
     const { data } = await supabase
       .from('conversation')
       .select('*')
