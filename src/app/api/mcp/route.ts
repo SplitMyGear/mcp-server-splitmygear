@@ -57,6 +57,7 @@ function buildServer(ctx: AuthContext): McpServer {
     maxPrice: z.number().optional().describe('Maximum price per day'),
     query: z.string().optional().describe('Natural language search query'),
   },
+  { readOnlyHint: true, openWorldHint: true },
   async ({ location, checkIn, checkOut, guests, category, minPrice, maxPrice, query }) => {
     const results = await listingTools.searchListings({
       location,
@@ -77,8 +78,9 @@ function buildServer(ctx: AuthContext): McpServer {
 server.tool(
   'get_listing_details',
   {
-    listingId: z.string().describe('The unique identifier of the listing'),
+    listingId: z.string().uuid().describe('The unique identifier of the listing'),
   },
+  { readOnlyHint: true, openWorldHint: true },
   async ({ listingId }) => {
     const listing = await listingTools.getListingDetails(listingId);
     return {
@@ -90,11 +92,12 @@ server.tool(
 server.tool(
   'check_availability',
   {
-    listingId: z.string().describe('The unique identifier of the listing'),
+    listingId: z.string().uuid().describe('The unique identifier of the listing'),
     checkIn: z.string().describe('Check-in date (ISO format)'),
     checkOut: z.string().describe('Check-out date (ISO format)'),
     guests: z.number().min(1).max(20).describe('Number of guests'),
   },
+  { readOnlyHint: true, openWorldHint: true },
   async ({ listingId, checkIn, checkOut, guests }) => {
     const availability = await listingTools.checkAvailability(listingId, checkIn, checkOut, guests);
     return {
@@ -106,11 +109,12 @@ server.tool(
 server.tool(
   'create_booking',
   {
-    listingId: z.string().describe('The unique identifier of the listing'),
+    listingId: z.string().uuid().describe('The unique identifier of the listing'),
     checkIn: z.string().describe('Check-in date (ISO format)'),
     checkOut: z.string().describe('Check-out date (ISO format)'),
     guests: z.number().min(1).max(20).describe('Number of guests'),
   },
+  { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   async ({ listingId, checkIn, checkOut, guests }) => {
     if (!ctx.userId) return requiresUser();
     const booking = await bookingTools.createBooking({
@@ -132,6 +136,7 @@ server.tool(
     bookingId: z.string().uuid().describe('The unique identifier of the booking'),
     reason: z.string().max(500).optional().describe('Reason for cancellation'),
   },
+  { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   async ({ bookingId, reason }) => {
     if (!ctx.userId) return requiresUser();
     // cancelBooking re-verifies booking.userId === ctx.userId server-side.
@@ -147,6 +152,7 @@ server.tool(
   {
     bookingId: z.string().uuid().describe('The unique identifier of the booking'),
   },
+  { readOnlyHint: true, openWorldHint: true },
   async ({ bookingId }) => {
     if (!ctx.userId) return requiresUser();
     const status = await bookingTools.getBookingStatus(bookingId);
@@ -166,9 +172,10 @@ server.tool(
 server.tool(
   'get_similar_listings',
   {
-    listingId: z.string().describe('The unique identifier of the listing'),
+    listingId: z.string().uuid().describe('The unique identifier of the listing'),
     limit: z.number().optional().default(5),
   },
+  { readOnlyHint: true, openWorldHint: true },
   async ({ listingId, limit }) => {
     const results = await listingTools.getSimilarListings(listingId, limit);
     return {
@@ -182,6 +189,7 @@ server.tool(
   {
     limit: z.number().min(1).max(50).optional().default(5),
   },
+  { readOnlyHint: true, openWorldHint: true },
   async ({ limit }) => {
     if (!ctx.userId) return requiresUser();
     const results = await listingTools.getPersonalizedRecommendations(ctx.userId, limit);
@@ -197,6 +205,7 @@ server.tool(
     category: z.string().describe('The category of the gear'),
     location: z.string().optional().describe('Optional location for local market analysis'),
   },
+  { readOnlyHint: true, openWorldHint: true },
   async ({ category, location }) => {
     const results = await pricingTools.suggestListingPrice(category, location);
     return {
@@ -208,8 +217,9 @@ server.tool(
 server.tool(
   'analyze_competitor_pricing',
   {
-    listingId: z.string().describe('The listing ID to analyze against competitors'),
+    listingId: z.string().uuid().describe('The listing ID to analyze against competitors'),
   },
+  { readOnlyHint: true, openWorldHint: true },
   async ({ listingId }) => {
     const results = await pricingTools.analyzeCompetitorPricing(listingId);
     return {
@@ -225,6 +235,7 @@ server.tool(
     category: z.string().describe('The category of the item'),
     keywords: z.array(z.string()).describe('List of key features or keywords'),
   },
+  { readOnlyHint: true, openWorldHint: true },
   async ({ name, category, keywords }) => {
     const description = await contentTools.generateListingDescription(name, category, keywords);
     return {
@@ -238,6 +249,7 @@ server.tool(
   {
     currentTitle: z.string().describe('The current listing title'),
   },
+  { readOnlyHint: true, openWorldHint: true },
   async ({ currentTitle }) => {
     const optimizedTitle = await contentTools.improveListingTitle(currentTitle);
     return {
@@ -252,6 +264,7 @@ server.tool(
     location: z.string().optional().describe('City or neighborhood'),
     category: z.string().optional().describe('Category (Outdoor, Tours, Fitness, etc.)'),
   },
+  { readOnlyHint: true, openWorldHint: true },
   async ({ location, category }) => {
     const results = await experienceTools.searchExperiences({ location, category });
     return {
@@ -263,8 +276,9 @@ server.tool(
 server.tool(
   'get_experience_details',
   {
-    experienceId: z.string().describe('The unique identifier of the experience'),
+    experienceId: z.string().uuid().describe('The unique identifier of the experience'),
   },
+  { readOnlyHint: true, openWorldHint: true },
   async ({ experienceId }) => {
     const details = await experienceTools.getExperienceDetails(experienceId);
     return {
@@ -279,6 +293,7 @@ server.tool(
     scheduleId: z.string().uuid().describe('The schedule ID to book'),
     guests: z.number().min(1).max(20).describe('Number of guests'),
   },
+  { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   async ({ scheduleId, guests }) => {
     if (!ctx.userId) return requiresUser();
     const booking = await experienceTools.bookExperience(scheduleId, ctx.userId, guests);
@@ -295,6 +310,7 @@ server.tool(
     content: z.string().min(1).max(5000).describe('The message content'),
     conversationId: z.string().uuid().optional().describe('Optional conversation ID'),
   },
+  { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   async ({ recipientId, content, conversationId }) => {
     if (!ctx.userId) return requiresUser();
     // Sender is the authenticated user — never caller-supplied (was an
@@ -310,6 +326,7 @@ server.tool(
 server.tool(
   'get_conversations',
   {},
+  { readOnlyHint: true, openWorldHint: true },
   async () => {
     if (!ctx.userId) return requiresUser();
     const results = await messagingTools.getConversations(ctx.userId);
@@ -326,6 +343,7 @@ server.tool(
     userRole: z.enum(['renter', 'vendor']).describe('Role of the sender'),
     tone: z.string().optional().default('professional'),
   },
+  { readOnlyHint: true, openWorldHint: true },
   async ({ context, userRole, tone }) => {
     const draft = await messagingTools.generateAIDraft(context, userRole, tone);
     return {

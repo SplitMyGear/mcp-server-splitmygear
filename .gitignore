@@ -25,3 +25,6 @@ coverage/
 
 # Vercel
 .vercel/
+
+# TypeScript incremental build cache (machine-specific)
+*.tsbuildinfo
