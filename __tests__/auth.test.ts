@@ -1,20 +1,5 @@
 export {};
 
-jest.mock('@supabase/supabase-js', () => ({
-  createClient: jest.fn(() => ({
-    auth: {
-      getUser: jest.fn(),
-    },
-    from: jest.fn(() => ({
-      select: jest.fn(() => ({
-        eq: jest.fn(() => ({
-          single: jest.fn(),
-        })),
-      })),
-    })),
-  })),
-}));
-
 import { authMiddleware } from '../src/middleware/auth';
 
 // Build a backend-style JWT (HS256, claims = { sub, role, exp }). No signature
@@ -30,8 +15,6 @@ describe('Auth Middleware', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.MCP_API_KEY = 'test-operator-key';
-    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
   });
 
   afterEach(() => {
@@ -124,58 +107,15 @@ describe('Auth Middleware', () => {
     expect(result.error).toBe('Invalid token');
   });
 
-  it('should accept valid API key', async () => {
-    const { createClient } = require('@supabase/supabase-js');
-    const mockSupabase = {
-      from: jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { user_id: 'user-456', role: 'vendor' },
-              error: null,
-            }),
-          }),
-        }),
-      }),
-    };
-    (createClient as jest.Mock).mockReturnValue(mockSupabase);
-
+  it('rejects a non-operator x-api-key with no bearer (api_keys path removed — no Supabase)', async () => {
     const mockRequest = {
-      headers: new Headers({ 'x-api-key': 'valid-api-key' }),
+      headers: new Headers({ 'x-api-key': 'some-other-key' }),
       nextUrl: { pathname: '/api/mcp' },
     } as any;
-    
-    const result = await authMiddleware(mockRequest);
-    
-    expect(result.success).toBe(true);
-    expect(result.userId).toBe('user-456');
-    expect(result.role).toBe('vendor');
-  });
 
-  it('should reject invalid API key', async () => {
-    const { createClient } = require('@supabase/supabase-js');
-    const mockSupabase = {
-      from: jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: null,
-              error: { message: 'Not found' },
-            }),
-          }),
-        }),
-      }),
-    };
-    (createClient as jest.Mock).mockReturnValue(mockSupabase);
-
-    const mockRequest = {
-      headers: new Headers({ 'x-api-key': 'invalid-api-key' }),
-      nextUrl: { pathname: '/api/mcp' },
-    } as any;
-    
     const result = await authMiddleware(mockRequest);
-    
+
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Invalid API key');
+    expect(result.error).toBe('No authentication provided');
   });
 });
