@@ -1,9 +1,19 @@
 import { supabase, Experience, ExperienceSchedule } from '@/lib/supabase';
-import Stripe from 'stripe';
+import { backendRequest, BackendApiError } from '@/lib/backend-client';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16',
-});
+/**
+ * `bookExperience` calls the backend REST API forwarding the caller's JWT
+ * (SPLIT-226 / M4) — the backend owns auth, capacity/availability, pricing and
+ * payment. The read tools (search/details) remain direct Supabase reads for now
+ * (migrating those to GET /experiences is tracked as a follow-up).
+ */
+
+const AUTH_REQUIRED =
+  'Authentication required: call with a user Bearer token (obtained from POST /api/v1/users/login).';
+
+function toMessage(error: unknown, fallback: string): string {
+  return error instanceof BackendApiError ? error.message : fallback;
+}
 
 export const experienceTools = {
   async searchExperiences(filters: { location?: string; category?: string }): Promise<Experience[]> {
@@ -54,68 +64,29 @@ export const experienceTools = {
     };
   },
 
-  async bookExperience(
-    scheduleId: string,
-    userId: string,
-    guests: number
-  ): Promise<{ success: boolean; bookingId?: string; clientSecret?: string; error?: string }> {
+  async bookExperience(params: {
+    experienceId: string;
+    scheduleId?: string;
+    guests: number;
+    token: string;
+  }): Promise<{ success: boolean; booking?: Record<string, unknown>; bookingId?: string; error?: string }> {
+    if (!params.token) return { success: false, error: AUTH_REQUIRED };
     try {
-      const { data: schedule, error: schError } = await supabase
-        .from('experience_schedule')
-        .select('*, experience:experienceId(pricePerPerson, hostId)')
-        .eq('id', scheduleId)
-        .single();
-
-      if (schError || !schedule) {
-        return { success: false, error: 'Schedule not found' };
-      }
-
-      const availableSpots = schedule.spotsTotal - schedule.spotsBooked;
-      if (availableSpots < guests) {
-        return { success: false, error: 'Not enough spots available' };
-      }
-
-      const totalPrice = schedule.experience.pricePerPerson * guests;
-
-      const { data: booking, error: bookError } = await supabase
-        .from('experience_booking')
-        .insert({
-          experienceId: schedule.experienceId,
-          scheduleId,
-          userId,
-          guests,
-          totalPrice,
-          status: 'pending',
-        })
-        .select()
-        .single();
-
-      if (bookError) {
-        return { success: false, error: bookError.message };
-      }
-
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(totalPrice * 100),
-        currency: 'usd',
-        metadata: {
-          experienceBookingId: booking.id,
-          userId,
+      const result = await backendRequest<{ success: boolean; booking: { id: string; [k: string]: unknown } }>(
+        'POST',
+        '/experiences/bookings',
+        {
+          token: params.token,
+          body: {
+            experienceId: params.experienceId,
+            ...(params.scheduleId ? { scheduleId: params.scheduleId } : {}),
+            numberOfGuests: params.guests,
+          },
         },
-      });
-
-      await supabase
-        .from('experience_booking')
-        .update({ paymentIntentId: paymentIntent.id })
-        .eq('id', booking.id);
-
-      return {
-        success: true,
-        bookingId: booking.id,
-        clientSecret: paymentIntent.client_secret || undefined,
-      };
+      );
+      return { success: true, booking: result.booking, bookingId: result.booking?.id };
     } catch (error) {
-      console.error('Book experience error:', error);
-      return { success: false, error: 'Failed to book experience' };
+      return { success: false, error: toMessage(error, 'Failed to book experience') };
     }
   },
 };
