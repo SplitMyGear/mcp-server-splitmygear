@@ -1,6 +1,24 @@
 import { supabase, Listing, SearchFilters } from '@/lib/supabase';
 import { aiService } from '@/lib/ai-service';
 
+// M6 (SPLIT-253): values interpolated into a PostgREST `.or()` filter string
+// must not be able to break out of their token. The free-text search query is
+// arbitrary user input, so strip the characters that delimit PostgREST filter
+// syntax — commas (separate OR conditions), parentheses (group), and the
+// value-quoting chars — before it reaches the `name.ilike.%…%` value.
+function sanitizeOrLikeValue(value: string): string {
+  return value.replace(/[,()*"\\]/g, ' ').trim();
+}
+
+// Date bounds are interpolated into a `.or()` filter too; require a real
+// ISO date prefix (YYYY-MM-DD …) so the value can neither carry
+// filter-injection characters nor be punctuation-only garbage.
+function assertIsoDateLike(value: string, field: string): void {
+  if (!/^\d{4}-\d{2}-\d{2}/.test(value) || Number.isNaN(Date.parse(value))) {
+    throw new Error(`Invalid ${field}: expected an ISO date`);
+  }
+}
+
 export const listingTools = {
   async searchListings(initialFilters: SearchFilters): Promise<Listing[]> {
     let filters = { ...initialFilters };
@@ -60,8 +78,12 @@ export const listingTools = {
     }
 
     if (filters.query && !filters.location && !filters.category) {
-      // If we only have a query, search name and description
-      query = query.or(`name.ilike.%${filters.query}%,description.ilike.%${filters.query}%`);
+      // If we only have a query, search name and description. Sanitize first —
+      // raw free text in a PostgREST .or() filter is an injection vector (M6).
+      const q = sanitizeOrLikeValue(filters.query);
+      if (q) {
+        query = query.or(`name.ilike.%${q}%,description.ilike.%${q}%`);
+      }
     }
 
     const { data, error } = await query.limit(50);
@@ -105,12 +127,21 @@ export const listingTools = {
       return { available: false, message: `Maximum guests for this listing is ${listing.maxGuests}` };
     }
 
-    const { data: bookings } = await supabase
+    // M6: guard the date bounds before they enter the .or() filter string.
+    assertIsoDateLike(checkIn, 'checkIn');
+    assertIsoDateLike(checkOut, 'checkOut');
+    const { data: bookings, error } = await supabase
       .from('booking')
       .select('*')
       .eq('listingId', listingId)
       .eq('status', 'confirmed')
       .or(`checkIn.lte.${checkOut},checkOut.gte.${checkIn}`);
+
+    // Fail safe: never report availability we could not actually confirm.
+    if (error) {
+      console.error('Availability check error:', error);
+      return { available: false, message: 'Unable to verify availability' };
+    }
 
     if (bookings && bookings.length > 0) {
       return { available: false, message: 'Selected dates are not available' };
