@@ -9,7 +9,7 @@ startCommand:
     properties:
       apiKey:
         type: string
-        description: "Optional SplitMyGear API key for authenticated tools (booking, messaging). Browse and search work without one."
+        description: "Required SplitMyGear API key (x-api-key). Authentication is mandatory — there is no public tier. A user JWT may be supplied instead for user-scoped tools."
     required: []
   configHeadersFunction: |
     (config) => {

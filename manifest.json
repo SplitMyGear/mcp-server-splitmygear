@@ -4,7 +4,7 @@
   "display_name": "SplitMyGear — Outdoor Gear Rental",
   "version": "1.0.0",
   "description": "Search, browse, and book outdoor gear rentals on SplitMyGear. Supports natural language search, availability checks, pricing analysis, AI-generated listing descriptions, experiences, and more.",
-  "long_description": "The SplitMyGear MCP server gives AI agents full access to the SplitMyGear outdoor gear rental platform. Browse 8 gear categories (camping, hiking, water sports, snow sports, climbing, cycling, fishing, photography), search with natural language, check availability, view pricing, and book gear or outdoor experiences. Vendors can generate AI-powered listing descriptions and get competitive pricing insights. Authenticated users can manage bookings and conversations.",
+  "long_description": "The SplitMyGear MCP server gives AI agents full access to the SplitMyGear outdoor gear rental platform. Browse 8 gear categories (camping, hiking, water sports, snow sports, climbing, cycling, fishing, photography), search with natural language, check availability, view pricing, and book gear or outdoor experiences. Vendors can generate AI-powered listing descriptions and get competitive pricing insights. Authenticated users can manage bookings and conversations. All access requires an API key (no public tier).",
   "author": {
     "name": "SplitMyGear",
     "url": "https://splitmygear.com"
@@ -43,9 +43,9 @@
   "user_config": {
     "api_key": {
       "type": "string",
-      "title": "API Key (optional)",
-      "description": "Your SplitMyGear API key. Required for booking and messaging. Browse and search work without one.",
-      "required": false,
+      "title": "API Key (required)",
+      "description": "Your SplitMyGear API key, sent as the x-api-key header. Required for all access — the server has no public tier and rejects unauthenticated requests.",
+      "required": true,
       "secret": true
     }
   }
