@@ -1,139 +1,123 @@
 import { listingTools } from '../src/tools/listings';
-import { supabase } from '../src/lib/supabase';
 
-jest.mock('../src/lib/ai-service', () => ({
-  aiService: {
-    parseSearchQuery: jest.fn().mockResolvedValue({}),
-    generateEmbedding: jest.fn().mockResolvedValue(new Array(1536).fill(0.1)),
-  },
-}));
-
-const mockListings = [
-  { id: 'listing-1', name: 'Test 1', category: 'camping', pricePerDay: 50, location: 'Seattle', status: 'available' },
-  { id: 'listing-2', name: 'Test 2', category: 'hiking', pricePerDay: 75, location: 'Portland', status: 'available' },
-];
-
-const createMockBuilder = (data: any[]): any => {
-  const builder: any = {
-    select: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    neq: jest.fn().mockReturnThis(),
-    ilike: jest.fn().mockReturnThis(),
-    gte: jest.fn().mockReturnThis(),
-    lte: jest.fn().mockReturnThis(),
-    or: jest.fn().mockReturnThis(),
-    in: jest.fn().mockReturnThis(),
-    not: jest.fn().mockReturnThis(),
-    order: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockResolvedValue({ data, error: null }),
-    single: jest.fn().mockImplementation(() => {
-      return Promise.resolve({ data: data[0] || null, error: data.length === 0 ? { message: 'Not found' } : null });
-    }),
-    then: jest.fn().mockImplementation((callback) => {
-      return Promise.resolve(callback({ data, error: null }));
-    }),
-  };
-  return builder;
-};
-
-jest.mock('../src/lib/supabase', () => {
-  // Hoist data if possible or use local copy
-  const localMockListings = [
-    { id: 'listing-1', name: 'Test 1', category: 'camping', pricePerDay: 50, location: 'Seattle', status: 'available' },
-    { id: 'listing-2', name: 'Test 2', category: 'hiking', pricePerDay: 75, location: 'Portland', status: 'available' },
-  ];
+// All listing read tools are backend REST clients now (SPLIT-226).
+const mockBackendRequest = jest.fn();
+jest.mock('../src/lib/backend-client', () => {
+  class BackendApiError extends Error {
+    status: number;
+    constructor(status: number, message: string) {
+      super(message);
+      this.name = 'BackendApiError';
+      this.status = status;
+    }
+  }
   return {
-    supabase: {
-      from: jest.fn((table: string) => {
-        if (table === 'listing') return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          neq: jest.fn().mockReturnThis(),
-          ilike: jest.fn().mockReturnThis(),
-          gte: jest.fn().mockReturnThis(),
-          lte: jest.fn().mockReturnThis(),
-          or: jest.fn().mockReturnThis(),
-          in: jest.fn().mockReturnThis(),
-          not: jest.fn().mockReturnThis(),
-          order: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue({ data: localMockListings, error: null }),
-          single: jest.fn().mockImplementation(() => {
-            return Promise.resolve({ data: localMockListings[0] || null, error: null });
-          }),
-          then: jest.fn().mockImplementation((callback) => {
-            return Promise.resolve(callback({ data: localMockListings, error: null }));
-          }),
-        };
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null }),
-        };
-      }),
-      rpc: jest.fn().mockResolvedValue({ data: localMockListings, error: null }),
-    },
+    BackendApiError,
+    backendRequest: (...args: unknown[]) => mockBackendRequest(...args),
   };
 });
 
-describe('Listing Tools', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    process.env.OPENAI_API_KEY = 'test-key';
-  });
+const TOKEN = 'header.payload.sig';
 
-  it('should search listings', async () => {
-    const results = await listingTools.searchListings({ location: 'Seattle' });
-    expect(results).toBeDefined();
-  });
+describe('Listing Tools (backend REST)', () => {
+  beforeEach(() => jest.clearAllMocks());
 
-  it('should get listing details', async () => {
-    const result = await listingTools.getListingDetails('listing-1');
-    expect(result).toBeDefined();
-  });
-
-  describe('Vector Search', () => {
-    it('should call match_listings RPC when query is present', async () => {
-      const results = await listingTools.searchListings({ query: 'cozy tent' });
-      expect(supabase.rpc).toHaveBeenCalledWith('match_listings', expect.objectContaining({
-        match_threshold: 0.5
-      }));
-      expect(results).toBeDefined();
+  describe('searchListings', () => {
+    it('uses GET /listings with structured filters when there is no query', async () => {
+      mockBackendRequest.mockResolvedValue({ data: [{ id: 'l1' }], total: 1 });
+      const results = await listingTools.searchListings({ location: 'Seattle', category: 'camping' });
+      expect(results).toEqual([{ id: 'l1' }]);
+      const [method, path] = mockBackendRequest.mock.calls[0];
+      expect(method).toBe('GET');
+      expect(path).toMatch(/^\/listings\?/);
+      expect(path).toContain('location=Seattle');
+      expect(path).toContain('category=camping');
     });
 
-    it('should call match_listings RPC for similar listings if embedding exists', async () => {
-      (supabase.from as jest.Mock).mockImplementationOnce(() => ({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({ 
-          data: { id: 'l1', category: 'camping', embedding: [0.1, 0.2] }, 
-          error: null 
-        }),
-      }));
+    it('uses the vibe (semantic) endpoint for a natural-language query', async () => {
+      mockBackendRequest.mockResolvedValue({ success: true, data: [{ id: 'v1' }] });
+      const results = await listingTools.searchListings({ query: 'cozy lakeside kayak' });
+      expect(results).toEqual([{ id: 'v1' }]);
+      expect(mockBackendRequest.mock.calls[0][1]).toContain('/listings/search/vibe?q=');
+    });
 
-      await listingTools.getSimilarListings('listing-1');
-      expect(supabase.rpc).toHaveBeenCalledWith('match_listings', expect.objectContaining({
-        match_threshold: 0.7
-      }));
+    it('falls through to structured browse when vibe returns nothing', async () => {
+      mockBackendRequest
+        .mockResolvedValueOnce({ success: true, data: [] }) // vibe
+        .mockResolvedValueOnce({ data: [{ id: 'b1' }] }); // browse
+      const results = await listingTools.searchListings({ query: 'obscure' });
+      expect(results).toEqual([{ id: 'b1' }]);
+      expect(mockBackendRequest.mock.calls[1][1]).toMatch(/^\/listings\?/);
+    });
+
+    it('returns [] on a backend error', async () => {
+      mockBackendRequest.mockRejectedValue(new Error('boom'));
+      expect(await listingTools.searchListings({ location: 'X' })).toEqual([]);
+    });
+  });
+
+  describe('getListingDetails', () => {
+    it('returns the listing from GET /listings/:id', async () => {
+      mockBackendRequest.mockResolvedValue({ id: 'l1', name: 'Tent' });
+      const result = await listingTools.getListingDetails('l1');
+      expect(result).toEqual({ id: 'l1', name: 'Tent' });
+      expect(mockBackendRequest).toHaveBeenCalledWith('GET', '/listings/l1');
+    });
+
+    it('returns null on a 404', async () => {
+      const { BackendApiError } = jest.requireMock('../src/lib/backend-client');
+      mockBackendRequest.mockRejectedValue(new BackendApiError(404, 'not found'));
+      expect(await listingTools.getListingDetails('missing')).toBeNull();
+    });
+  });
+
+  describe('checkAvailability', () => {
+    it('maps an available backend response', async () => {
+      mockBackendRequest.mockResolvedValue({ isAvailable: true });
+      const result = await listingTools.checkAvailability('l1', '2026-09-01', '2026-09-03', 2);
+      expect(result.available).toBe(true);
+      expect(mockBackendRequest.mock.calls[0][1]).toContain('/listings/l1/availability?');
+    });
+
+    it('maps an unavailable backend response', async () => {
+      mockBackendRequest.mockResolvedValue({ isAvailable: false, conflicts: [{ type: 'booking' }] });
+      const result = await listingTools.checkAvailability('l1', '2026-09-01', '2026-09-03', 2);
+      expect(result.available).toBe(false);
+    });
+
+    it('reports "Listing not found" on a 404', async () => {
+      const { BackendApiError } = jest.requireMock('../src/lib/backend-client');
+      mockBackendRequest.mockRejectedValue(new BackendApiError(404, 'nope'));
+      const result = await listingTools.checkAvailability('missing', '2026-09-01', '2026-09-03', 2);
+      expect(result.available).toBe(false);
+      expect(result.message).toBe('Listing not found');
+    });
+  });
+
+  describe('getSimilarListings', () => {
+    it('returns the data array from GET /listings/:id/similar', async () => {
+      mockBackendRequest.mockResolvedValue({ success: true, data: [{ id: 'l2' }], count: 1 });
+      const results = await listingTools.getSimilarListings('l1', 5);
+      expect(results).toEqual([{ id: 'l2' }]);
+      expect(mockBackendRequest.mock.calls[0][1]).toContain('/listings/l1/similar?limit=5');
     });
   });
 
   describe('getPersonalizedRecommendations', () => {
-    it('should fallback if no history', async () => {
-      (supabase.from as jest.Mock).mockImplementation((table) => {
-        if (table === 'booking') return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null }),
-        };
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          order: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue({ data: mockListings, error: null }),
-        };
-      });
-      const results = await listingTools.getPersonalizedRecommendations('u1');
-      expect(results.length).toBeGreaterThan(0);
+    it('forwards the token to GET /ai/recommendations/for-me', async () => {
+      mockBackendRequest.mockResolvedValue([{ id: 'r1' }]);
+      const results = await listingTools.getPersonalizedRecommendations(TOKEN, 5);
+      expect(results).toEqual([{ id: 'r1' }]);
+      expect(mockBackendRequest).toHaveBeenCalledWith(
+        'GET',
+        expect.stringContaining('/ai/recommendations/for-me'),
+        { token: TOKEN },
+      );
+    });
+
+    it('returns [] without a token (never queries the backend)', async () => {
+      expect(await listingTools.getPersonalizedRecommendations('', 5)).toEqual([]);
+      expect(mockBackendRequest).not.toHaveBeenCalled();
     });
   });
 });

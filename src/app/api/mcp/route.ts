@@ -187,8 +187,9 @@ server.tool(
   },
   { readOnlyHint: true, openWorldHint: true },
   async ({ limit }) => {
-    if (!ctx.userId) return requiresUser();
-    const results = await listingTools.getPersonalizedRecommendations(ctx.userId, limit);
+    if (!ctx.token) return requiresUser();
+    // The backend derives the user from the forwarded JWT (GET /ai/recommendations/for-me).
+    const results = await listingTools.getPersonalizedRecommendations(ctx.token, limit);
     return {
       content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
     };
