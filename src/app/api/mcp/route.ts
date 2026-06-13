@@ -14,19 +14,22 @@ import { rateLimiter } from '@/middleware/rate-limit';
 interface AuthContext {
   userId?: string;
   role?: string;
+  /** Raw backend JWT, forwarded to the REST API by user-scoped tools (M4). */
+  token?: string;
 }
 
 // Result returned by a user-scoped tool invoked without a user principal (e.g.
-// the operator key, which has no userId). User-scoped tools must NOT accept a
-// caller-supplied id — that was the IDOR (M3). They derive the acting user
-// from the authenticated bearer token instead.
+// the operator key, which carries no per-user token). User-scoped tools must
+// NOT accept a caller-supplied id — that was the IDOR (M3). They derive the
+// acting user from the authenticated bearer token and forward it to the backend
+// REST API, which is the single authority for auth/RBAC/ownership (M4).
 function requiresUser() {
   return {
     isError: true as const,
     content: [
       {
         type: 'text' as const,
-        text: 'This tool requires user authentication: call it with a Supabase bearer token, not the operator key.',
+        text: 'This tool requires user authentication: call it with a user Bearer token (from POST /api/v1/users/login), not the operator key.',
       },
     ],
   };
@@ -110,19 +113,17 @@ server.tool(
   'create_booking',
   {
     listingId: z.string().uuid().describe('The unique identifier of the listing'),
-    checkIn: z.string().describe('Check-in date (ISO format)'),
-    checkOut: z.string().describe('Check-out date (ISO format)'),
-    guests: z.number().min(1).max(20).describe('Number of guests'),
+    checkIn: z.string().describe('Rental start date (ISO format)'),
+    checkOut: z.string().describe('Rental end date (ISO format)'),
   },
   { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-  async ({ listingId, checkIn, checkOut, guests }) => {
-    if (!ctx.userId) return requiresUser();
+  async ({ listingId, checkIn, checkOut }) => {
+    if (!ctx.token) return requiresUser();
     const booking = await bookingTools.createBooking({
       listingId,
       checkIn,
       checkOut,
-      guests,
-      userId: ctx.userId,
+      token: ctx.token,
     });
     return {
       content: [{ type: 'text', text: JSON.stringify(booking, null, 2) }],
@@ -134,13 +135,13 @@ server.tool(
   'cancel_booking',
   {
     bookingId: z.string().uuid().describe('The unique identifier of the booking'),
-    reason: z.string().max(500).optional().describe('Reason for cancellation'),
   },
   { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
-  async ({ bookingId, reason }) => {
-    if (!ctx.userId) return requiresUser();
-    // cancelBooking re-verifies booking.userId === ctx.userId server-side.
-    const result = await bookingTools.cancelBooking(bookingId, ctx.userId, reason);
+  async ({ bookingId }) => {
+    if (!ctx.token) return requiresUser();
+    // The backend enforces ownership (renter/vendor) from the forwarded token
+    // and handles any refund.
+    const result = await bookingTools.cancelBooking(bookingId, ctx.token);
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
     };
@@ -154,15 +155,10 @@ server.tool(
   },
   { readOnlyHint: true, openWorldHint: true },
   async ({ bookingId }) => {
-    if (!ctx.userId) return requiresUser();
-    const status = await bookingTools.getBookingStatus(bookingId);
-    // Only the booking's owner may see it (was an IDOR leaking owner id).
-    if (status && (status as { userId?: string }).userId !== ctx.userId) {
-      return {
-        isError: true,
-        content: [{ type: 'text', text: 'Booking not found.' }],
-      };
-    }
+    if (!ctx.token) return requiresUser();
+    // GET /bookings/:id is ownership-gated server-side (renter/vendor/admin),
+    // so the backend — not this layer — enforces who may see the booking.
+    const status = await bookingTools.getBookingStatus(bookingId, ctx.token);
     return {
       content: [{ type: 'text', text: JSON.stringify(status, null, 2) }],
     };
@@ -290,13 +286,19 @@ server.tool(
 server.tool(
   'book_experience',
   {
-    scheduleId: z.string().uuid().describe('The schedule ID to book'),
+    experienceId: z.string().uuid().describe('The experience to book'),
+    scheduleId: z.string().uuid().optional().describe('Optional specific schedule/time slot'),
     guests: z.number().min(1).max(20).describe('Number of guests'),
   },
   { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-  async ({ scheduleId, guests }) => {
-    if (!ctx.userId) return requiresUser();
-    const booking = await experienceTools.bookExperience(scheduleId, ctx.userId, guests);
+  async ({ experienceId, scheduleId, guests }) => {
+    if (!ctx.token) return requiresUser();
+    const booking = await experienceTools.bookExperience({
+      experienceId,
+      scheduleId,
+      guests,
+      token: ctx.token,
+    });
     return {
       content: [{ type: 'text', text: JSON.stringify(booking, null, 2) }],
     };
@@ -312,11 +314,10 @@ server.tool(
   },
   { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   async ({ recipientId, content, conversationId }) => {
-    if (!ctx.userId) return requiresUser();
-    // Sender is the authenticated user — never caller-supplied (was an
-    // impersonation vector). UUID-validated ids also close the .or() filter
-    // injection in messagingTools (M6).
-    const result = await messagingTools.sendMessage(ctx.userId, recipientId, content, conversationId);
+    if (!ctx.token) return requiresUser();
+    // The backend derives the sender from the forwarded token — never
+    // caller-supplied (was an impersonation vector).
+    const result = await messagingTools.sendMessage({ recipientId, content, conversationId, token: ctx.token });
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
     };
@@ -328,8 +329,8 @@ server.tool(
   {},
   { readOnlyHint: true, openWorldHint: true },
   async () => {
-    if (!ctx.userId) return requiresUser();
-    const results = await messagingTools.getConversations(ctx.userId);
+    if (!ctx.token) return requiresUser();
+    const results = await messagingTools.getConversations(ctx.token);
     return {
       content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
     };
@@ -409,7 +410,7 @@ async function handleRequest(request: NextRequest) {
     // Stateless: a brand-new server + transport per request (no session id),
     // with JSON responses enabled so a single POST completes the
     // initialize/tools-call round-trip without a persistent SSE session.
-    const server = buildServer({ userId: authResult.userId, role: authResult.role });
+    const server = buildServer({ userId: authResult.userId, role: authResult.role, token: authResult.token });
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,

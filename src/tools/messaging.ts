@@ -1,91 +1,76 @@
-import { supabase, Conversation, Message } from '@/lib/supabase';
+import { supabase, Message } from '@/lib/supabase';
 import { getAIClient, isAIConfigured, chatModel } from '@/lib/ai-client';
+import { backendRequest, BackendApiError } from '@/lib/backend-client';
 
-// Defense in depth (M6): values interpolated into a PostgREST .or() filter
-// string must be UUIDs. The route layer now UUID-validates ids and supplies a
-// server-derived senderId, but guarding here too means the raw query can never
-// be coerced into an injected filter.
+/**
+ * `sendMessage` / `getConversations` call the backend REST API forwarding the
+ * caller's JWT (SPLIT-226 / M4): the backend derives the sender from the token
+ * (never caller-supplied — closes the impersonation vector) and owns the chat
+ * schema. `getMessages`/`markAsRead` remain Supabase helpers (not exposed as
+ * tools); `generateAIDraft` is a pure AI call.
+ */
+
+// Defense in depth (M6): the route layer UUID-validates ids, but validating
+// here too avoids a pointless backend round-trip on obviously-bad input.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function assertUuid(value: string, field: string): void {
-  if (!UUID_RE.test(value)) {
-    throw new Error(`Invalid ${field}: expected a UUID`);
-  }
+function isUuid(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
+const AUTH_REQUIRED =
+  'Authentication required: call with a user Bearer token (obtained from POST /api/v1/users/login).';
+
+function toMessage(error: unknown, fallback: string): string {
+  return error instanceof BackendApiError ? error.message : fallback;
 }
 
 export const messagingTools = {
-  async sendMessage(
-    senderId: string,
-    recipientId: string,
-    content: string,
-    conversationId?: string
-  ): Promise<{ success: boolean; message?: Message; error?: string }> {
+  async sendMessage(params: {
+    recipientId: string;
+    content: string;
+    conversationId?: string;
+    token: string;
+  }): Promise<{ success: boolean; message?: Record<string, unknown>; conversationId?: string; error?: string }> {
+    if (!params.token) return { success: false, error: AUTH_REQUIRED };
+    if (!isUuid(params.recipientId)) {
+      return { success: false, error: 'Invalid recipientId: expected a UUID' };
+    }
+    if (params.conversationId && !isUuid(params.conversationId)) {
+      return { success: false, error: 'Invalid conversationId: expected a UUID' };
+    }
     try {
-      assertUuid(senderId, 'senderId');
-      assertUuid(recipientId, 'recipientId');
-      if (conversationId) assertUuid(conversationId, 'conversationId');
-      let convId = conversationId;
-
+      let convId = params.conversationId;
       if (!convId) {
-        // Try to find existing conversation between these two users
-        const { data: existingConv } = await supabase
-          .from('conversation')
-          .select('id')
-          .or(`and(participant1Id.eq.${senderId},participant2Id.eq.${recipientId}),and(participant1Id.eq.${recipientId},participant2Id.eq.${senderId})`)
-          .single();
-
-        if (existingConv) {
-          convId = existingConv.id;
-        } else {
-          // Create new conversation
-          const { data: newConv, error: convError } = await supabase
-            .from('conversation')
-            .insert({
-              participant1Id: senderId,
-              participant2Id: recipientId,
-            })
-            .select()
-            .single();
-
-          if (convError) return { success: false, error: convError.message };
-          convId = newConv.id;
-        }
+        // Resolve (or create) the conversation with the recipient. The backend
+        // derives the initiator from the token.
+        const conversation = await backendRequest<{ id: string }>('POST', '/chat/conversations', {
+          token: params.token,
+          body: { participantId: params.recipientId },
+        });
+        convId = conversation?.id;
+        if (!convId) return { success: false, error: 'Failed to resolve conversation' };
       }
 
-      const { data: message, error: msgError } = await supabase
-        .from('message')
-        .insert({
-          conversationId: convId,
-          senderId,
-          content,
-          isRead: false,
-        })
-        .select()
-        .single();
-
-      if (msgError) return { success: false, error: msgError.message };
-
-      // Update conversation timestamp
-      await supabase
-        .from('conversation')
-        .update({ updatedAt: new Date().toISOString() })
-        .eq('id', convId);
-
-      return { success: true, message };
+      const message = await backendRequest<Record<string, unknown>>(
+        'POST',
+        `/chat/conversations/${convId}/messages`,
+        { token: params.token, body: { content: params.content } },
+      );
+      return { success: true, message, conversationId: convId };
     } catch (error) {
-      console.error('Send message error:', error);
-      return { success: false, error: 'Failed to send message' };
+      return { success: false, error: toMessage(error, 'Failed to send message') };
     }
   },
 
-  async getConversations(userId: string): Promise<Conversation[]> {
-    assertUuid(userId, 'userId');
-    const { data } = await supabase
-      .from('conversation')
-      .select('*')
-      .or(`participant1Id.eq.${userId},participant2Id.eq.${userId}`)
-      .order('updatedAt', { ascending: false });
-
-    return data || [];
+  async getConversations(token: string): Promise<Record<string, unknown>[]> {
+    if (!token) return [];
+    try {
+      const result = await backendRequest<Record<string, unknown>[]>('GET', '/chat/conversations', { token });
+      return Array.isArray(result) ? result : [];
+    } catch (error) {
+      console.error('Get conversations error:', error);
+      return [];
+    }
   },
 
   async getMessages(conversationId: string, limit = 50): Promise<Message[]> {
@@ -118,10 +103,10 @@ export const messagingTools = {
     }
 
     const prompt = `
-      You are an AI assistant for SplitMyGear. 
+      You are an AI assistant for SplitMyGear.
       Draft a message for a ${userRole} based on the following context:
       "${context}"
-      
+
       Tone: ${tone}
       Keep it concise, friendly, and helpful.
     `;

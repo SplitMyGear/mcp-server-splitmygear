@@ -1,57 +1,106 @@
 import { bookingTools } from '../src/tools/bookings';
-import { supabase } from '../src/lib/supabase';
 
-const mockListings = [{ id: 'listing-1', title: 'Test', pricePerDay: 50, maxGuests: 4 }];
-const mockBookings = [{ id: 'booking-1', userId: 'user-1', listingId: 'listing-1', status: 'confirmed', paymentIntentId: 'pi_1' }];
-
-const createMockBuilder = (data: any[]): any => ({
-  select: jest.fn().mockReturnThis(),
-  eq: jest.fn().mockReturnThis(),
-  in: jest.fn().mockReturnThis(),
-  order: jest.fn().mockReturnThis(),
-  limit: jest.fn().mockResolvedValue({ data, error: null }),
-  single: jest.fn().mockImplementation(() => ({ 
-    data: data[0] || null, 
-    error: data.length === 0 ? { message: 'Not found' } : null 
-  })),
-  insert: jest.fn().mockReturnThis(),
-  update: jest.fn().mockReturnThis(),
-  then: jest.fn().mockImplementation((cb) => Promise.resolve(cb({ data, error: null }))),
+// Mock the backend REST client (SPLIT-226 / M4): booking tools now forward the
+// caller's JWT to the backend instead of writing to Supabase/Stripe.
+const mockBackendRequest = jest.fn();
+jest.mock('../src/lib/backend-client', () => {
+  class BackendApiError extends Error {
+    status: number;
+    constructor(status: number, message: string) {
+      super(message);
+      this.name = 'BackendApiError';
+      this.status = status;
+    }
+  }
+  return {
+    BackendApiError,
+    backendRequest: (...args: unknown[]) => mockBackendRequest(...args),
+  };
 });
 
-jest.mock('../src/lib/supabase', () => ({
-  supabase: {
-    from: jest.fn((table: string) => {
-      if (table === 'listing') return createMockBuilder(mockListings);
-      if (table === 'booking') return createMockBuilder(mockBookings);
-      return createMockBuilder([]);
-    }),
-  },
-}));
+const TOKEN = 'header.payload.sig';
 
-jest.mock('stripe', () => jest.fn().mockImplementation(() => ({
-  paymentIntents: { create: jest.fn().mockResolvedValue({ id: 'pi_new', client_secret: 'secret' }) },
-  refunds: { create: jest.fn().mockResolvedValue({ id: 'ref_1' }) },
-})));
+function defaultBackend() {
+  mockBackendRequest.mockImplementation(async (method: string, path: string) => {
+    if (method === 'GET' && path.startsWith('/listings/')) return { pricePerDay: '50.00' };
+    if (method === 'POST' && path === '/bookings') return { id: 'booking-1', status: 'pending', totalPrice: 100 };
+    if (method === 'PUT' && /^\/bookings\/.+\/status$/.test(path)) return { id: 'booking-1', status: 'cancelled' };
+    if (method === 'GET' && /^\/bookings\/.+$/.test(path)) return { id: 'booking-1', status: 'pending' };
+    throw new Error(`unexpected request ${method} ${path}`);
+  });
+}
 
-describe('Booking Tools Exhaustive', () => {
-  it('should create booking', async () => {
-    const result = await bookingTools.createBooking({
-      listingId: 'listing-1', checkIn: '2024-01-01', checkOut: '2024-01-02', guests: 2, userId: 'u1'
-    });
-    expect(result.success).toBe(true);
+describe('Booking Tools (backend REST)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    defaultBackend();
   });
 
-  it('should fail if listing not found', async () => {
-    (supabase.from as jest.Mock).mockImplementationOnce(() => createMockBuilder([]));
+  it('creates a booking via POST /bookings with the forwarded token', async () => {
     const result = await bookingTools.createBooking({
-      listingId: 'none', checkIn: '2024-01-01', checkOut: '2024-01-02', guests: 2, userId: 'u1'
+      listingId: 'listing-1',
+      checkIn: '2026-07-01',
+      checkOut: '2026-07-03',
+      token: TOKEN,
+    });
+    expect(result.success).toBe(true);
+    expect(result.booking?.id).toBe('booking-1');
+    // The POST carried the token and mapped checkIn/checkOut → startDate/endDate.
+    const post = mockBackendRequest.mock.calls.find((c) => c[0] === 'POST' && c[1] === '/bookings');
+    expect(post?.[2]).toMatchObject({ token: TOKEN });
+    expect(post?.[2].body).toMatchObject({ listingId: 'listing-1', startDate: '2026-07-01', endDate: '2026-07-03' });
+    // guests is NOT forwarded (backend whitelist would 400 on it).
+    expect(post?.[2].body).not.toHaveProperty('guests');
+  });
+
+  it('requires a token to create a booking', async () => {
+    const result = await bookingTools.createBooking({
+      listingId: 'listing-1',
+      checkIn: '2026-07-01',
+      checkOut: '2026-07-03',
+      token: '',
     });
     expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Authentication required/);
+    expect(mockBackendRequest).not.toHaveBeenCalled();
   });
 
-  it('should cancel booking', async () => {
-    const result = await bookingTools.cancelBooking('booking-1', 'user-1');
+  it('surfaces the backend error message when booking creation fails', async () => {
+    const { BackendApiError } = jest.requireMock('../src/lib/backend-client');
+    mockBackendRequest.mockImplementation(async (method: string) => {
+      if (method === 'GET') return { pricePerDay: '50.00' };
+      throw new BackendApiError(400, 'totalPrice must be a positive number');
+    });
+    const result = await bookingTools.createBooking({
+      listingId: 'listing-1',
+      checkIn: '2026-07-01',
+      checkOut: '2026-07-03',
+      token: TOKEN,
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('totalPrice must be a positive number');
+  });
+
+  it('cancels a booking via PUT /bookings/:id/status', async () => {
+    const result = await bookingTools.cancelBooking('booking-1', TOKEN);
     expect(result.success).toBe(true);
+    expect(mockBackendRequest).toHaveBeenCalledWith(
+      'PUT',
+      '/bookings/booking-1/status',
+      expect.objectContaining({ token: TOKEN, body: { status: 'cancelled' } }),
+    );
+  });
+
+  it('requires a token to cancel a booking', async () => {
+    const result = await bookingTools.cancelBooking('booking-1', '');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Authentication required/);
+  });
+
+  it('fetches booking status via GET /bookings/:id with the token', async () => {
+    const result = await bookingTools.getBookingStatus('booking-1', TOKEN);
+    expect(result.success).toBe(true);
+    expect(result.booking?.id).toBe('booking-1');
+    expect(mockBackendRequest).toHaveBeenCalledWith('GET', '/bookings/booking-1', { token: TOKEN });
   });
 });

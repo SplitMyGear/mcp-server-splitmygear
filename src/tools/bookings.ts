@@ -1,165 +1,100 @@
-import { supabase, Booking } from '@/lib/supabase';
-import Stripe from 'stripe';
+import { backendRequest, BackendApiError } from '@/lib/backend-client';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16',
-});
+/**
+ * Booking tools call the SplitMyGear backend REST API (/api/v1) forwarding the
+ * caller's JWT (SPLIT-226 / M4). The backend owns auth, RBAC, ownership checks,
+ * server-authoritative pricing (SPLIT-157), risk scoring and payment — none of
+ * which the previous direct Supabase+Stripe writes honoured (they also targeted
+ * a column schema that diverged from the real `booking` entity).
+ */
 
-interface CreateBookingData {
-  listingId: string;
-  checkIn: string;
-  checkOut: string;
-  guests: number;
-  userId: string;
+export interface BackendBooking {
+  id: string;
+  status?: string;
+  totalPrice?: number | string;
+  [key: string]: unknown;
+}
+
+const AUTH_REQUIRED =
+  'Authentication required: call with a user Bearer token (obtained from POST /api/v1/users/login).';
+
+function toMessage(error: unknown, fallback: string): string {
+  return error instanceof BackendApiError ? error.message : fallback;
 }
 
 export const bookingTools = {
-  async createBooking(data: CreateBookingData): Promise<{ success: boolean; booking?: Booking; error?: string }> {
+  async createBooking(data: {
+    listingId: string;
+    checkIn: string;
+    checkOut: string;
+    token: string;
+  }): Promise<{ success: boolean; booking?: BackendBooking; error?: string }> {
+    if (!data.token) return { success: false, error: AUTH_REQUIRED };
     try {
-      const { data: listing, error: listingError } = await supabase
-        .from('listing')
-        .select('pricePerDay, vendorId')
-        .eq('id', data.listingId)
-        .single();
-
-      if (listingError || !listing) {
-        return { success: false, error: 'Listing not found' };
+      // The backend recomputes the authoritative total (SPLIT-157) but its DTO
+      // requires a positive totalPrice. Send a best-effort estimate from the
+      // public listing; the response reflects the server's real price.
+      let totalPrice = 1;
+      try {
+        const listing = await backendRequest<{ pricePerDay?: number | string }>(
+          'GET',
+          `/listings/${data.listingId}`,
+        );
+        const perDay = parseFloat(String(listing?.pricePerDay ?? '0')) || 0;
+        const days = Math.max(
+          1,
+          Math.ceil((new Date(data.checkOut).getTime() - new Date(data.checkIn).getTime()) / 86_400_000),
+        );
+        if (perDay > 0) totalPrice = Math.round(perDay * days * 100) / 100;
+      } catch {
+        // Listing lookup failed — fall back to a nominal value; the server
+        // recomputes regardless, and an invalid listingId surfaces below.
       }
 
-      const checkIn = new Date(data.checkIn);
-      const checkOut = new Date(data.checkOut);
-      const days = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
-      const totalPrice = listing.pricePerDay * days;
-
-      const { data: booking, error } = await supabase
-        .from('booking')
-        .insert({
+      const booking = await backendRequest<BackendBooking>('POST', '/bookings', {
+        token: data.token,
+        body: {
           listingId: data.listingId,
-          userId: data.userId,
-          checkIn: data.checkIn,
-          checkOut: data.checkOut,
-          guests: data.guests,
+          startDate: data.checkIn,
+          endDate: data.checkOut,
           totalPrice,
-          status: 'pending',
-        })
-        .select()
-        .single();
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(totalPrice * 100),
-        currency: 'usd',
-        metadata: {
-          bookingId: booking.id,
-          userId: data.userId,
         },
       });
-
-      await supabase
-        .from('booking')
-        .update({ paymentIntentId: paymentIntent.id })
-        .eq('id', booking.id);
-
-      return {
-        success: true,
-        booking: {
-          ...booking,
-          clientSecret: paymentIntent.client_secret,
-        },
-      };
+      return { success: true, booking };
     } catch (error) {
-      console.error('Create booking error:', error);
-      return { success: false, error: 'Failed to create booking' };
+      return { success: false, error: toMessage(error, 'Failed to create booking') };
     }
   },
 
   async cancelBooking(
     bookingId: string,
-    userId: string,
-    reason?: string
-  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    token: string,
+  ): Promise<{ success: boolean; booking?: BackendBooking; message?: string; error?: string }> {
+    if (!token) return { success: false, error: AUTH_REQUIRED };
     try {
-      const { data: booking, error } = await supabase
-        .from('booking')
-        .select('*')
-        .eq('id', bookingId)
-        .single();
-
-      if (error || !booking) {
-        return { success: false, error: 'Booking not found' };
-      }
-
-      if (booking.userId !== userId) {
-        return { success: false, error: 'Unauthorized' };
-      }
-
-      if (booking.status === 'cancelled') {
-        return { success: false, error: 'Booking already cancelled' };
-      }
-
-      await supabase
-        .from('booking')
-        .update({ status: 'cancelled', cancellationReason: reason })
-        .eq('id', bookingId);
-
-      if (booking.paymentIntentId) {
-        await stripe.refunds.create({
-          payment_intent: booking.paymentIntentId,
-        });
-      }
-
-      return { success: true, message: 'Booking cancelled successfully' };
+      // The backend enforces that only the renter/vendor may cancel and handles
+      // any refund. Ownership is derived from the forwarded token, not a param.
+      const booking = await backendRequest<BackendBooking>('PUT', `/bookings/${bookingId}/status`, {
+        token,
+        body: { status: 'cancelled' },
+      });
+      return { success: true, booking, message: 'Booking cancelled successfully' };
     } catch (error) {
-      console.error('Cancel booking error:', error);
-      return { success: false, error: 'Failed to cancel booking' };
+      return { success: false, error: toMessage(error, 'Failed to cancel booking') };
     }
   },
 
-  async getBookingStatus(bookingId: string): Promise<Booking | null> {
-    const { data, error } = await supabase
-      .from('booking')
-      .select('*')
-      .eq('id', bookingId)
-      .single();
-
-    if (error) {
-      return null;
+  async getBookingStatus(
+    bookingId: string,
+    token: string,
+  ): Promise<{ success: boolean; booking?: BackendBooking; error?: string }> {
+    if (!token) return { success: false, error: AUTH_REQUIRED };
+    try {
+      // GET /bookings/:id is ownership-gated server-side (renter/vendor/admin).
+      const booking = await backendRequest<BackendBooking>('GET', `/bookings/${bookingId}`, { token });
+      return { success: true, booking };
+    } catch (error) {
+      return { success: false, error: toMessage(error, 'Failed to fetch booking') };
     }
-
-    return data;
-  },
-
-  async getUserBookings(userId: string): Promise<Booking[]> {
-    const { data } = await supabase
-      .from('booking')
-      .select('*')
-      .eq('userId', userId)
-      .order('createdAt', { ascending: false });
-
-    return data || [];
-  },
-
-  async getVendorBookings(vendorId: string): Promise<Booking[]> {
-    const { data: listings } = await supabase
-      .from('listing')
-      .select('id')
-      .eq('vendorId', vendorId);
-
-    if (!listings || listings.length === 0) {
-      return [];
-    }
-
-    const listingIds = listings.map((l) => l.id);
-
-    const { data } = await supabase
-      .from('booking')
-      .select('*')
-      .in('listingId', listingIds)
-      .order('createdAt', { ascending: false });
-
-    return data || [];
   },
 };

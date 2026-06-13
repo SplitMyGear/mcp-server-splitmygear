@@ -17,6 +17,15 @@ jest.mock('@supabase/supabase-js', () => ({
 
 import { authMiddleware } from '../src/middleware/auth';
 
+// Build a backend-style JWT (HS256, claims = { sub, role, exp }). No signature
+// verification happens unless MCP_BACKEND_JWT_SECRET is set, so the signature
+// segment is a placeholder for these decode-path tests.
+function makeJwt(payload: Record<string, unknown>): string {
+  const seg = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  return `${seg({ alg: 'HS256', typ: 'JWT' })}.${seg(payload)}.sig`;
+}
+const FUTURE = Math.floor(Date.now() / 1000) + 3600;
+
 describe('Auth Middleware', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -74,58 +83,43 @@ describe('Auth Middleware', () => {
     expect(result.error).toBe('No authentication provided');
   });
 
-  it('should accept valid JWT token', async () => {
-    const { createClient } = require('@supabase/supabase-js');
-    const mockSupabase = {
-      auth: {
-        getUser: jest.fn().mockResolvedValue({
-          data: { user: { id: 'user-123' } },
-          error: null,
-        }),
-      },
-      from: jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { role: 'renter' },
-              error: null,
-            }),
-          }),
-        }),
-      }),
-    };
-    (createClient as jest.Mock).mockReturnValue(mockSupabase);
-
+  it('accepts a backend JWT, derives the user from sub, and exposes the token for forwarding', async () => {
+    const token = makeJwt({ sub: 'user-123', role: 'vendor', exp: FUTURE });
     const mockRequest = {
-      headers: new Headers({ 'authorization': 'Bearer valid-token' }),
+      headers: new Headers({ authorization: `Bearer ${token}` }),
       nextUrl: { pathname: '/api/mcp' },
     } as any;
-    
+
     const result = await authMiddleware(mockRequest);
-    
+
     expect(result.success).toBe(true);
     expect(result.userId).toBe('user-123');
+    expect(result.role).toBe('vendor');
+    // The raw token must be surfaced so user-scoped tools can forward it.
+    expect(result.token).toBe(token);
   });
 
-  it('should reject invalid JWT token', async () => {
-    const { createClient } = require('@supabase/supabase-js');
-    const mockSupabase = {
-      auth: {
-        getUser: jest.fn().mockResolvedValue({
-          data: { user: null },
-          error: { message: 'Invalid token' },
-        }),
-      },
-    };
-    (createClient as jest.Mock).mockReturnValue(mockSupabase);
-
+  it('rejects a malformed bearer token (not a JWT)', async () => {
     const mockRequest = {
-      headers: new Headers({ 'authorization': 'Bearer invalid-token' }),
+      headers: new Headers({ authorization: 'Bearer not-a-jwt' }),
       nextUrl: { pathname: '/api/mcp' },
     } as any;
-    
+
     const result = await authMiddleware(mockRequest);
-    
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Invalid token');
+  });
+
+  it('rejects an expired backend JWT', async () => {
+    const token = makeJwt({ sub: 'user-123', role: 'renter', exp: Math.floor(Date.now() / 1000) - 60 });
+    const mockRequest = {
+      headers: new Headers({ authorization: `Bearer ${token}` }),
+      nextUrl: { pathname: '/api/mcp' },
+    } as any;
+
+    const result = await authMiddleware(mockRequest);
+
     expect(result.success).toBe(false);
     expect(result.error).toBe('Invalid token');
   });
