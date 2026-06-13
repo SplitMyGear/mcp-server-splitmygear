@@ -1,4 +1,13 @@
-import { supabase, Listing } from '@/lib/supabase';
+import { backendRequest, BackendApiError } from '@/lib/backend-client';
+
+/**
+ * Pricing tools read anonymized market aggregates from the public backend
+ * endpoint GET /listings/pricing-stats (SPLIT-226) instead of querying the
+ * listing table directly with the service-role key. The backend is the single
+ * source of truth for what counts as an active, visible listing.
+ */
+
+type ListingRecord = Record<string, unknown>;
 
 interface PricingAnalysis {
   suggestedPrice: number;
@@ -10,79 +19,82 @@ interface PricingAnalysis {
   confidence: 'high' | 'medium' | 'low';
 }
 
+interface PricingStatsResponse {
+  category: string;
+  location: string | null;
+  averagePrice: number;
+  medianPrice: number;
+  minPrice: number;
+  maxPrice: number;
+  count: number;
+  suggestedPrice: number;
+}
+
+const EMPTY_ANALYSIS: PricingAnalysis = {
+  suggestedPrice: 0,
+  marketAverage: 0,
+  marketMedian: 0,
+  minPrice: 0,
+  maxPrice: 0,
+  competitorCount: 0,
+  confidence: 'low',
+};
+
+function confidenceFor(count: number): PricingAnalysis['confidence'] {
+  return count > 10 ? 'high' : count > 3 ? 'medium' : 'low';
+}
+
+function qs(params: Record<string, string | undefined>): string {
+  const usp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v) usp.set(k, v);
+  }
+  const s = usp.toString();
+  return s ? `?${s}` : '';
+}
+
 export const pricingTools = {
   async suggestListingPrice(
     category: string,
-    location?: string
+    location?: string,
   ): Promise<PricingAnalysis> {
-    let query = supabase
-      .from('listing')
-      .select('pricePerDay')
-      .eq('category', category)
-      .eq('status', 'active');
-
-    if (location) {
-      query = query.ilike('location', `%${location}%`);
-    }
-
-    const { data: listings, error } = await query;
-
-    if (error || !listings || listings.length === 0) {
-      // If no local data, try category-wide
-      if (location) {
+    try {
+      const stats = await backendRequest<PricingStatsResponse>(
+        'GET',
+        `/listings/pricing-stats${qs({ category, location })}`,
+      );
+      // If a location-scoped query found nothing, retry category-wide (matches
+      // the previous behaviour).
+      if (location && stats.count === 0) {
         return this.suggestListingPrice(category);
       }
       return {
-        suggestedPrice: 0,
-        marketAverage: 0,
-        marketMedian: 0,
-        minPrice: 0,
-        maxPrice: 0,
-        competitorCount: 0,
-        confidence: 'low',
+        suggestedPrice: stats.suggestedPrice,
+        marketAverage: stats.averagePrice,
+        marketMedian: stats.medianPrice,
+        minPrice: stats.minPrice,
+        maxPrice: stats.maxPrice,
+        competitorCount: stats.count,
+        confidence: confidenceFor(stats.count),
       };
+    } catch (error) {
+      console.error(
+        'Suggest price error:',
+        error instanceof BackendApiError ? error.message : error,
+      );
+      return { ...EMPTY_ANALYSIS };
     }
-
-    const prices = listings.map((l) => Number(l.pricePerDay)).sort((a, b) => a - b);
-    const sum = prices.reduce((a, b) => a + b, 0);
-    const avg = sum / prices.length;
-    const median = prices[Math.floor(prices.length / 2)];
-    const min = prices[0];
-    const max = prices[prices.length - 1];
-
-    // Suggestion logic: slightly below average to be competitive for new listings
-    // or at median for established ones. Let's go with 95% of median.
-    const suggested = Math.round(median * 0.95 * 100) / 100;
-
-    return {
-      suggestedPrice: suggested,
-      marketAverage: Math.round(avg * 100) / 100,
-      marketMedian: median,
-      minPrice: min,
-      maxPrice: max,
-      competitorCount: listings.length,
-      confidence: listings.length > 10 ? 'high' : listings.length > 3 ? 'medium' : 'low',
-    };
   },
 
   async analyzeCompetitorPricing(
-    listingId: string
-  ): Promise<{ currentListing: Listing; analysis: PricingAnalysis }> {
-    const { data: listing } = await supabase
-      .from('listing')
-      .select('*')
-      .eq('id', listingId)
-      .single();
-
-    if (!listing) {
-      throw new Error('Listing not found');
-    }
-
-    const analysis = await this.suggestListingPrice(listing.category, listing.location);
-
-    return {
-      currentListing: listing,
-      analysis,
-    };
+    listingId: string,
+  ): Promise<{ currentListing: ListingRecord; analysis: PricingAnalysis }> {
+    // Throws BackendApiError(404) for an unknown listing (surfaced to the caller).
+    const listing = await backendRequest<ListingRecord>('GET', `/listings/${listingId}`);
+    const analysis = await this.suggestListingPrice(
+      String(listing.category ?? ''),
+      listing.location ? String(listing.location) : undefined,
+    );
+    return { currentListing: listing, analysis };
   },
 };

@@ -1,7 +1,7 @@
 import { messagingTools } from '../src/tools/messaging';
 
 // sendMessage + getConversations forward the caller's JWT to the backend
-// (SPLIT-226 / M4). markAsRead/getMessages remain Supabase helpers.
+// (SPLIT-226). No Supabase: the MCP no longer has a direct service-role client.
 const mockBackendRequest = jest.fn();
 jest.mock('../src/lib/backend-client', () => {
   class BackendApiError extends Error {
@@ -17,19 +17,6 @@ jest.mock('../src/lib/backend-client', () => {
     backendRequest: (...args: unknown[]) => mockBackendRequest(...args),
   };
 });
-
-jest.mock('../src/lib/supabase', () => ({
-  supabase: {
-    from: jest.fn(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      order: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockResolvedValue({ data: [], error: null }),
-      update: jest.fn().mockReturnThis(),
-      in: jest.fn().mockResolvedValue({ data: null, error: null }),
-    })),
-  },
-}));
 
 jest.mock('openai', () => {
   return jest.fn().mockImplementation(() => ({
@@ -116,13 +103,6 @@ describe('Messaging Tools', () => {
       mockBackendRequest.mockRejectedValue(new Error('boom'));
       const results = await messagingTools.getConversations(TOKEN);
       expect(results).toEqual([]);
-    });
-  });
-
-  describe('markAsRead', () => {
-    it('should update message status', async () => {
-      const result = await messagingTools.markAsRead(['m1']);
-      expect(result.success).toBe(true);
     });
   });
 

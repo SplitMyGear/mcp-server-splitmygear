@@ -1,4 +1,3 @@
-import { supabase, Message } from '@/lib/supabase';
 import { getAIClient, isAIConfigured, chatModel } from '@/lib/ai-client';
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
 
@@ -6,8 +5,8 @@ import { backendRequest, BackendApiError } from '@/lib/backend-client';
  * `sendMessage` / `getConversations` call the backend REST API forwarding the
  * caller's JWT (SPLIT-226 / M4): the backend derives the sender from the token
  * (never caller-supplied — closes the impersonation vector) and owns the chat
- * schema. `getMessages`/`markAsRead` remain Supabase helpers (not exposed as
- * tools); `generateAIDraft` is a pure AI call.
+ * schema. `generateAIDraft` is a pure AI call. No Supabase: the whole MCP now
+ * reads/writes through the backend, so there is no direct service-role client.
  */
 
 // Defense in depth (M6): the route layer UUID-validates ids, but validating
@@ -71,26 +70,6 @@ export const messagingTools = {
       console.error('Get conversations error:', error);
       return [];
     }
-  },
-
-  async getMessages(conversationId: string, limit = 50): Promise<Message[]> {
-    const { data } = await supabase
-      .from('message')
-      .select('*')
-      .eq('conversationId', conversationId)
-      .order('createdAt', { ascending: true })
-      .limit(limit);
-
-    return data || [];
-  },
-
-  async markAsRead(messageIds: string[]): Promise<{ success: boolean }> {
-    const { error } = await supabase
-      .from('message')
-      .update({ isRead: true })
-      .in('id', messageIds);
-
-    return { success: !error };
   },
 
   async generateAIDraft(

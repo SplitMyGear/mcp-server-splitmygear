@@ -1,248 +1,137 @@
-import { supabase, Listing, SearchFilters } from '@/lib/supabase';
-import { aiService } from '@/lib/ai-service';
+import { backendRequest, BackendApiError } from '@/lib/backend-client';
 
-// M6 (SPLIT-253): values interpolated into a PostgREST `.or()` filter string
-// must not be able to break out of their token. The free-text search query is
-// arbitrary user input, so strip the characters that delimit PostgREST filter
-// syntax — commas (separate OR conditions), parentheses (group), and the
-// value-quoting chars — before it reaches the `name.ilike.%…%` value.
-function sanitizeOrLikeValue(value: string): string {
-  return value.replace(/[,()*"\\]/g, ' ').trim();
+/**
+ * Listing read tools are thin clients of the public backend REST API (SPLIT-226)
+ * — the canonical, moderation-filtered source. This drops the direct
+ * service-role Supabase reads (which targeted a divergent schema) AND the
+ * duplicated embedding/match_listings logic, which now lives behind the
+ * backend's /listings/search/vibe + /listings/:id/similar endpoints.
+ */
+
+type ListingRecord = Record<string, unknown>;
+
+export interface SearchFilters {
+  location?: string;
+  checkIn?: string;
+  checkOut?: string;
+  guests?: number;
+  category?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  query?: string;
 }
 
-// Date bounds are interpolated into a `.or()` filter too; require a real
-// ISO date prefix (YYYY-MM-DD …) so the value can neither carry
-// filter-injection characters nor be punctuation-only garbage.
-function assertIsoDateLike(value: string, field: string): void {
-  if (!/^\d{4}-\d{2}-\d{2}/.test(value) || Number.isNaN(Date.parse(value))) {
-    throw new Error(`Invalid ${field}: expected an ISO date`);
+function toMessage(error: unknown, fallback: string): string {
+  return error instanceof BackendApiError ? error.message : fallback;
+}
+
+function qs(params: Record<string, string | number | undefined>): string {
+  const usp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
   }
+  const s = usp.toString();
+  return s ? `?${s}` : '';
 }
 
 export const listingTools = {
-  async searchListings(initialFilters: SearchFilters): Promise<Listing[]> {
-    let filters = { ...initialFilters };
-
-    if (filters.query) {
-      const aiFilters = await aiService.parseSearchQuery(filters.query);
-      const combinedFilters = { ...filters, ...aiFilters };
-      
-      // Attempt Vector Search via RPC
-      try {
-        const queryEmbedding = await aiService.generateEmbedding(filters.query);
-        if (queryEmbedding && queryEmbedding.length > 0) {
-          const { data: vectorResults, error: rpcError } = await supabase.rpc('match_listings', {
-            query_embedding: queryEmbedding,
-            match_threshold: 0.5, // Broad threshold for discovery
-            match_count: 50,
-            p_category: combinedFilters.category || null,
-            p_location: combinedFilters.location || null,
-            p_min_price: combinedFilters.minPrice || null,
-            p_max_price: combinedFilters.maxPrice || null,
-          });
-
-          if (!rpcError && vectorResults && vectorResults.length > 0) {
-            return vectorResults;
-          }
-        }
-      } catch (e) {
-        console.warn('Vector search failed, falling back to keyword matching:', e);
+  async searchListings(filters: SearchFilters): Promise<ListingRecord[]> {
+    try {
+      // A natural-language query → the backend's semantic "vibe" search, which
+      // runs the embedding + match_listings pgvector RPC server-side.
+      if (filters.query) {
+        const vibe = await backendRequest<{ success: boolean; data: ListingRecord[] }>(
+          'GET',
+          `/listings/search/vibe${qs({ q: filters.query, limit: 50 })}`,
+        );
+        if (Array.isArray(vibe?.data) && vibe.data.length > 0) return vibe.data;
+        // Fall through to structured browse if vibe returns nothing.
       }
 
-      filters = combinedFilters;
-    }
-
-    let query = supabase
-      .from('listing')
-      .select('*')
-      .eq('status', 'active');
-
-    if (filters.location) {
-      query = query.ilike('location', `%${filters.location}%`);
-    }
-
-    if (filters.category) {
-      query = query.eq('category', filters.category);
-    }
-
-    if (filters.minPrice) {
-      query = query.gte('pricePerDay', filters.minPrice);
-    }
-
-    if (filters.maxPrice) {
-      query = query.lte('pricePerDay', filters.maxPrice);
-    }
-
-    if (filters.guests) {
-      query = query.gte('maxGuests', filters.guests);
-    }
-
-    if (filters.query && !filters.location && !filters.category) {
-      // If we only have a query, search name and description. Sanitize first —
-      // raw free text in a PostgREST .or() filter is an injection vector (M6).
-      const q = sanitizeOrLikeValue(filters.query);
-      if (q) {
-        query = query.or(`name.ilike.%${q}%,description.ilike.%${q}%`);
-      }
-    }
-
-    const { data, error } = await query.limit(50);
-
-    if (error) {
-      console.error('Search error:', error);
+      const browse = await backendRequest<{ data: ListingRecord[] }>(
+        'GET',
+        `/listings${qs({
+          search: filters.query,
+          category: filters.category,
+          location: filters.location,
+          minPrice: filters.minPrice,
+          maxPrice: filters.maxPrice,
+          startDate: filters.checkIn,
+          endDate: filters.checkOut,
+          limit: 50,
+        })}`,
+      );
+      return Array.isArray(browse?.data) ? browse.data : [];
+    } catch (error) {
+      console.error('Search listings error:', toMessage(error, 'unknown'));
       return [];
     }
-
-    return data || [];
   },
 
-  async getListingDetails(listingId: string): Promise<Listing | null> {
-    const { data, error } = await supabase
-      .from('listing')
-      .select('*')
-      .eq('id', listingId)
-      .single();
-
-    if (error) {
-      console.error('Get listing error:', error);
+  async getListingDetails(listingId: string): Promise<ListingRecord | null> {
+    try {
+      return await backendRequest<ListingRecord>('GET', `/listings/${listingId}`);
+    } catch (error) {
+      // 404 → not found (matches the prior null contract); log only the unexpected.
+      if (!(error instanceof BackendApiError)) console.error('Get listing error:', error);
       return null;
     }
-
-    return data;
   },
 
   async checkAvailability(
     listingId: string,
     checkIn: string,
     checkOut: string,
-    guests: number
+    guests: number,
   ): Promise<{ available: boolean; message: string }> {
-    const listing = await this.getListingDetails(listingId);
-    
-    if (!listing) {
-      return { available: false, message: 'Listing not found' };
-    }
-
-    if (listing.maxGuests < guests) {
-      return { available: false, message: `Maximum guests for this listing is ${listing.maxGuests}` };
-    }
-
-    // M6: guard the date bounds before they enter the .or() filter string.
-    assertIsoDateLike(checkIn, 'checkIn');
-    assertIsoDateLike(checkOut, 'checkOut');
-    const { data: bookings, error } = await supabase
-      .from('booking')
-      .select('*')
-      .eq('listingId', listingId)
-      .eq('status', 'confirmed')
-      .or(`checkIn.lte.${checkOut},checkOut.gte.${checkIn}`);
-
-    // Fail safe: never report availability we could not actually confirm.
-    if (error) {
-      console.error('Availability check error:', error);
-      return { available: false, message: 'Unable to verify availability' };
-    }
-
-    if (bookings && bookings.length > 0) {
-      return { available: false, message: 'Selected dates are not available' };
-    }
-
-    return { available: true, message: 'Dates are available' };
-  },
-
-  async getSimilarListings(listingId: string, limit = 5): Promise<Listing[]> {
-    const { data: listing, error } = await supabase
-      .from('listing')
-      .select('*, embedding')
-      .eq('id', listingId)
-      .single();
-    
-    if (error || !listing) {
-      return [];
-    }
-
-    // Attempt embedding-based similarity
-    if (listing.embedding && Array.isArray(listing.embedding)) {
-      try {
-        const { data: vectorResults, error: rpcError } = await supabase.rpc('match_listings', {
-          query_embedding: listing.embedding,
-          match_threshold: 0.7, // Higher threshold for "similar"
-          match_count: limit + 1, // +1 because it might return itself
-          p_category: listing.category,
-        });
-
-        if (!rpcError && vectorResults) {
-          return (vectorResults as any[]).filter(l => l.id !== listingId).slice(0, limit);
-        }
-      } catch (e) {
-        console.warn('Similar listings vector search failed:', e);
+    try {
+      const result = await backendRequest<{ isAvailable: boolean; conflicts?: unknown[] }>(
+        'GET',
+        `/listings/${listingId}/availability${qs({ startDate: checkIn, endDate: checkOut, guests })}`,
+      );
+      return result.isAvailable
+        ? { available: true, message: 'Dates are available' }
+        : { available: false, message: 'Selected dates are not available' };
+    } catch (error) {
+      if (error instanceof BackendApiError && error.status === 404) {
+        return { available: false, message: 'Listing not found' };
       }
+      // Fail safe: never report availability we could not actually confirm.
+      return { available: false, message: toMessage(error, 'Unable to verify availability') };
     }
-
-    // Fallback to category matching
-    const { data } = await supabase
-      .from('listing')
-      .select('*')
-      .eq('category', listing.category)
-      .neq('id', listingId)
-      .eq('status', 'available')
-      .limit(limit);
-
-    return data || [];
   },
 
-  async getPersonalizedRecommendations(userId: string, limit = 5): Promise<Listing[]> {
-    // 1. Get user booking history
-    const { data: bookings } = await supabase
-      .from('booking')
-      .select('listingId')
-      .eq('userId', userId)
-      .limit(20);
-
-    if (!bookings || bookings.length === 0) {
-      // Fallback to top-rated or recent listings if no history
-      const { data: fallbackListings } = await supabase
-        .from('listing')
-        .select('*')
-        .eq('status', 'active')
-        .order('createdAt', { ascending: false })
-        .limit(limit);
-      return fallbackListings || [];
-    }
-
-    const listingIds = bookings.map((b) => b.listingId);
-
-    // 2. Get categories of those listings to find preferences
-    const { data: pastListings } = await supabase
-      .from('listing')
-      .select('category')
-      .in('id', listingIds);
-
-    if (!pastListings || pastListings.length === 0) {
+  async getSimilarListings(listingId: string, limit = 5): Promise<ListingRecord[]> {
+    try {
+      const result = await backendRequest<{ success: boolean; data: ListingRecord[] }>(
+        'GET',
+        `/listings/${listingId}/similar${qs({ limit })}`,
+      );
+      return Array.isArray(result?.data) ? result.data : [];
+    } catch (error) {
+      console.error('Similar listings error:', toMessage(error, 'unknown'));
       return [];
     }
+  },
 
-    // 3. Count category frequencies
-    const categoryCounts: Record<string, number> = {};
-    pastListings.forEach((l) => {
-      categoryCounts[l.category] = (categoryCounts[l.category] || 0) + 1;
-    });
-
-    // 4. Sort categories by frequency
-    const sortedCategories = Object.keys(categoryCounts).sort(
-      (a, b) => categoryCounts[b] - categoryCounts[a]
-    );
-
-    // 5. Get recommendations from top categories
-    const topCategory = sortedCategories[0];
-    const { data: recommendations } = await supabase
-      .from('listing')
-      .select('*')
-      .eq('category', topCategory)
-      .eq('status', 'active')
-      .not('id', 'in', `(${listingIds.join(',')})`) // Don't recommend what they already booked
-      .limit(limit);
-
-    return recommendations || [];
+  async getPersonalizedRecommendations(token: string, limit = 5): Promise<ListingRecord[]> {
+    if (!token) return [];
+    try {
+      // The backend derives the user from the forwarded JWT (no caller-supplied
+      // id — closes the IDOR). Endpoint returns Listing[]; tolerate a wrapped shape.
+      const result = await backendRequest<ListingRecord[] | { data: ListingRecord[] }>(
+        'GET',
+        `/ai/recommendations/for-me${qs({ limit })}`,
+        { token },
+      );
+      if (Array.isArray(result)) return result;
+      if (result && Array.isArray((result as { data?: ListingRecord[] }).data)) {
+        return (result as { data: ListingRecord[] }).data;
+      }
+      return [];
+    } catch (error) {
+      console.error('Recommendations error:', toMessage(error, 'unknown'));
+      return [];
+    }
   },
 };
