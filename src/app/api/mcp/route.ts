@@ -11,12 +11,34 @@ import { messagingTools } from '@/tools/messaging';
 import { authMiddleware } from '@/middleware/auth';
 import { rateLimiter } from '@/middleware/rate-limit';
 
+interface AuthContext {
+  userId?: string;
+  role?: string;
+}
+
+// Result returned by a user-scoped tool invoked without a user principal (e.g.
+// the operator key, which has no userId). User-scoped tools must NOT accept a
+// caller-supplied id — that was the IDOR (M3). They derive the acting user
+// from the authenticated bearer token instead.
+function requiresUser() {
+  return {
+    isError: true as const,
+    content: [
+      {
+        type: 'text' as const,
+        text: 'This tool requires user authentication: call it with a Supabase bearer token, not the operator key.',
+      },
+    ],
+  };
+}
+
 // A FRESH server + transport is built per request (see handleRequest). The
 // previous module-singleton + stateful transport never completed the
 // initialize handshake on serverless ("Server not initialized"), making the
 // server unusable. buildServer() registers all tools on a new instance each
-// time so requests are fully independent and stateless.
-function buildServer(): McpServer {
+// time so requests are fully independent and stateless. The authenticated
+// principal (ctx.userId) is closed over by user-scoped tool handlers.
+function buildServer(ctx: AuthContext): McpServer {
   const server = new McpServer({
     name: 'splitmygear-mcp',
     version: '1.0.0',
@@ -88,15 +110,15 @@ server.tool(
     checkIn: z.string().describe('Check-in date (ISO format)'),
     checkOut: z.string().describe('Check-out date (ISO format)'),
     guests: z.number().min(1).max(20).describe('Number of guests'),
-    userId: z.string().describe('User ID making the booking'),
   },
-  async ({ listingId, checkIn, checkOut, guests, userId }) => {
+  async ({ listingId, checkIn, checkOut, guests }) => {
+    if (!ctx.userId) return requiresUser();
     const booking = await bookingTools.createBooking({
       listingId,
       checkIn,
       checkOut,
       guests,
-      userId,
+      userId: ctx.userId,
     });
     return {
       content: [{ type: 'text', text: JSON.stringify(booking, null, 2) }],
@@ -107,12 +129,13 @@ server.tool(
 server.tool(
   'cancel_booking',
   {
-    bookingId: z.string().describe('The unique identifier of the booking'),
-    userId: z.string().describe('User ID cancelling the booking'),
-    reason: z.string().optional().describe('Reason for cancellation'),
+    bookingId: z.string().uuid().describe('The unique identifier of the booking'),
+    reason: z.string().max(500).optional().describe('Reason for cancellation'),
   },
-  async ({ bookingId, userId, reason }) => {
-    const result = await bookingTools.cancelBooking(bookingId, userId, reason);
+  async ({ bookingId, reason }) => {
+    if (!ctx.userId) return requiresUser();
+    // cancelBooking re-verifies booking.userId === ctx.userId server-side.
+    const result = await bookingTools.cancelBooking(bookingId, ctx.userId, reason);
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
     };
@@ -122,10 +145,18 @@ server.tool(
 server.tool(
   'get_booking_status',
   {
-    bookingId: z.string().describe('The unique identifier of the booking'),
+    bookingId: z.string().uuid().describe('The unique identifier of the booking'),
   },
   async ({ bookingId }) => {
+    if (!ctx.userId) return requiresUser();
     const status = await bookingTools.getBookingStatus(bookingId);
+    // Only the booking's owner may see it (was an IDOR leaking owner id).
+    if (status && (status as { userId?: string }).userId !== ctx.userId) {
+      return {
+        isError: true,
+        content: [{ type: 'text', text: 'Booking not found.' }],
+      };
+    }
     return {
       content: [{ type: 'text', text: JSON.stringify(status, null, 2) }],
     };
@@ -149,11 +180,11 @@ server.tool(
 server.tool(
   'get_personalized_recommendations',
   {
-    userId: z.string().describe('The unique identifier of the user'),
-    limit: z.number().optional().default(5),
+    limit: z.number().min(1).max(50).optional().default(5),
   },
-  async ({ userId, limit }) => {
-    const results = await listingTools.getPersonalizedRecommendations(userId, limit);
+  async ({ limit }) => {
+    if (!ctx.userId) return requiresUser();
+    const results = await listingTools.getPersonalizedRecommendations(ctx.userId, limit);
     return {
       content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
     };
@@ -245,12 +276,12 @@ server.tool(
 server.tool(
   'book_experience',
   {
-    scheduleId: z.string().describe('The schedule ID to book'),
-    userId: z.string().describe('The user ID booking the experience'),
+    scheduleId: z.string().uuid().describe('The schedule ID to book'),
     guests: z.number().min(1).max(20).describe('Number of guests'),
   },
-  async ({ scheduleId, userId, guests }) => {
-    const booking = await experienceTools.bookExperience(scheduleId, userId, guests);
+  async ({ scheduleId, guests }) => {
+    if (!ctx.userId) return requiresUser();
+    const booking = await experienceTools.bookExperience(scheduleId, ctx.userId, guests);
     return {
       content: [{ type: 'text', text: JSON.stringify(booking, null, 2) }],
     };
@@ -260,13 +291,16 @@ server.tool(
 server.tool(
   'send_message',
   {
-    senderId: z.string().describe('The user ID of the sender'),
-    recipientId: z.string().describe('The user ID of the recipient'),
-    content: z.string().describe('The message content'),
-    conversationId: z.string().optional().describe('Optional conversation ID'),
+    recipientId: z.string().uuid().describe('The user ID of the recipient'),
+    content: z.string().min(1).max(5000).describe('The message content'),
+    conversationId: z.string().uuid().optional().describe('Optional conversation ID'),
   },
-  async ({ senderId, recipientId, content, conversationId }) => {
-    const result = await messagingTools.sendMessage(senderId, recipientId, content, conversationId);
+  async ({ recipientId, content, conversationId }) => {
+    if (!ctx.userId) return requiresUser();
+    // Sender is the authenticated user — never caller-supplied (was an
+    // impersonation vector). UUID-validated ids also close the .or() filter
+    // injection in messagingTools (M6).
+    const result = await messagingTools.sendMessage(ctx.userId, recipientId, content, conversationId);
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
     };
@@ -275,11 +309,10 @@ server.tool(
 
 server.tool(
   'get_conversations',
-  {
-    userId: z.string().describe('The user ID to fetch conversations for'),
-  },
-  async ({ userId }) => {
-    const results = await messagingTools.getConversations(userId);
+  {},
+  async () => {
+    if (!ctx.userId) return requiresUser();
+    const results = await messagingTools.getConversations(ctx.userId);
     return {
       content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
     };
@@ -358,7 +391,7 @@ async function handleRequest(request: NextRequest) {
     // Stateless: a brand-new server + transport per request (no session id),
     // with JSON responses enabled so a single POST completes the
     // initialize/tools-call round-trip without a persistent SSE session.
-    const server = buildServer();
+    const server = buildServer({ userId: authResult.userId, role: authResult.role });
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
