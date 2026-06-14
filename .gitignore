@@ -1,5 +1,8 @@
 # Dependencies
 node_modules/
+# also ignore a root node_modules symlink (the `/` form matches a file/symlink,
+# not just a directory) so it can never be force-added again — see SPLIT-276
+/node_modules
 
 # Next.js
 .next/
