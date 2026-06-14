@@ -23,6 +23,54 @@ function toMessage(error: unknown, fallback: string): string {
   return error instanceof BackendApiError ? error.message : fallback;
 }
 
+interface ConversationRecord {
+  id?: string;
+  participant1Id?: string;
+  participant2Id?: string;
+}
+
+/**
+ * Resolve (or create) the conversation to post into.
+ *
+ * The backend's `POST /chat/conversations` is NOT idempotent — it 409s
+ * ("Conversation with this user already exists") once a conversation between the
+ * two users exists. An MCP caller that sent an earlier message and did not
+ * retain the conversationId would then be unable to send ANY follow-up (every
+ * subsequent send_message to that person failed). On a 409 we fall back to
+ * listing the caller's conversations and reusing the existing one with this
+ * recipient, so repeat messaging "just works".
+ */
+async function resolveOrCreateConversation(
+  recipientId: string,
+  token: string,
+): Promise<string | undefined> {
+  try {
+    const created = await backendRequest<ConversationRecord>('POST', '/chat/conversations', {
+      token,
+      body: { participantId: recipientId },
+    });
+    return created?.id;
+  } catch (error) {
+    if (error instanceof BackendApiError && error.status === 409) {
+      return findConversationWith(recipientId, token);
+    }
+    throw error;
+  }
+}
+
+/** Find the caller's existing conversation with `recipientId`, if any. */
+async function findConversationWith(
+  recipientId: string,
+  token: string,
+): Promise<string | undefined> {
+  const list = await backendRequest<ConversationRecord[]>('GET', '/chat/conversations', { token });
+  if (!Array.isArray(list)) return undefined;
+  const match = list.find(
+    (c) => c && (c.participant1Id === recipientId || c.participant2Id === recipientId),
+  );
+  return match?.id;
+}
+
 export const messagingTools = {
   async sendMessage(params: {
     recipientId: string;
@@ -41,12 +89,9 @@ export const messagingTools = {
       let convId = params.conversationId;
       if (!convId) {
         // Resolve (or create) the conversation with the recipient. The backend
-        // derives the initiator from the token.
-        const conversation = await backendRequest<{ id: string }>('POST', '/chat/conversations', {
-          token: params.token,
-          body: { participantId: params.recipientId },
-        });
-        convId = conversation?.id;
+        // derives the initiator from the token, and 409s if the pair already has
+        // a conversation — resolveOrCreateConversation reuses it in that case.
+        convId = await resolveOrCreateConversation(params.recipientId, params.token);
         if (!convId) return { success: false, error: 'Failed to resolve conversation' };
       }
 

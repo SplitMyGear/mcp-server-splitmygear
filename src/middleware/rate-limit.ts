@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
  * IMPORTANT: this is a BEST-EFFORT, PER-INSTANCE limiter. On Vercel each
  * concurrent lambda has its own in-memory store, so this does not enforce a
  * true global limit — it is defense-in-depth on top of the mandatory auth
- * (operator API key or Supabase bearer; see middleware/auth.ts). A true
+ * (operator API key or backend JWT bearer; see middleware/auth.ts). A true
  * distributed limit needs a shared store (Upstash Redis); tracked as a
  * follow-up. The previous implementation also leaked a module-level
  * setInterval (a dangling timer/handle per cold start) and imported Supabase
