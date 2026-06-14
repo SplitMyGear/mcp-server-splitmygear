@@ -1,12 +1,12 @@
-import { getAIClient, isAIConfigured, chatModel } from '@/lib/ai-client';
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
 
 /**
  * `sendMessage` / `getConversations` call the backend REST API forwarding the
  * caller's JWT (SPLIT-226 / M4): the backend derives the sender from the token
  * (never caller-supplied — closes the impersonation vector) and owns the chat
- * schema. `generateAIDraft` is a pure AI call. No Supabase: the whole MCP now
- * reads/writes through the backend, so there is no direct service-role client.
+ * schema. `generateAIDraft` now also goes through the backend AI (SPLIT-277) —
+ * the MCP holds no LLM provider key of its own. No Supabase, no direct openai:
+ * the whole MCP reads/writes through the backend.
  */
 
 // Defense in depth (M6): the route layer UUID-validates ids, but validating
@@ -122,28 +122,18 @@ export const messagingTools = {
     userRole: 'renter' | 'vendor',
     tone: string = 'professional'
   ): Promise<string> {
-    if (!isAIConfigured()) {
-      return 'AI drafting is disabled.';
-    }
-
-    const prompt = `
-      You are an AI assistant for SplitMyGear.
-      Draft a message for a ${userRole} based on the following context:
-      "${context}"
-
-      Tone: ${tone}
-      Keep it concise, friendly, and helpful.
-    `;
-
     try {
-      const response = await getAIClient().chat.completions.create({
-        model: chatModel(),
-        messages: [{ role: 'user', content: prompt }],
-      });
-
-      return response.choices[0].message.content || 'Failed to generate draft.';
+      const result = await backendRequest<{ draft?: string; available?: boolean; message?: string }>(
+        'POST',
+        '/ai/draft-message',
+        { body: { context, userRole, tone } },
+      );
+      if (result?.available === false) {
+        return result.message || 'AI drafting is currently unavailable.';
+      }
+      return result?.draft || 'Failed to generate draft.';
     } catch (error) {
-      console.error('AI draft error:', error);
+      console.error('AI draft error:', toMessage(error, 'unknown'));
       return 'Error generating draft.';
     }
   },
