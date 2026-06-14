@@ -161,9 +161,13 @@ The `search_listings` `query` parameter accepts plain English. The server parses
 
 ### Prerequisites
 - Node.js 18+
-- Supabase project
-- Stripe account (for booking tools)
-- OpenRouter API key (free tier, for AI features)
+- An operator `MCP_API_KEY` (and, for user-scoped tools, a backend JWT)
+- Access to the SplitMyGear backend REST API (defaults to production; override with `BACKEND_API_URL`)
+- *(optional)* An AI provider key (OpenCode Zen / OpenRouter / OpenAI) for the two content tools and the AI message draft
+
+> This server holds **no** Supabase or Stripe credentials — every action goes
+> through the backend REST API, which is the single authority for auth, data,
+> pricing and payments (SPLIT-226).
 
 ### Setup
 
@@ -182,11 +186,9 @@ Your local server will be at `http://localhost:3000/api/mcp`.
 
 ```env
 MCP_API_KEY=               # REQUIRED — operator key clients send via x-api-key
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-STRIPE_SECRET_KEY=
-# AI provider (first key present wins): OPENCODE → OPENROUTER → OPENAI
+BACKEND_API_URL=           # optional — defaults to the production backend /api/v1
+MCP_BACKEND_JWT_SECRET=    # optional — verify forwarded JWT signatures locally (defense in depth)
+# AI provider for the content/draft tools (first key present wins): OPENCODE → OPENROUTER → OPENAI
 OPENCODE_API_KEY=          # https://opencode.ai/zen — free tier
 OPENROUTER_API_KEY=        # https://openrouter.ai — free tier
 AI_CHAT_MODEL=             # optional override
@@ -194,7 +196,9 @@ AI_EMBEDDING_MODEL=        # optional override
 MCP_RATE_LIMIT_TIER=public # internal | beta | public | default
 ```
 
-> Without `MCP_API_KEY` the server fails closed (every request 401s).
+> Without `MCP_API_KEY` the server fails closed (every request 401s). Without an
+> AI provider key the three AI content tools degrade gracefully (they return a
+> "disabled" notice); every other tool is unaffected.
 
 ### Tests
 

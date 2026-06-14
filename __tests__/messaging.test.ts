@@ -1,4 +1,5 @@
 import { messagingTools } from '../src/tools/messaging';
+import { BackendApiError } from '../src/lib/backend-client';
 
 // sendMessage + getConversations forward the caller's JWT to the backend
 // (SPLIT-226). No Supabase: the MCP no longer has a direct service-role client.
@@ -75,6 +76,56 @@ describe('Messaging Tools', () => {
         '/chat/conversations',
         expect.objectContaining({ token: TOKEN, body: { participantId: RECIPIENT } }),
       );
+    });
+
+    it('reuses an existing conversation when the backend 409s on create', async () => {
+      const EXISTING = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+      mockBackendRequest.mockImplementation(async (method: string, path: string) => {
+        if (method === 'POST' && path === '/chat/conversations') {
+          throw new BackendApiError(409, 'Conversation with this user already exists.');
+        }
+        if (method === 'GET' && path === '/chat/conversations') {
+          return [
+            { id: 'unrelated', participant1Id: 'zzzz', participant2Id: 'yyyy' },
+            { id: EXISTING, participant1Id: 'me', participant2Id: RECIPIENT },
+          ];
+        }
+        return { id: 'm2', content: 'follow up' };
+      });
+      const result = await messagingTools.sendMessage({ recipientId: RECIPIENT, content: 'follow up', token: TOKEN });
+      expect(result.success).toBe(true);
+      expect(result.conversationId).toBe(EXISTING);
+      // The follow-up posts into the EXISTING conversation, not a freshly created one.
+      expect(mockBackendRequest).toHaveBeenCalledWith(
+        'POST',
+        `/chat/conversations/${EXISTING}/messages`,
+        expect.objectContaining({ token: TOKEN, body: { content: 'follow up' } }),
+      );
+    });
+
+    it('fails gracefully when the 409 conversation cannot be located', async () => {
+      mockBackendRequest.mockImplementation(async (method: string, path: string) => {
+        if (method === 'POST' && path === '/chat/conversations') {
+          throw new BackendApiError(409, 'Conversation with this user already exists.');
+        }
+        if (method === 'GET' && path === '/chat/conversations') return [];
+        return { id: 'm3' };
+      });
+      const result = await messagingTools.sendMessage({ recipientId: RECIPIENT, content: 'hi', token: TOKEN });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/Failed to resolve conversation/);
+    });
+
+    it('surfaces a non-409 conversation-create error', async () => {
+      mockBackendRequest.mockImplementation(async (method: string, path: string) => {
+        if (method === 'POST' && path === '/chat/conversations') {
+          throw new BackendApiError(400, 'Cannot create a conversation with yourself.');
+        }
+        return { id: 'm4' };
+      });
+      const result = await messagingTools.sendMessage({ recipientId: RECIPIENT, content: 'hi', token: TOKEN });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/yourself/);
     });
 
     it('rejects a non-UUID recipientId before any network call (M6 guard)', async () => {
