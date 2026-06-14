@@ -19,18 +19,6 @@ jest.mock('../src/lib/backend-client', () => {
   };
 });
 
-jest.mock('openai', () => {
-  return jest.fn().mockImplementation(() => ({
-    chat: {
-      completions: {
-        create: jest.fn().mockResolvedValue({
-          choices: [{ message: { content: 'AI draft response' } }],
-        }),
-      },
-    },
-  }));
-});
-
 const TOKEN = 'header.payload.sig';
 const RECIPIENT = '22222222-2222-4222-8222-222222222222';
 const CONV = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -157,18 +145,34 @@ describe('Messaging Tools', () => {
     });
   });
 
-  describe('generateAIDraft', () => {
-    it('should return AI generated draft', async () => {
-      const draft = await messagingTools.generateAIDraft('context', 'renter');
-      expect(draft).toBe('AI draft response');
+  describe('generateAIDraft (backend AI)', () => {
+    it('returns the backend-drafted message', async () => {
+      mockBackendRequest.mockResolvedValue({ draft: 'Hi! Yes, the kayak is available.' });
+      const draft = await messagingTools.generateAIDraft('is the kayak available', 'renter');
+      expect(draft).toBe('Hi! Yes, the kayak is available.');
+      expect(mockBackendRequest).toHaveBeenCalledWith('POST', '/ai/draft-message', {
+        body: { context: 'is the kayak available', userRole: 'renter', tone: 'professional' },
+      });
     });
 
-    it('should return error if key is missing', async () => {
-      delete process.env.OPENAI_API_KEY;
-      delete process.env.OPENROUTER_API_KEY;
-      delete process.env.OPENCODE_API_KEY;
+    it('forwards a custom tone', async () => {
+      mockBackendRequest.mockResolvedValue({ draft: 'Hey there!' });
+      await messagingTools.generateAIDraft('quick hello', 'vendor', 'casual');
+      expect(mockBackendRequest).toHaveBeenCalledWith('POST', '/ai/draft-message', {
+        body: { context: 'quick hello', userRole: 'vendor', tone: 'casual' },
+      });
+    });
+
+    it('surfaces the disabled notice when the backend AI flag is off', async () => {
+      mockBackendRequest.mockResolvedValue({ available: false, message: 'AI features are currently disabled.' });
       const draft = await messagingTools.generateAIDraft('context', 'renter');
       expect(draft).toContain('disabled');
+    });
+
+    it('returns an error string on backend failure', async () => {
+      mockBackendRequest.mockRejectedValue(new BackendApiError(500, 'boom'));
+      const draft = await messagingTools.generateAIDraft('context', 'renter');
+      expect(draft).toBe('Error generating draft.');
     });
   });
 });
