@@ -42,6 +42,25 @@ describe('Auth Middleware', () => {
     expect(result.role).toBe('admin');
   });
 
+  it('rejects a wrong operator API key (constant-time compare, SPLIT-335)', async () => {
+    const mockRequest = {
+      headers: new Headers({ 'x-api-key': 'wrong-key' }),
+      nextUrl: { pathname: '/api/mcp' },
+    } as any;
+    const result = await authMiddleware(mockRequest);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('No authentication provided');
+  });
+
+  it('rejects an operator API key that is a prefix of the real key (SPLIT-335)', async () => {
+    const mockRequest = {
+      headers: new Headers({ 'x-api-key': 'test-operator' }),
+      nextUrl: { pathname: '/api/mcp' },
+    } as any;
+    const result = await authMiddleware(mockRequest);
+    expect(result.success).toBe(false);
+  });
+
   it('DENIES unauthenticated requests to /api/mcp (lockdown: no public tier)', async () => {
     const mockRequest = {
       headers: new Headers({}),
