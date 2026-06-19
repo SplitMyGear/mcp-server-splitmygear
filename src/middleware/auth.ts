@@ -1,5 +1,17 @@
 import { NextRequest } from 'next/server';
+import crypto from 'crypto';
 import { readBackendJwtClaims } from '@/lib/jwt';
+
+/**
+ * SPLIT-335: constant-time secret comparison. A plain `a === b` short-circuits
+ * on the first differing byte, leaking the operator key length/prefix via
+ * response timing. Compare digests of equal length instead.
+ */
+function timingSafeEqualStr(a: string, b: string): boolean {
+  const ab = crypto.createHash('sha256').update(a).digest();
+  const bb = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(ab, bb);
+}
 
 export interface AuthResult {
   success: boolean;
@@ -33,7 +45,7 @@ export async function authMiddleware(request: NextRequest): Promise<AuthResult> 
   if (!operatorKey) {
     return { success: false, error: 'Server auth not configured' };
   }
-  if (apiKey && apiKey === operatorKey) {
+  if (apiKey && timingSafeEqualStr(apiKey, operatorKey)) {
     return { success: true, role: 'admin' };
   }
 
