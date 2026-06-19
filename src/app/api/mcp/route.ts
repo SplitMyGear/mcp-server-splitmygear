@@ -45,7 +45,7 @@ function buildServer(ctx: AuthContext): McpServer {
   const server = new McpServer({
     name: 'splitmygear-mcp',
     version: '1.0.0',
-    description: 'MCP Server for SplitMyGear - AI-first rental platform',
+    description: 'MCP Server for Splitt - AI-first rental platform',
   });
 
   server.tool(
