@@ -18,8 +18,33 @@ export interface BackendBooking {
 const AUTH_REQUIRED =
   'Authentication required: call with a user Bearer token (obtained from POST /api/v1/users/login).';
 
+/** Upper bound on a single rental window. Anything longer is almost certainly a
+ *  caller mistake (e.g. swapped year), so we reject it client-side with a clear
+ *  message rather than sending a nonsensical estimate to the backend. */
+const MAX_RENTAL_DAYS = 365;
+
 function toMessage(error: unknown, fallback: string): string {
   return error instanceof BackendApiError ? error.message : fallback;
+}
+
+/**
+ * Client-side date hygiene before hitting the backend: ensures both dates parse
+ * and that checkOut is strictly after checkIn within a sane window. Returns a
+ * human-readable error string when invalid, or null when the dates are usable.
+ * This gives the caller a clear 400-style message instead of a confusing
+ * backend error derived from a clamped/garbage estimate (the backend remains
+ * the authority and re-validates).
+ */
+function validateBookingDates(checkIn: string, checkOut: string): string | null {
+  const start = new Date(checkIn).getTime();
+  const end = new Date(checkOut).getTime();
+  if (Number.isNaN(start)) return `Invalid checkIn date: "${checkIn}". Use an ISO date (e.g. 2026-07-01).`;
+  if (Number.isNaN(end)) return `Invalid checkOut date: "${checkOut}". Use an ISO date (e.g. 2026-07-03).`;
+  if (end <= start) return 'checkOut must be after checkIn.';
+  if (end - start > MAX_RENTAL_DAYS * 86_400_000) {
+    return `Rental window too long (max ${MAX_RENTAL_DAYS} days).`;
+  }
+  return null;
 }
 
 export const bookingTools = {
@@ -30,6 +55,8 @@ export const bookingTools = {
     token: string;
   }): Promise<{ success: boolean; booking?: BackendBooking; error?: string }> {
     if (!data.token) return { success: false, error: AUTH_REQUIRED };
+    const dateError = validateBookingDates(data.checkIn, data.checkOut);
+    if (dateError) return { success: false, error: dateError };
     try {
       // The backend recomputes the authoritative total (SPLIT-157) but its DTO
       // requires a positive totalPrice. Send a best-effort estimate from the

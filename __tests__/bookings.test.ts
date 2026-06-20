@@ -65,6 +65,54 @@ describe('Booking Tools (backend REST)', () => {
     expect(mockBackendRequest).not.toHaveBeenCalled();
   });
 
+  it('rejects checkOut before checkIn client-side without calling the backend', async () => {
+    const result = await bookingTools.createBooking({
+      listingId: 'listing-1',
+      checkIn: '2026-07-03',
+      checkOut: '2026-07-01',
+      token: TOKEN,
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/checkOut must be after checkIn/);
+    expect(mockBackendRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects equal checkIn/checkOut client-side', async () => {
+    const result = await bookingTools.createBooking({
+      listingId: 'listing-1',
+      checkIn: '2026-07-01',
+      checkOut: '2026-07-01',
+      token: TOKEN,
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/checkOut must be after checkIn/);
+    expect(mockBackendRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unparseable date client-side', async () => {
+    const result = await bookingTools.createBooking({
+      listingId: 'listing-1',
+      checkIn: 'not-a-date',
+      checkOut: '2026-07-03',
+      token: TOKEN,
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Invalid checkIn date/);
+    expect(mockBackendRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects a rental window longer than the cap client-side', async () => {
+    const result = await bookingTools.createBooking({
+      listingId: 'listing-1',
+      checkIn: '2026-07-01',
+      checkOut: '2030-07-01',
+      token: TOKEN,
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Rental window too long/);
+    expect(mockBackendRequest).not.toHaveBeenCalled();
+  });
+
   it('surfaces the backend error message when booking creation fails', async () => {
     const { BackendApiError } = jest.requireMock('../src/lib/backend-client');
     mockBackendRequest.mockImplementation(async (method: string) => {
