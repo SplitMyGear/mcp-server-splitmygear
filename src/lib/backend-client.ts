@@ -11,6 +11,16 @@
 
 const DEFAULT_BASE_URL = 'https://splitmygear-backend.vercel.app/api/v1';
 
+/**
+ * Per-request timeout. The function's Vercel `maxDuration` is 30s; without an
+ * explicit bound a hung/slow backend ties the whole invocation up until that
+ * hard limit and then surfaces as an opaque 500. Aborting at 15s keeps a single
+ * upstream stall well inside the budget (leaving room for the create-booking
+ * listing pre-fetch + the booking POST in one request) and turns the failure
+ * into a structured 504 the tool handlers already know how to render.
+ */
+const REQUEST_TIMEOUT_MS = 15_000;
+
 export function backendBaseUrl(): string {
   return process.env.BACKEND_API_URL || DEFAULT_BASE_URL;
 }
@@ -45,11 +55,27 @@ export async function backendRequest<T = unknown>(
     headers['Authorization'] = `Bearer ${options.token}`;
   }
 
-  const response = await fetch(`${backendBaseUrl()}${path}`, {
-    method,
-    headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${backendBaseUrl()}${path}`, {
+      method,
+      headers,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      // AbortSignal.timeout (Node 18+/20) bounds every upstream call so a stalled
+      // backend can't hang the serverless function to its maxDuration.
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    // A timeout abort, DNS failure, or connection reset reaches here as a raw
+    // Error/DOMException. Normalize to a BackendApiError so callers' existing
+    // `instanceof BackendApiError` handling renders a structured result instead
+    // of an unhandled rejection that 500s the whole MCP request.
+    const isTimeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
+    throw new BackendApiError(
+      isTimeout ? 504 : 502,
+      isTimeout ? 'Backend request timed out' : 'Backend request failed (network error)',
+    );
+  }
 
   const raw = await response.text();
   let parsed: unknown;

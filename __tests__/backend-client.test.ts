@@ -68,4 +68,32 @@ describe('backendRequest', () => {
       expect((e as BackendApiError).status).toBe(409);
     }
   });
+
+  it('passes an AbortSignal so the upstream call is timeout-bounded', async () => {
+    mockFetch.mockResolvedValue(makeResponse(true, 200, { id: 'x' }));
+    await backendRequest('GET', '/listings/1');
+    const [, init] = mockFetch.mock.calls[0];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('normalizes a timeout abort to BackendApiError(504)', async () => {
+    const timeout = Object.assign(new Error('timed out'), { name: 'TimeoutError' });
+    mockFetch.mockRejectedValue(timeout);
+    try {
+      await backendRequest('GET', '/listings/slow');
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(BackendApiError);
+      expect((e as BackendApiError).status).toBe(504);
+      expect((e as BackendApiError).message).toMatch(/timed out/i);
+    }
+  });
+
+  it('normalizes a network/connection error to BackendApiError(502)', async () => {
+    mockFetch.mockRejectedValue(new TypeError('fetch failed'));
+    await expect(backendRequest('GET', '/listings/down')).rejects.toMatchObject({
+      name: 'BackendApiError',
+      status: 502,
+    });
+  });
 });

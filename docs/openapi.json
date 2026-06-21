@@ -211,7 +211,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "JWT token from Supabase authentication"
+        "description": "Backend-issued JWT from POST /api/v1/users/login (HS256). Forwarded by user-scoped tools to the Splitt backend, which is the single authority for auth/RBAC/ownership."
       },
       "apiKeyAuth": {
         "type": "apiKey",
