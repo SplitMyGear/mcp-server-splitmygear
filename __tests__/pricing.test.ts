@@ -40,7 +40,9 @@ describe('Pricing Tools (backend REST)', () => {
       expect(result.marketMedian).toBe(60);
       expect(result.competitorCount).toBe(5);
       expect(result.confidence).toBe('medium'); // 3 < 5 <= 10
-      expect(mockBackendRequest.mock.calls[0][1]).toContain('/listings/pricing-stats?');
+      // SPLIT-220: canonical /rentals alias (byte-identical to /listings).
+      expect(mockBackendRequest.mock.calls[0][1]).toContain('/rentals/pricing-stats?');
+      expect(mockBackendRequest.mock.calls[0][1]).not.toContain('/listings/pricing-stats');
       expect(mockBackendRequest.mock.calls[0][1]).toContain('category=camping');
     });
 
@@ -63,14 +65,19 @@ describe('Pricing Tools (backend REST)', () => {
   });
 
   describe('analyzeCompetitorPricing', () => {
-    it('returns the listing plus its category analysis', async () => {
+    it('returns the listing plus its category analysis (SPLIT-220 canonical alias)', async () => {
       mockBackendRequest.mockImplementation(async (_m: string, path: string) => {
-        if (path.startsWith('/listings/pricing-stats')) return STATS;
+        if (path.startsWith('/rentals/pricing-stats')) return STATS;
         return { id: 'l1', category: 'camping', location: 'Seattle' };
       });
       const result = await pricingTools.analyzeCompetitorPricing('l1');
       expect(result.currentListing).toMatchObject({ id: 'l1' });
       expect(result.analysis.suggestedPrice).toBe(57);
+      // SPLIT-220: the listing fetch hits /rentals/:id, never the legacy /listings.
+      const listingFetch = mockBackendRequest.mock.calls.find(
+        (c) => typeof c[1] === 'string' && !(c[1] as string).includes('pricing-stats'),
+      );
+      expect(listingFetch?.[1]).toBe('/rentals/l1');
     });
 
     it('throws when the listing is not found (backend 404)', async () => {

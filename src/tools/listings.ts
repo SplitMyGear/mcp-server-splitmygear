@@ -5,7 +5,12 @@ import { backendRequest, BackendApiError } from '@/lib/backend-client';
  * — the canonical, moderation-filtered source. This drops the direct
  * service-role Supabase reads (which targeted a divergent schema) AND the
  * duplicated embedding/match_listings logic, which now lives behind the
- * backend's /listings/search/vibe + /listings/:id/similar endpoints.
+ * backend's /rentals/search/vibe + /rentals/:id/similar endpoints.
+ *
+ * SPLIT-220 (taxonomy rename): backend paths use the canonical `/rentals`
+ * family. The backend serves both aliases byte-identically
+ * (`@Controller(['listings', 'rentals'])`), so the response shape — and these
+ * tools' I/O contracts — are unchanged.
  */
 
 type ListingRecord = Record<string, unknown>;
@@ -42,7 +47,7 @@ export const listingTools = {
       if (filters.query) {
         const vibe = await backendRequest<{ success: boolean; data: ListingRecord[] }>(
           'GET',
-          `/listings/search/vibe${qs({ q: filters.query, limit: 50 })}`,
+          `/rentals/search/vibe${qs({ q: filters.query, limit: 50 })}`,
         );
         if (Array.isArray(vibe?.data) && vibe.data.length > 0) return vibe.data;
         // Fall through to structured browse if vibe returns nothing.
@@ -50,7 +55,7 @@ export const listingTools = {
 
       const browse = await backendRequest<{ data: ListingRecord[] }>(
         'GET',
-        `/listings${qs({
+        `/rentals${qs({
           search: filters.query,
           category: filters.category,
           location: filters.location,
@@ -70,7 +75,7 @@ export const listingTools = {
 
   async getListingDetails(listingId: string): Promise<ListingRecord | null> {
     try {
-      return await backendRequest<ListingRecord>('GET', `/listings/${listingId}`);
+      return await backendRequest<ListingRecord>('GET', `/rentals/${listingId}`);
     } catch (error) {
       // 404 → not found (matches the prior null contract); log only the unexpected.
       if (!(error instanceof BackendApiError)) console.error('Get listing error:', error);
@@ -87,7 +92,7 @@ export const listingTools = {
     try {
       const result = await backendRequest<{ isAvailable: boolean; conflicts?: unknown[] }>(
         'GET',
-        `/listings/${listingId}/availability${qs({ startDate: checkIn, endDate: checkOut, guests })}`,
+        `/rentals/${listingId}/availability${qs({ startDate: checkIn, endDate: checkOut, guests })}`,
       );
       return result.isAvailable
         ? { available: true, message: 'Dates are available' }
@@ -105,7 +110,7 @@ export const listingTools = {
     try {
       const result = await backendRequest<{ success: boolean; data: ListingRecord[] }>(
         'GET',
-        `/listings/${listingId}/similar${qs({ limit })}`,
+        `/rentals/${listingId}/similar${qs({ limit })}`,
       );
       return Array.isArray(result?.data) ? result.data : [];
     } catch (error) {

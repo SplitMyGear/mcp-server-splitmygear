@@ -23,22 +23,24 @@ describe('Listing Tools (backend REST)', () => {
   beforeEach(() => jest.clearAllMocks());
 
   describe('searchListings', () => {
-    it('uses GET /listings with structured filters when there is no query', async () => {
+    it('uses GET /rentals with structured filters when there is no query (SPLIT-220 canonical alias)', async () => {
       mockBackendRequest.mockResolvedValue({ data: [{ id: 'l1' }], total: 1 });
       const results = await listingTools.searchListings({ location: 'Seattle', category: 'camping' });
       expect(results).toEqual([{ id: 'l1' }]);
       const [method, path] = mockBackendRequest.mock.calls[0];
       expect(method).toBe('GET');
-      expect(path).toMatch(/^\/listings\?/);
+      expect(path).toMatch(/^\/rentals\?/);
+      // SPLIT-220: never the legacy /listings path.
+      expect(path).not.toMatch(/^\/listings(\?|\/|$)/);
       expect(path).toContain('location=Seattle');
       expect(path).toContain('category=camping');
     });
 
-    it('uses the vibe (semantic) endpoint for a natural-language query', async () => {
+    it('uses the vibe (semantic) endpoint for a natural-language query (SPLIT-220 canonical alias)', async () => {
       mockBackendRequest.mockResolvedValue({ success: true, data: [{ id: 'v1' }] });
       const results = await listingTools.searchListings({ query: 'cozy lakeside kayak' });
       expect(results).toEqual([{ id: 'v1' }]);
-      expect(mockBackendRequest.mock.calls[0][1]).toContain('/listings/search/vibe?q=');
+      expect(mockBackendRequest.mock.calls[0][1]).toContain('/rentals/search/vibe?q=');
     });
 
     it('falls through to structured browse when vibe returns nothing', async () => {
@@ -47,7 +49,7 @@ describe('Listing Tools (backend REST)', () => {
         .mockResolvedValueOnce({ data: [{ id: 'b1' }] }); // browse
       const results = await listingTools.searchListings({ query: 'obscure' });
       expect(results).toEqual([{ id: 'b1' }]);
-      expect(mockBackendRequest.mock.calls[1][1]).toMatch(/^\/listings\?/);
+      expect(mockBackendRequest.mock.calls[1][1]).toMatch(/^\/rentals\?/);
     });
 
     it('returns [] on a backend error', async () => {
@@ -57,11 +59,11 @@ describe('Listing Tools (backend REST)', () => {
   });
 
   describe('getListingDetails', () => {
-    it('returns the listing from GET /listings/:id', async () => {
+    it('returns the listing from GET /rentals/:id (SPLIT-220 canonical alias)', async () => {
       mockBackendRequest.mockResolvedValue({ id: 'l1', name: 'Tent' });
       const result = await listingTools.getListingDetails('l1');
       expect(result).toEqual({ id: 'l1', name: 'Tent' });
-      expect(mockBackendRequest).toHaveBeenCalledWith('GET', '/listings/l1');
+      expect(mockBackendRequest).toHaveBeenCalledWith('GET', '/rentals/l1');
     });
 
     it('returns null on a 404', async () => {
@@ -76,7 +78,7 @@ describe('Listing Tools (backend REST)', () => {
       mockBackendRequest.mockResolvedValue({ isAvailable: true });
       const result = await listingTools.checkAvailability('l1', '2026-09-01', '2026-09-03', 2);
       expect(result.available).toBe(true);
-      expect(mockBackendRequest.mock.calls[0][1]).toContain('/listings/l1/availability?');
+      expect(mockBackendRequest.mock.calls[0][1]).toContain('/rentals/l1/availability?');
     });
 
     it('maps an unavailable backend response', async () => {
@@ -95,11 +97,11 @@ describe('Listing Tools (backend REST)', () => {
   });
 
   describe('getSimilarListings', () => {
-    it('returns the data array from GET /listings/:id/similar', async () => {
+    it('returns the data array from GET /rentals/:id/similar (SPLIT-220 canonical alias)', async () => {
       mockBackendRequest.mockResolvedValue({ success: true, data: [{ id: 'l2' }], count: 1 });
       const results = await listingTools.getSimilarListings('l1', 5);
       expect(results).toEqual([{ id: 'l2' }]);
-      expect(mockBackendRequest.mock.calls[0][1]).toContain('/listings/l1/similar?limit=5');
+      expect(mockBackendRequest.mock.calls[0][1]).toContain('/rentals/l1/similar?limit=5');
     });
   });
 

@@ -22,7 +22,9 @@ const TOKEN = 'header.payload.sig';
 
 function defaultBackend() {
   mockBackendRequest.mockImplementation(async (method: string, path: string) => {
-    if (method === 'GET' && path.startsWith('/listings/')) return { pricePerDay: '50.00' };
+    // SPLIT-220: the createBooking listing pre-fetch hits the canonical /rentals
+    // alias; the /bookings mutation paths are a different controller, unchanged.
+    if (method === 'GET' && path.startsWith('/rentals/')) return { pricePerDay: '50.00' };
     if (method === 'POST' && path === '/bookings') return { id: 'booking-1', status: 'pending', totalPrice: 100 };
     if (method === 'PUT' && /^\/bookings\/.+\/status$/.test(path)) return { id: 'booking-1', status: 'cancelled' };
     if (method === 'GET' && /^\/bookings\/.+$/.test(path)) return { id: 'booking-1', status: 'pending' };
@@ -45,6 +47,9 @@ describe('Booking Tools (backend REST)', () => {
     });
     expect(result.success).toBe(true);
     expect(result.booking?.id).toBe('booking-1');
+    // SPLIT-220: the price pre-fetch hits the canonical /rentals/:id alias.
+    const prefetch = mockBackendRequest.mock.calls.find((c) => c[0] === 'GET');
+    expect(prefetch?.[1]).toBe('/rentals/listing-1');
     // The POST carried the token and mapped checkIn/checkOut → startDate/endDate.
     const post = mockBackendRequest.mock.calls.find((c) => c[0] === 'POST' && c[1] === '/bookings');
     expect(post?.[2]).toMatchObject({ token: TOKEN });
