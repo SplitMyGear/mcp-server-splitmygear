@@ -2,11 +2,16 @@ import { backendRequest, BackendApiError } from '@/lib/backend-client';
 
 /**
  * Experience tools are thin clients of the backend REST API (SPLIT-226). The
- * read tools (search/details) hit the public GET /experiences endpoints — the
+ * read tools (search/details) hit the public GET /packages endpoints — the
  * canonical, moderation-filtered source — instead of a direct service-role
  * Supabase read against a schema that diverged from the real entity. The write
  * tool (bookExperience) forwards the caller's JWT (M4): the backend owns auth,
  * capacity, pricing and payment.
+ *
+ * SPLIT-220 (taxonomy rename): backend paths use the canonical `/packages`
+ * family. The backend serves both aliases byte-identically
+ * (`@Controller(['experiences', 'packages'])`), so the response shape — and
+ * these tools' I/O contracts — are unchanged.
  */
 
 type ExperienceRecord = Record<string, unknown>;
@@ -32,7 +37,7 @@ export const experienceTools = {
     try {
       const result = await backendRequest<{ success: boolean; experiences: ExperienceRecord[] }>(
         'GET',
-        `/experiences${queryString({ location: filters.location, category: filters.category, limit: '50' })}`,
+        `/packages${queryString({ location: filters.location, category: filters.category, limit: '50' })}`,
       );
       return Array.isArray(result?.experiences) ? result.experiences : [];
     } catch (error) {
@@ -47,7 +52,7 @@ export const experienceTools = {
     try {
       const detail = await backendRequest<{ success: boolean; experience: ExperienceRecord }>(
         'GET',
-        `/experiences/${experienceId}`,
+        `/packages/${experienceId}`,
       );
       if (!detail?.experience) return null;
 
@@ -57,7 +62,7 @@ export const experienceTools = {
       try {
         const sched = await backendRequest<{ success: boolean; schedules: ExperienceRecord[] }>(
           'GET',
-          `/experiences/${experienceId}/schedules`,
+          `/packages/${experienceId}/schedules`,
         );
         schedules = Array.isArray(sched?.schedules) ? sched.schedules : [];
       } catch {
@@ -82,7 +87,7 @@ export const experienceTools = {
     try {
       const result = await backendRequest<{ success: boolean; booking: { id: string; [k: string]: unknown } }>(
         'POST',
-        '/experiences/bookings',
+        '/packages/bookings',
         {
           token: params.token,
           body: {

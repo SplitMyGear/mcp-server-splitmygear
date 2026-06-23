@@ -65,7 +65,10 @@ export const bookingTools = {
       try {
         const listing = await backendRequest<{ pricePerDay?: number | string }>(
           'GET',
-          `/listings/${data.listingId}`,
+          // SPLIT-220: canonical `/rentals` alias (byte-identical to `/listings`,
+          // `@Controller(['listings', 'rentals'])`); the `/bookings` mutation
+          // path below is a different controller and stays as-is.
+          `/rentals/${data.listingId}`,
         );
         const perDay = parseFloat(String(listing?.pricePerDay ?? '0')) || 0;
         const days = Math.max(

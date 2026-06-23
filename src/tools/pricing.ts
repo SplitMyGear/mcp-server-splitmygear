@@ -2,9 +2,14 @@ import { backendRequest, BackendApiError } from '@/lib/backend-client';
 
 /**
  * Pricing tools read anonymized market aggregates from the public backend
- * endpoint GET /listings/pricing-stats (SPLIT-226) instead of querying the
+ * endpoint GET /rentals/pricing-stats (SPLIT-226) instead of querying the
  * listing table directly with the service-role key. The backend is the single
  * source of truth for what counts as an active, visible listing.
+ *
+ * SPLIT-220 (taxonomy rename): backend paths use the canonical `/rentals`
+ * family. The backend serves both aliases byte-identically
+ * (`@Controller(['listings', 'rentals'])`), so the response shape — and these
+ * tools' I/O contracts — are unchanged.
  */
 
 type ListingRecord = Record<string, unknown>;
@@ -61,7 +66,7 @@ export const pricingTools = {
     try {
       const stats = await backendRequest<PricingStatsResponse>(
         'GET',
-        `/listings/pricing-stats${qs({ category, location })}`,
+        `/rentals/pricing-stats${qs({ category, location })}`,
       );
       // If a location-scoped query found nothing, retry category-wide (matches
       // the previous behaviour).
@@ -90,7 +95,7 @@ export const pricingTools = {
     listingId: string,
   ): Promise<{ currentListing: ListingRecord; analysis: PricingAnalysis }> {
     // Throws BackendApiError(404) for an unknown listing (surfaced to the caller).
-    const listing = await backendRequest<ListingRecord>('GET', `/listings/${listingId}`);
+    const listing = await backendRequest<ListingRecord>('GET', `/rentals/${listingId}`);
     const analysis = await this.suggestListingPrice(
       String(listing.category ?? ''),
       listing.location ? String(listing.location) : undefined,

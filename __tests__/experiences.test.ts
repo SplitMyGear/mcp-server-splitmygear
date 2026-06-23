@@ -23,14 +23,16 @@ describe('Experience Tools (backend REST)', () => {
   beforeEach(() => jest.clearAllMocks());
 
   describe('searchExperiences', () => {
-    it('queries GET /experiences with filters and returns the experiences array', async () => {
+    it('queries GET /packages with filters and returns the experiences array (SPLIT-220 canonical alias)', async () => {
       mockBackendRequest.mockResolvedValue({ success: true, experiences: [{ id: 'e1', title: 'Hiking Tour' }] });
       const results = await experienceTools.searchExperiences({ location: 'Seattle', category: 'outdoor' });
       expect(results).toHaveLength(1);
       expect((results[0] as { id: string }).id).toBe('e1');
       const [method, path] = mockBackendRequest.mock.calls[0];
       expect(method).toBe('GET');
-      expect(path).toContain('/experiences?');
+      expect(path).toContain('/packages?');
+      // SPLIT-220: never the legacy /experiences path.
+      expect(path).not.toMatch(/^\/experiences(\?|\/|$)/);
       expect(path).toContain('location=Seattle');
       expect(path).toContain('category=outdoor');
     });
@@ -43,15 +45,19 @@ describe('Experience Tools (backend REST)', () => {
   });
 
   describe('getExperienceDetails', () => {
-    it('returns the experience plus its schedules from the public endpoints', async () => {
+    it('returns the experience plus its schedules from the public /packages endpoints (SPLIT-220 canonical alias)', async () => {
       mockBackendRequest.mockImplementation(async (_method: string, path: string) => {
-        if (/\/experiences\/e1\/schedules/.test(path)) return { success: true, schedules: [{ id: 's1' }] };
-        if (/\/experiences\/e1$/.test(path)) return { success: true, experience: { id: 'e1' } };
+        if (/\/packages\/e1\/schedules/.test(path)) return { success: true, schedules: [{ id: 's1' }] };
+        if (/\/packages\/e1$/.test(path)) return { success: true, experience: { id: 'e1' } };
         throw new Error(`unexpected ${path}`);
       });
       const result = await experienceTools.getExperienceDetails('e1');
       expect(result?.experience).toBeDefined();
       expect(result?.schedules).toHaveLength(1);
+      // SPLIT-220: both calls hit /packages, never the legacy /experiences path.
+      for (const call of mockBackendRequest.mock.calls) {
+        expect(call[1]).toMatch(/^\/packages\/e1/);
+      }
     });
 
     it('returns null when the experience is not found (backend 404)', async () => {
@@ -73,14 +79,14 @@ describe('Experience Tools (backend REST)', () => {
   });
 
   describe('bookExperience', () => {
-    it('books via POST /experiences/bookings with the forwarded token', async () => {
+    it('books via POST /packages/bookings with the forwarded token (SPLIT-220 canonical alias)', async () => {
       mockBackendRequest.mockResolvedValue({ success: true, booking: { id: 'eb1', status: 'pending' } });
       const result = await experienceTools.bookExperience({ experienceId: 'e1', scheduleId: 's1', guests: 2, token: TOKEN });
       expect(result.success).toBe(true);
       expect(result.bookingId).toBe('eb1');
       expect(mockBackendRequest).toHaveBeenCalledWith(
         'POST',
-        '/experiences/bookings',
+        '/packages/bookings',
         expect.objectContaining({ token: TOKEN, body: { experienceId: 'e1', scheduleId: 's1', numberOfGuests: 2 } }),
       );
     });
