@@ -146,33 +146,48 @@ describe('Messaging Tools', () => {
   });
 
   describe('generateAIDraft (backend AI)', () => {
-    it('returns the backend-drafted message', async () => {
+    it('returns the backend-drafted message and forwards the token', async () => {
       mockBackendRequest.mockResolvedValue({ draft: 'Hi! Yes, the kayak is available.' });
-      const draft = await messagingTools.generateAIDraft('is the kayak available', 'renter');
+      const draft = await messagingTools.generateAIDraft('is the kayak available', 'renter', 'professional', TOKEN);
       expect(draft).toBe('Hi! Yes, the kayak is available.');
       expect(mockBackendRequest).toHaveBeenCalledWith('POST', '/ai/draft-message', {
+        token: TOKEN,
         body: { context: 'is the kayak available', userRole: 'renter', tone: 'professional' },
       });
     });
 
-    it('forwards a custom tone', async () => {
+    it('forwards a custom tone and the token', async () => {
       mockBackendRequest.mockResolvedValue({ draft: 'Hey there!' });
-      await messagingTools.generateAIDraft('quick hello', 'vendor', 'casual');
+      await messagingTools.generateAIDraft('quick hello', 'vendor', 'casual', TOKEN);
       expect(mockBackendRequest).toHaveBeenCalledWith('POST', '/ai/draft-message', {
+        token: TOKEN,
         body: { context: 'quick hello', userRole: 'vendor', tone: 'casual' },
       });
     });
 
     it('surfaces the disabled notice when the backend AI flag is off', async () => {
       mockBackendRequest.mockResolvedValue({ available: false, message: 'AI features are currently disabled.' });
-      const draft = await messagingTools.generateAIDraft('context', 'renter');
+      const draft = await messagingTools.generateAIDraft('context', 'renter', 'professional', TOKEN);
       expect(draft).toContain('disabled');
     });
 
-    it('returns an error string on backend failure', async () => {
+    it('returns an error string on a non-auth backend failure', async () => {
       mockBackendRequest.mockRejectedValue(new BackendApiError(500, 'boom'));
-      const draft = await messagingTools.generateAIDraft('context', 'renter');
+      const draft = await messagingTools.generateAIDraft('context', 'renter', 'professional', TOKEN);
       expect(draft).toBe('Error generating draft.');
+    });
+
+    it('surfaces a re-auth error (not a silent template fallback) on a 401', async () => {
+      mockBackendRequest.mockRejectedValue(new BackendApiError(401, 'Unauthorized'));
+      const draft = await messagingTools.generateAIDraft('context', 'renter', 'professional', TOKEN);
+      expect(draft).toMatch(/Authentication required/);
+      expect(draft).not.toBe('Error generating draft.');
+    });
+
+    it('surfaces a re-auth error on a 403', async () => {
+      mockBackendRequest.mockRejectedValue(new BackendApiError(403, 'Forbidden'));
+      const draft = await messagingTools.generateAIDraft('context', 'vendor', 'professional', TOKEN);
+      expect(draft).toMatch(/Authentication required/);
     });
   });
 });

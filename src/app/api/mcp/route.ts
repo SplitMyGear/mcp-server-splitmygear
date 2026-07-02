@@ -234,7 +234,10 @@ server.tool(
   },
   { readOnlyHint: true, openWorldHint: true },
   async ({ name, category, keywords }) => {
-    const description = await contentTools.generateListingDescription(name, category, keywords);
+    // SPLIT-635: /ai/* is JwtAuthGuard-protected (SPLIT-585) — forward the
+    // caller's token, and require a user principal like every other AI tool.
+    if (!ctx.token) return requiresUser();
+    const description = await contentTools.generateListingDescription(name, category, keywords, ctx.token);
     return {
       content: [{ type: 'text', text: description }],
     };
@@ -248,7 +251,10 @@ server.tool(
   },
   { readOnlyHint: true, openWorldHint: true },
   async ({ currentTitle }) => {
-    const optimizedTitle = await contentTools.improveListingTitle(currentTitle);
+    // SPLIT-635: /ai/* is JwtAuthGuard-protected (SPLIT-585) — forward the
+    // caller's token, and require a user principal like every other AI tool.
+    if (!ctx.token) return requiresUser();
+    const optimizedTitle = await contentTools.improveListingTitle(currentTitle, ctx.token);
     return {
       content: [{ type: 'text', text: optimizedTitle }],
     };
@@ -347,7 +353,10 @@ server.tool(
   },
   { readOnlyHint: true, openWorldHint: true },
   async ({ context, userRole, tone }) => {
-    const draft = await messagingTools.generateAIDraft(context, userRole, tone);
+    // SPLIT-635: /ai/draft-message is JwtAuthGuard-protected (SPLIT-585) —
+    // forward the caller's token, and require a user principal like every other AI tool.
+    if (!ctx.token) return requiresUser();
+    const draft = await messagingTools.generateAIDraft(context, userRole, tone, ctx.token);
     return {
       content: [{ type: 'text', text: draft }],
     };
