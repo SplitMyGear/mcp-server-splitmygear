@@ -23,6 +23,11 @@ function toMessage(error: unknown, fallback: string): string {
   return error instanceof BackendApiError ? error.message : fallback;
 }
 
+/** A backend auth rejection — the caller's JWT is missing, invalid or expired. */
+function isAuthError(error: unknown): error is BackendApiError {
+  return error instanceof BackendApiError && (error.status === 401 || error.status === 403);
+}
+
 interface ConversationRecord {
   id?: string;
   participant1Id?: string;
@@ -120,19 +125,26 @@ export const messagingTools = {
   async generateAIDraft(
     context: string,
     userRole: 'renter' | 'vendor',
-    tone: string = 'professional'
+    tone: string = 'professional',
+    // SPLIT-635: /ai/draft-message is now JwtAuthGuard-protected (SPLIT-585), so
+    // this must forward the caller's JWT like every other authenticated tool.
+    token?: string,
   ): Promise<string> {
     try {
       const result = await backendRequest<{ draft?: string; available?: boolean; message?: string }>(
         'POST',
         '/ai/draft-message',
-        { body: { context, userRole, tone } },
+        { token, body: { context, userRole, tone } },
       );
       if (result?.available === false) {
         return result.message || 'AI drafting is currently unavailable.';
       }
       return result?.draft || 'Failed to generate draft.';
     } catch (error) {
+      // An auth failure is NOT a soft "fall back to a template" case — the tool
+      // never ran. Surface it so the caller re-authenticates instead of silently
+      // receiving a canned string that masks the broken auth.
+      if (isAuthError(error)) return AUTH_REQUIRED;
       console.error('AI draft error:', toMessage(error, 'unknown'));
       return 'Error generating draft.';
     }
