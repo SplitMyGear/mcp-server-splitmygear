@@ -55,7 +55,7 @@ function buildServer(ctx: AuthContext): McpServer {
     checkIn: z.string().optional().describe('Check-in date (ISO format)'),
     checkOut: z.string().optional().describe('Check-out date (ISO format)'),
     guests: z.number().min(1).max(20).optional(),
-    category: z.string().optional().describe('Category of listing (camping, hiking, water, etc.)'),
+    category: z.string().optional().describe("Canonical listing category, Title-Case (e.g. 'Camping', 'Hiking', 'Water Sports', 'E-Bikes' — full list via the splitmygear://categories resource)"),
     minPrice: z.number().optional().describe('Minimum price per day'),
     maxPrice: z.number().optional().describe('Maximum price per day'),
     query: z.string().optional().describe('Natural language search query'),
@@ -371,15 +371,29 @@ server.resource(
     return {
       contents: [{
         uri: uri.href,
+        // Mirrors the backend's canonical taxonomy (apps/api/src/listing/
+        // listing-categories.ts) — ids ARE the Title-Case values the API
+        // expects; lowercase variants create non-canonical rows (SPLIT-685).
         text: JSON.stringify([
-          { id: 'camping', name: 'Camping', icon: '🏕️' },
-          { id: 'hiking', name: 'Hiking', icon: '🥾' },
-          { id: 'water', name: 'Water Sports', icon: '🚣' },
-          { id: 'snow', name: 'Winter Sports', icon: '⛷️' },
-          { id: 'climbing', name: 'Climbing', icon: '🧗' },
-          { id: 'cycling', name: 'Cycling', icon: '🚴' },
-          { id: 'fishing', name: 'Fishing', icon: '🎣' },
-          { id: 'photography', name: 'Photography', icon: '📷' },
+          { id: 'E-Bikes', name: 'E-Bikes', icon: '🚴' },
+          { id: 'Biking', name: 'Biking', icon: '🚵' },
+          { id: 'Camping', name: 'Camping', icon: '🏕️' },
+          { id: 'RV', name: 'RV', icon: '🚐' },
+          { id: 'Hiking', name: 'Hiking', icon: '🥾' },
+          { id: 'Water Sports', name: 'Water Sports', icon: '🚣' },
+          { id: 'Winter Sports', name: 'Winter Sports', icon: '⛷️' },
+          { id: 'Snow Sports', name: 'Snow Sports', icon: '🏂' },
+          { id: 'Climbing', name: 'Climbing', icon: '🧗' },
+          { id: 'Surfing', name: 'Surfing', icon: '🏄' },
+          { id: 'Fishing', name: 'Fishing', icon: '🎣' },
+          { id: 'Golf', name: 'Golf', icon: '⛳' },
+          { id: 'Kayaking', name: 'Kayaking', icon: '🛶' },
+          { id: 'Skiing', name: 'Skiing', icon: '🎿' },
+          { id: 'Tennis', name: 'Tennis', icon: '🎾' },
+          { id: 'Boating', name: 'Boating', icon: '⛵' },
+          { id: 'Photography', name: 'Photography', icon: '📷' },
+          { id: 'Electronics', name: 'Electronics', icon: '🔌' },
+          { id: 'Other', name: 'Other', icon: '🎒' },
         ], null, 2),
       }],
     };
