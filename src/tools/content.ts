@@ -14,6 +14,12 @@ import { backendRequest, BackendApiError } from '@/lib/backend-client';
  * unchanged input title / a canned string) that masks the broken auth.
  */
 
+// SPLIT-197 §C-MCP contract gap: the backend types the /ai REQUEST bodies
+// (GenerateDescriptionDto, ImproveTitleDto) but declares NO typed RESPONSE
+// schema for /ai/generate-description or /ai/improve-title — openapi-typescript
+// emits a bare `Record<string, never>`, so these can't be derived from the spec.
+// These local interfaces document the real response shape the tools read; a
+// backend `@ApiResponse({ type })` on the /ai routes would let them be generated.
 interface DescriptionResponse {
   description?: string;
   available?: boolean;
