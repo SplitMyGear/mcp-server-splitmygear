@@ -14,6 +14,14 @@ import { backendRequest, BackendApiError } from '@/lib/backend-client';
  * these tools' I/O contracts — are unchanged.
  */
 
+// SPLIT-197 §C-MCP contract gap: unlike listings (`Listing`) and chat
+// (`Conversation`/`Message`), experiences/packages have NO entity schema in the
+// backend OpenAPI contract at all (only Create/Update DTOs), and the
+// `GET/POST /packages*` routes declare bare `object` responses. So there is
+// nothing generated to derive these element/response types from; they stay
+// untyped `Record<string, unknown>` records with narrow local response
+// envelopes. A backend `Experience` entity schema + typed `@ApiResponse` would
+// let these be generated like the listing tools.
 type ExperienceRecord = Record<string, unknown>;
 
 const AUTH_REQUIRED =

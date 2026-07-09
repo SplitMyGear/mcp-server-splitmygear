@@ -1,4 +1,5 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
+import type { GetResponse, PostResponse, BookingResponseDto } from '@/lib/api-contract';
 
 /**
  * Booking tools call the SplitMyGear backend REST API (/api/v1) forwarding the
@@ -6,14 +7,24 @@ import { backendRequest, BackendApiError } from '@/lib/backend-client';
  * server-authoritative pricing (SPLIT-157), risk scoring and payment — none of
  * which the previous direct Supabase+Stripe writes honoured (they also targeted
  * a column schema that diverged from the real `booking` entity).
+ *
+ * SPLIT-197 §C-MCP: booking response types are now derived from the backend's
+ * OpenAPI contract (`@/lib/api-contract`) instead of the old hand-rolled
+ * `BackendBooking` interface, so the tool layer type-checks against the real
+ * `Booking` / `BookingResponseDto` schemas and stops drifting silently.
  */
 
-export interface BackendBooking {
-  id: string;
-  status?: string;
-  totalPrice?: number | string;
-  [key: string]: unknown;
-}
+/** POST /bookings returns the created `Booking` (spec-bound response). */
+type CreatedBooking = PostResponse<'/api/v1/bookings'>;
+/** GET /bookings/{id} returns a `BookingResponseDto` (spec-bound response). */
+type FetchedBooking = GetResponse<'/api/v1/bookings/{id}'>;
+/**
+ * PUT /bookings/{id}/status returns the updated booking, but the backend
+ * declares only a bare `object` response for that route (SPLIT-197 contract
+ * gap — no `@ApiResponse` schema), so we type it as the known real shape,
+ * `BookingResponseDto`, rather than the useless generated `Record<string, never>`.
+ */
+type UpdatedBooking = BookingResponseDto;
 
 const AUTH_REQUIRED =
   'Authentication required: call with a user Bearer token (obtained from POST /api/v1/users/login).';
@@ -53,7 +64,7 @@ export const bookingTools = {
     checkIn: string;
     checkOut: string;
     token: string;
-  }): Promise<{ success: boolean; booking?: BackendBooking; error?: string }> {
+  }): Promise<{ success: boolean; booking?: CreatedBooking; error?: string }> {
     if (!data.token) return { success: false, error: AUTH_REQUIRED };
     const dateError = validateBookingDates(data.checkIn, data.checkOut);
     if (dateError) return { success: false, error: dateError };
@@ -81,7 +92,7 @@ export const bookingTools = {
         // recomputes regardless, and an invalid listingId surfaces below.
       }
 
-      const booking = await backendRequest<BackendBooking>('POST', '/bookings', {
+      const booking = await backendRequest<CreatedBooking>('POST', '/bookings', {
         token: data.token,
         body: {
           listingId: data.listingId,
@@ -99,12 +110,12 @@ export const bookingTools = {
   async cancelBooking(
     bookingId: string,
     token: string,
-  ): Promise<{ success: boolean; booking?: BackendBooking; message?: string; error?: string }> {
+  ): Promise<{ success: boolean; booking?: UpdatedBooking; message?: string; error?: string }> {
     if (!token) return { success: false, error: AUTH_REQUIRED };
     try {
       // The backend enforces that only the renter/vendor may cancel and handles
       // any refund. Ownership is derived from the forwarded token, not a param.
-      const booking = await backendRequest<BackendBooking>('PUT', `/bookings/${bookingId}/status`, {
+      const booking = await backendRequest<UpdatedBooking>('PUT', `/bookings/${bookingId}/status`, {
         token,
         body: { status: 'cancelled' },
       });
@@ -117,11 +128,11 @@ export const bookingTools = {
   async getBookingStatus(
     bookingId: string,
     token: string,
-  ): Promise<{ success: boolean; booking?: BackendBooking; error?: string }> {
+  ): Promise<{ success: boolean; booking?: FetchedBooking; error?: string }> {
     if (!token) return { success: false, error: AUTH_REQUIRED };
     try {
       // GET /bookings/:id is ownership-gated server-side (renter/vendor/admin).
-      const booking = await backendRequest<BackendBooking>('GET', `/bookings/${bookingId}`, { token });
+      const booking = await backendRequest<FetchedBooking>('GET', `/bookings/${bookingId}`, { token });
       return { success: true, booking };
     } catch (error) {
       return { success: false, error: toMessage(error, 'Failed to fetch booking') };

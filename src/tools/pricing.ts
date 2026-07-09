@@ -1,4 +1,5 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
+import type { Listing } from '@/lib/api-contract';
 
 /**
  * Pricing tools read anonymized market aggregates from the public backend
@@ -10,9 +11,15 @@ import { backendRequest, BackendApiError } from '@/lib/backend-client';
  * family. The backend serves both aliases byte-identically
  * (`@Controller(['listings', 'rentals'])`), so the response shape — and these
  * tools' I/O contracts — are unchanged.
+ *
+ * SPLIT-197 §C-MCP: `ListingRecord` is the generated `Listing` entity from the
+ * backend OpenAPI contract. `PricingStatsResponse` stays a local type: the
+ * backend declares NO typed response schema for GET /rentals/pricing-stats
+ * (contract gap — see `@/lib/api-contract`), so it can't be derived from the
+ * spec; this interface documents the real shape the tool reads.
  */
 
-type ListingRecord = Record<string, unknown>;
+type ListingRecord = Listing;
 
 interface PricingAnalysis {
   suggestedPrice: number;

@@ -1,4 +1,5 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
+import type { Listing } from '@/lib/api-contract';
 
 /**
  * Listing read tools are thin clients of the public backend REST API (SPLIT-226)
@@ -11,9 +12,23 @@ import { backendRequest, BackendApiError } from '@/lib/backend-client';
  * family. The backend serves both aliases byte-identically
  * (`@Controller(['listings', 'rentals'])`), so the response shape — and these
  * tools' I/O contracts — are unchanged.
+ *
+ * SPLIT-197 §C-MCP: `ListingRecord` is now the generated `Listing` entity from
+ * the backend OpenAPI contract instead of an untyped `Record<string, unknown>`.
+ * NOTE: the read routes below (`GET /rentals*`) declare no typed response schema
+ * in the spec (only a bare `object`), so their result envelopes are modelled
+ * with the narrow local types below over the generated `Listing` element type —
+ * a documented contract gap (see `@/lib/api-contract`).
  */
 
-type ListingRecord = Record<string, unknown>;
+type ListingRecord = Listing;
+
+/** GET /rentals & /rentals/search/vibe & /rentals/{id}/similar wrap results in a
+ *  `data` array (vibe/similar also carry `success`). Untyped in the spec. */
+type ListingListResponse = { success?: boolean; data?: ListingRecord[] };
+
+/** GET /rentals/{id}/availability. Untyped in the spec (contract gap). */
+type AvailabilityResponse = { isAvailable: boolean; conflicts?: unknown[] };
 
 export interface SearchFilters {
   location?: string;
@@ -45,7 +60,7 @@ export const listingTools = {
       // A natural-language query → the backend's semantic "vibe" search, which
       // runs the embedding + match_listings pgvector RPC server-side.
       if (filters.query) {
-        const vibe = await backendRequest<{ success: boolean; data: ListingRecord[] }>(
+        const vibe = await backendRequest<ListingListResponse>(
           'GET',
           `/rentals/search/vibe${qs({ q: filters.query, limit: 50 })}`,
         );
@@ -53,7 +68,7 @@ export const listingTools = {
         // Fall through to structured browse if vibe returns nothing.
       }
 
-      const browse = await backendRequest<{ data: ListingRecord[] }>(
+      const browse = await backendRequest<ListingListResponse>(
         'GET',
         `/rentals${qs({
           search: filters.query,
@@ -90,7 +105,7 @@ export const listingTools = {
     guests: number,
   ): Promise<{ available: boolean; message: string }> {
     try {
-      const result = await backendRequest<{ isAvailable: boolean; conflicts?: unknown[] }>(
+      const result = await backendRequest<AvailabilityResponse>(
         'GET',
         `/rentals/${listingId}/availability${qs({ startDate: checkIn, endDate: checkOut, guests })}`,
       );
@@ -108,7 +123,7 @@ export const listingTools = {
 
   async getSimilarListings(listingId: string, limit = 5): Promise<ListingRecord[]> {
     try {
-      const result = await backendRequest<{ success: boolean; data: ListingRecord[] }>(
+      const result = await backendRequest<ListingListResponse>(
         'GET',
         `/rentals/${listingId}/similar${qs({ limit })}`,
       );

@@ -1,4 +1,5 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
+import type { Conversation, PostResponse } from '@/lib/api-contract';
 
 /**
  * `sendMessage` / `getConversations` call the backend REST API forwarding the
@@ -7,7 +8,17 @@ import { backendRequest, BackendApiError } from '@/lib/backend-client';
  * schema. `generateAIDraft` now also goes through the backend AI (SPLIT-277) —
  * the MCP holds no LLM provider key of its own. No Supabase, no direct openai:
  * the whole MCP reads/writes through the backend.
+ *
+ * SPLIT-197 §C-MCP: chat response types are derived from the backend OpenAPI
+ * contract (`@/lib/api-contract`). `POST /chat/conversations/{id}/messages` is
+ * spec-bound to `Message`; the conversation reads use the generated
+ * `Conversation` entity (the /chat/conversations routes declare only a bare
+ * `object` response — a contract gap — but the entity schema exists). The old
+ * hand-rolled `ConversationRecord` interface is gone.
  */
+
+/** POST /chat/conversations/{conversationId}/messages → `Message` (spec-bound). */
+type SentMessage = PostResponse<'/api/v1/chat/conversations/{conversationId}/messages'>;
 
 // Defense in depth (M6): the route layer UUID-validates ids, but validating
 // here too avoids a pointless backend round-trip on obviously-bad input.
@@ -28,12 +39,6 @@ function isAuthError(error: unknown): error is BackendApiError {
   return error instanceof BackendApiError && (error.status === 401 || error.status === 403);
 }
 
-interface ConversationRecord {
-  id?: string;
-  participant1Id?: string;
-  participant2Id?: string;
-}
-
 /**
  * Resolve (or create) the conversation to post into.
  *
@@ -50,7 +55,7 @@ async function resolveOrCreateConversation(
   token: string,
 ): Promise<string | undefined> {
   try {
-    const created = await backendRequest<ConversationRecord>('POST', '/chat/conversations', {
+    const created = await backendRequest<Conversation>('POST', '/chat/conversations', {
       token,
       body: { participantId: recipientId },
     });
@@ -68,7 +73,7 @@ async function findConversationWith(
   recipientId: string,
   token: string,
 ): Promise<string | undefined> {
-  const list = await backendRequest<ConversationRecord[]>('GET', '/chat/conversations', { token });
+  const list = await backendRequest<Conversation[]>('GET', '/chat/conversations', { token });
   if (!Array.isArray(list)) return undefined;
   const match = list.find(
     (c) => c && (c.participant1Id === recipientId || c.participant2Id === recipientId),
@@ -82,7 +87,7 @@ export const messagingTools = {
     content: string;
     conversationId?: string;
     token: string;
-  }): Promise<{ success: boolean; message?: Record<string, unknown>; conversationId?: string; error?: string }> {
+  }): Promise<{ success: boolean; message?: SentMessage; conversationId?: string; error?: string }> {
     if (!params.token) return { success: false, error: AUTH_REQUIRED };
     if (!isUuid(params.recipientId)) {
       return { success: false, error: 'Invalid recipientId: expected a UUID' };
@@ -100,7 +105,7 @@ export const messagingTools = {
         if (!convId) return { success: false, error: 'Failed to resolve conversation' };
       }
 
-      const message = await backendRequest<Record<string, unknown>>(
+      const message = await backendRequest<SentMessage>(
         'POST',
         `/chat/conversations/${convId}/messages`,
         { token: params.token, body: { content: params.content } },
@@ -111,10 +116,10 @@ export const messagingTools = {
     }
   },
 
-  async getConversations(token: string): Promise<Record<string, unknown>[]> {
+  async getConversations(token: string): Promise<Conversation[]> {
     if (!token) return [];
     try {
-      const result = await backendRequest<Record<string, unknown>[]>('GET', '/chat/conversations', { token });
+      const result = await backendRequest<Conversation[]>('GET', '/chat/conversations', { token });
       return Array.isArray(result) ? result : [];
     } catch (error) {
       console.error('Get conversations error:', error);
