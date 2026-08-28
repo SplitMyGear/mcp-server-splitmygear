@@ -4,7 +4,7 @@
   "display_name": "Splitt \u2014 Outdoor Gear Rental",
   "version": "1.0.0",
   "description": "Search, browse, and book outdoor gear rentals on Splitt. Supports natural language search, availability checks, pricing analysis, AI-generated listing descriptions, experiences, and more.",
-  "long_description": "The Splitt MCP server gives AI agents full access to the Splitt outdoor gear rental platform. Browse 8 gear categories (camping, hiking, water sports, snow sports, climbing, cycling, fishing, photography), search with natural language, check availability, view pricing, and book gear or outdoor experiences. Vendors can generate AI-powered listing descriptions and get competitive pricing insights. Authenticated users can manage bookings and conversations. All access requires an API key (no public tier).",
+  "long_description": "The Splitt MCP server gives AI agents full access to the Splitt outdoor gear rental platform. Browse 19 gear categories (camping, hiking, water sports, snow sports, climbing, biking, fishing, photography, and more), search with natural language, check availability, view pricing, and book gear or outdoor experiences. Vendors can generate AI-powered listing descriptions and get competitive pricing insights. Authenticated users can manage bookings and conversations. All access requires an API key (no public tier).",
   "author": {
     "name": "Splitt",
     "url": "https://splitmygear.com"

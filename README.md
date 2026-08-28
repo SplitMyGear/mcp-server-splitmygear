@@ -153,7 +153,7 @@ The `search_listings` `query` parameter accepts plain English. The server parses
 
 | Resource URI | Description |
 |---|---|
-| `splitmygear://categories` | List of all 8 gear categories |
+| `splitmygear://categories` | List of all 19 gear categories |
 
 ---
 
