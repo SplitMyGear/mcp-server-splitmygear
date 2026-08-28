@@ -7,15 +7,15 @@
   "long_description": "The Splitt MCP server gives AI agents full access to the Splitt outdoor gear rental platform. Browse 19 gear categories (camping, hiking, water sports, snow sports, climbing, biking, fishing, photography, and more), search with natural language, check availability, view pricing, and book gear or outdoor experiences. Vendors can generate AI-powered listing descriptions and get competitive pricing insights. Authenticated users can manage bookings and conversations. All access requires an API key (no public tier).",
   "author": {
     "name": "Splitt",
-    "url": "https://splitmygear.com"
+    "url": "https://go-splitt.com"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/SplitMyGear/mcp-server-splitmygear"
   },
-  "homepage": "https://splitmygear.com",
+  "homepage": "https://go-splitt.com",
   "license": "MIT",
-  "icon": "https://splitmygear.com/favicon.ico",
+  "icon": "https://go-splitt.com/favicon.ico",
   "server": {
     "type": "http",
     "url": "https://mcp-server-splitmygear.vercel.app/api/mcp"
