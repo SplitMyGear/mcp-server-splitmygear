@@ -1,6 +1,6 @@
 # mcp-server-splitmygear
 
-MCP (Model Context Protocol) server for [SplitMyGear](https://splitmygear.com) — an outdoor gear rental marketplace. Lets AI agents (Claude, Cursor, Windsurf, etc.) search gear, check availability, manage bookings, browse experiences, and more.
+MCP (Model Context Protocol) server for [SplitMyGear](https://go-splitt.com) — an outdoor gear rental marketplace. Lets AI agents (Claude, Cursor, Windsurf, etc.) search gear, check availability, manage bookings, browse experiences, and more.
 
 **18 tools** across search, booking, pricing, content generation, experiences, and messaging.
 

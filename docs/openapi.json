@@ -1,12 +1,13 @@
 {
   "openapi": "3.0.3",
+  "x-note": "Describes this MCP server's own HTTP endpoint (this repo). Distinct from openapi/openapi.json, which is a snapshot of the SplitMyGear BACKEND's REST API contract that this server calls.",
   "info": {
     "title": "Splitt MCP Server",
     "description": "MCP (Model Context Protocol) server for Splitt - AI-first rental platform. This server exposes tools that AI agents can use to interact with the Splitt platform.",
     "version": "1.0.0",
     "contact": {
       "name": "Splitt",
-      "url": "https://splitmygear.com"
+      "url": "https://go-splitt.com"
     },
     "license": {
       "name": "MIT"
@@ -14,7 +15,7 @@
   },
   "servers": [
     {
-      "url": "https://your-domain.com/api/mcp",
+      "url": "https://mcp-server-splitmygear.vercel.app/api/mcp",
       "description": "Production server"
     },
     {
