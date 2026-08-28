@@ -20,6 +20,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/access-grants/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminController_getPendingAccessGrants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/access-grants/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * POST /admin/access-grants/:id/approve — a DIFFERENT admin approves a
+         *     pending sensitive-entitlement grant, applying it through the exact same
+         *     `AdminService.setUserEntitlements`/`setUserAccess` path a non-sensitive
+         *     PATCH uses (see `AccessGrantService.approvePendingGrant`'s docblock).
+         *     Self-approval is rejected with a 400 SERVER-SIDE, not merely hidden in
+         *     the UI. Unknown grant id → 404; already-decided/expired grant → 400.
+         *     Audited as `access.grant.approved` — deliberately the ONLY audit write
+         *     on this path (the apply call's own `access.entitlements.set`/
+         *     `access.set` is NOT also written; `access.grant.approved` is listed in
+         *     `ACCESS_REVIEW_PRIVILEGE_ACTIONS` instead, so SPLIT-1230's access-review
+         *     report still sees this as the privilege change it is, with one
+         *     accurate audit row instead of two).
+         */
+        post: operations["AdminController_approveAccessGrant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/access-grants/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * POST /admin/access-grants/:id/reject — decline a pending grant. Body:
+         *     { reason?: string }. UNLIKE approval, the requesting admin MAY reject
+         *     their own request (withdrawing a mistaken ask is the safe direction —
+         *     see `AccessGrantService.rejectPendingGrant`'s docblock). Unknown grant
+         *     id → 404; already-decided/expired grant → 400. Audited
+         *     (`access.grant.rejected`).
+         */
+        post: operations["AdminController_rejectAccessGrant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/audit": {
         parameters: {
             query?: never;
@@ -29,7 +99,8 @@ export interface paths {
         };
         /**
          * GET /admin/audit — paginated, filterable view of the immutable audit
-         *     trail (SPLIT-192). Class-level guards already enforce ADMIN.
+         *     trail (SPLIT-192). SPLIT-761: stays admin-ROLE-only — the trail records
+         *     privilege administration itself, so it is not a delegable section.
          */
         get: operations["AdminController_getAuditLog"];
         put?: never;
@@ -131,6 +202,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/experiences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminExperiencesController_list"];
+        put?: never;
+        post: operations["AdminExperiencesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/experiences/vendors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminExperiencesController_listVendors"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/experiences/vendors/{hostId}/listings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminExperiencesController_listVendorListings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/experiences/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["AdminExperiencesController_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/experiences/{id}/gear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["AdminExperiencesController_setGear"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/experiences/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminExperiencesController_publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/experiences/{id}/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminExperiencesController_addSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/finance/1099k": {
         parameters: {
             query?: never;
@@ -188,6 +371,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/finance/tax-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SPLIT-903. READ-ONLY sales-tax remittance report: tax collected/refunded/
+         *     net BY JURISDICTION (state), sourced from the Stripe Tax breakdown the
+         *     checkout.session.completed webhook persists. Rows whose jurisdiction
+         *     could not be resolved (a failed breakdown retrieve, or a taxed booking
+         *     that predates SPLIT-903) are broken out separately in `unattributed`
+         *     rather than silently dropped or mis-attributed.
+         */
+        get: operations["FinanceController_getTaxReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/finance/tax-report/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * CSV export of the tax report (one row per state, an Unattributed row when
+         *     relevant, and a Total row). Returns { success, csv, filename } — frontend
+         *     creates a Blob download (mirrors analytics.controller.ts's export shape).
+         */
+        get: operations["FinanceController_exportTaxReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/finance/tax-report/itemized": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-936. Start a Stripe itemized-tax report run (per-LOCALITY rows —
+         *     the state/local split a Minnesota Sales and Use return needs, which the
+         *     aggregate `tax-report` above cannot provide because Checkout persists
+         *     state+local COMBINED). Returns `{ runId, status }`; poll the GET below.
+         *     Works on both modes today (staging-verified end-to-end 2026-07-28); if
+         *     Stripe enforces its historical live-mode-only limit, a clean 400 names
+         *     it.
+         */
+        post: operations["FinanceController_createItemizedTaxExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/finance/tax-report/itemized/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SPLIT-936. Poll an itemized report run; once Stripe finishes, the result
+         *     CSV is proxied back in the established `{ success, csv, filename }`
+         *     envelope (files.stripe.com needs secret-key auth, so the browser can
+         *     never fetch it directly).
+         */
+        get: operations["FinanceController_getItemizedTaxExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/finance/vendors": {
         parameters: {
             query?: never;
@@ -197,6 +472,90 @@ export interface paths {
         };
         /** Per-vendor revenue breakdown, filterable by date + category. */
         get: operations["FinanceController_getVendorBreakdown"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/insurance-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List vendor insurance policies (optional status) */
+        get: operations["InsuranceAdminController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/insurance-policies/{id}/document-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a short-lived signed URL for a policy document (admin) */
+        get: operations["InsuranceAdminController_getDocumentUrl"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/insurance-policies/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reject a vendor insurance policy */
+        put: operations["InsuranceAdminController_reject"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/insurance-policies/{id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Verify a vendor insurance policy */
+        put: operations["InsuranceAdminController_verify"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/leads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminController_getLeads"];
         put?: never;
         post?: never;
         delete?: never;
@@ -305,6 +664,57 @@ export interface paths {
         patch: operations["AdminController_setListingVisibility"];
         trace?: never;
     };
+    "/api/v1/admin/package-staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List staff assignment requests */
+        get: operations["AdminPackageStaffController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/package-staff/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve a staff assignment request */
+        post: operations["AdminPackageStaffController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/package-staff/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject a staff assignment request */
+        post: operations["AdminPackageStaffController_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/payouts": {
         parameters: {
             query?: never;
@@ -380,6 +790,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/reconciliation/overdue-rentals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SPLIT-738 — GET /admin/reconciliation/overdue-rentals — bookings a vendor
+         *     flagged as NOT RETURNED (overdue), as admin work items: booking, listing,
+         *     renter, days overdue, and the HELD deposit at risk. READ-ONLY. Gated on the
+         *     `finance` read section (mirrors stuck-deposits/stuck-payouts).
+         */
+        get: operations["ReconciliationController_getOverdueRentals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/reconciliation/reports": {
         parameters: {
             query?: never;
@@ -414,6 +846,98 @@ export interface paths {
          *     and return the persisted report. Audited. READ-ONLY w.r.t. vendor balances.
          */
         post: operations["ReconciliationController_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/reconciliation/stuck-deposits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SPLIT-725/741 — GET /admin/reconciliation/stuck-deposits — stuck DEPOSIT /
+         *     refund money items (deposit_expired, capture_missing_hold,
+         *     cancelled_refund_owed, held_releasable), as finance-console work items until
+         *     the daily compensation sweeps (or an operator) settle them. READ-ONLY. Gated
+         *     on the `finance` read section (mirrors stuck-payouts).
+         */
+        get: operations["ReconciliationController_getStuckDeposits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/reconciliation/stuck-payouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SPLIT-751 — GET /admin/reconciliation/stuck-payouts — payouts stuck PENDING
+         *     past the in-flight window, as finance-console work items. READ-ONLY.
+         *     `committedTransfer` (money moved, completion didn't finalize) is surfaced
+         *     DISTINCTLY from `ambiguous` (a transient transfer failure needing a Stripe
+         *     check before any retry). Gated on the `finance` read section.
+         */
+        get: operations["ReconciliationController_getStuckPayouts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/reconciliation/unpayable-balances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SPLIT-715 — GET /admin/reconciliation/unpayable-balances — vendors carrying a
+         *     positive accrued/available balance while their Stripe account is not
+         *     payouts-enabled (`stripeAccountStatus !== 'enabled'`). The ops chase-list for
+         *     stuck-KYC vendors under the intentional accept-and-accrue model. READ-ONLY.
+         *     Gated on the `finance` read section (mirrors stuck-payouts / stuck-deposits).
+         */
+        get: operations["ReconciliationController_getUnpayableBalances"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/reconciliation/vendor-cancel-rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SPLIT-749 — GET /admin/reconciliation/vendor-cancel-rates — per-vendor
+         *     cancellation-reliability over a trailing 90-day window: accepted bookings,
+         *     vendor-initiated cancels, the severe-weather subset (broken out + excluded
+         *     from the penalty), and the resulting penalty cancel-rate. READ-ONLY. Gated on
+         *     the `finance` read section (mirrors overdue-rentals / unpayable-balances).
+         */
+        get: operations["ReconciliationController_getVendorCancelRates"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -503,6 +1027,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RoutesAdminController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/routes/{id}/moderation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["RoutesAdminController_setModeration"];
+        trace?: never;
+    };
     "/api/v1/admin/seed/test-data": {
         parameters: {
             query?: never;
@@ -517,6 +1073,34 @@ export interface paths {
          *     Idempotent — safe to call multiple times. Creates test users and listings if they don't exist.
          */
         post: operations["AdminController_seedTestData"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/seed/waivers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * POST /admin/seed/waivers — SPLIT-721: bootstrap the default platform
+         *     waivers (waiver enforcement shipped with an EMPTY e_waivers table, so the
+         *     booking waiver gate was permanently inert). Idempotent — create-if-absent
+         *     by exact name from DEFAULT_WAIVER_TEMPLATES; existing rows are NEVER
+         *     overwritten (returned as `skipped` with their live id/version).
+         *
+         *     UNLIKE seed/test-data this deliberately has NO production gate: it plants
+         *     no credentials and no test data — only the platform's own legal waiver
+         *     content — and production is exactly where the bootstrap is needed.
+         *     Audited (admin write on prod).
+         */
+        post: operations["AdminController_seedDefaultWaivers"];
         delete?: never;
         options?: never;
         head?: never;
@@ -596,6 +1180,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/users/access-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminController_getAccessReview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users/commission-overrides": {
         parameters: {
             query?: never;
@@ -604,6 +1204,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["AdminController_getCommissionOverrides"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminController_getUserDetail"];
         put?: never;
         post?: never;
         delete?: never;
@@ -634,6 +1250,18 @@ export interface paths {
          *     entitlements), where a failure between them could leave a user escalated
          *     with the wrong entitlements. Audited as a single access change. The
          *     standalone role/entitlements endpoints above remain for other callers.
+         *
+         *     SPLIT-1231: dual control on the ENTITLEMENTS half of this atomic
+         *     request, exactly mirroring `setUserEntitlements` above (same sensitive
+         *     set, same "compare against current" rule, same
+         *     `status:'applied'`/`'pending_approval'` response discriminant, same
+         *     removal of `@Audited` in favor of `AccessGrantService` recording the
+         *     correct action itself). A role-only change that adds no sensitive
+         *     entitlement is NOT deferred — see `AccessGrantService`'s class docblock
+         *     for why that is a deliberate scope boundary. When deferred, the ROLE
+         *     change is deferred WITH the entitlements (the pair applies atomically
+         *     per SPLIT-411, so a deferred grant can never split them across two
+         *     separate applies).
          */
         patch: operations["AdminController_setUserAccess"];
         trace?: never;
@@ -717,6 +1345,33 @@ export interface paths {
         patch: operations["AdminController_setUserRole"];
         trace?: never;
     };
+    "/api/v1/admin/users/{id}/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * SPLIT-763: PATCH /admin/users/:id/staff
+         *     Designate (or remove) a user as an explicit Splitt employee. Body:
+         *     { isStaff: boolean, staffTitle?: string }. Employment is the PRECONDITION
+         *     for holding any internal privilege (an entitlement or a staff persona), so
+         *     this stays @Roles(ADMIN)-only — privilege management is NOT delegable
+         *     (mirrors users/:id/access). Designating a vendor, or removing a user who
+         *     still holds a staff persona, is a 400 (conflict of interest / invariant);
+         *     removing a user clears every entitlement and revokes their sessions. Missing
+         *     user → 404 (service guard). Audited.
+         */
+        patch: operations["AdminController_setUserStaff"];
+        trace?: never;
+    };
     "/api/v1/admin/users/{id}/suspension": {
         parameters: {
             query?: never;
@@ -797,6 +1452,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/verifications/{id}/request-info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-867: POST /admin/verifications/:id/request-info — a third review
+         *     outcome between approve/reject: ask the owner for a better/additional
+         *     document instead of an outright rejection. Body validated by
+         *     RequestMoreInfoDto (a required note, mirroring RejectVerificationDto's
+         *     shape). Unknown id → 404. Audited.
+         */
+        post: operations["AdminController_requestMoreInfo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/analyze-sentiment": {
         parameters: {
             query?: never;
@@ -861,22 +1539,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/ai/generate-care-guide": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["AiController_generateCareGuide"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/ai/generate-description": {
         parameters: {
             query?: never;
@@ -903,22 +1565,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["AiController_generateListing"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ai/get-recommendations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["AiController_getRecommendations"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1442,6 +2088,198 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/2fa/disable/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TwoFactorController_disableConfirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/disable/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TwoFactorController_disableStart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/enroll/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TwoFactorController_enrollConfirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/enroll/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TwoFactorController_enrollStart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/otp/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TwoFactorController_otpSend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/otp/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TwoFactorController_otpVerify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/passkeys/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TwoFactorController_passkeyOptions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/passkeys/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TwoFactorController_passkeyVerify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/passkeys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["TwoFactorController_passkeyRename"];
+        post?: never;
+        delete: operations["TwoFactorController_passkeyDelete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TwoFactorController_getStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/webauthn/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TwoFactorController_webauthnOptions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/webauthn/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TwoFactorController_webauthnVerify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/apple": {
         parameters: {
             query?: never;
@@ -1685,6 +2523,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/blog/slug/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BlogPublicController_findBySlug"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/blog/{id}": {
         parameters: {
             query?: never;
@@ -1917,6 +2771,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bookings/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Quote the price of a prospective booking (public, read-only)
+         * @description Returns the SERVER-AUTHORITATIVE price for a listing + date window, computed by the same pricing sequence `POST /bookings` uses. Creates nothing and reserves nothing — a quote is a price, not a hold, and the renter-eligibility and availability gates still run at booking time. Promo codes are NOT applied here (they require renter identity and a single-use redemption), so a renter who later applies one is charged LESS than the quoted total. `depositAmount` is a hold and is excluded from `total`.
+         */
+        post: operations["BookingController_quote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bookings/vendor-bookings": {
         parameters: {
             query?: never;
@@ -1965,6 +2839,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bookings/{id}/cancellation-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BookingController_cancellationPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bookings/{id}/dates": {
         parameters: {
             query?: never;
@@ -1990,6 +2880,38 @@ export interface paths {
         };
         get: operations["BookingController_getHistory"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bookings/{id}/mark-not-returned": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["BookingController_markNotReturned"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bookings/{id}/mark-returned": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["BookingController_markReturned"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2029,6 +2951,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bookings/{id}/reschedule-proposal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BookingController_proposeReschedule"];
+        delete: operations["BookingController_withdrawReschedule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bookings/{id}/reschedule-proposal/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BookingController_acceptReschedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bookings/{id}/reschedule-proposal/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BookingController_declineReschedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bookings/{id}/status": {
         parameters: {
             query?: never;
@@ -2055,6 +3025,54 @@ export interface paths {
         get?: never;
         put: operations["BookingController_reassignUnit"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bookings/{id}/vendor-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["BookingController_updateVendorNotes"];
+        trace?: never;
+    };
+    "/api/v1/calendar-feeds/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["CalendarFeedController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar-feeds/{id}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CalendarFeedController_sync"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2501,7 +3519,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Admin adjudicates a damage claim (admin only) */
+        /** Adjudicate a damage claim (operations_write entitlement) */
         post: operations["ClaimsController_resolve"];
         delete?: never;
         options?: never;
@@ -2568,6 +3586,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/destinations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DestinationsPublicController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/destinations/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DestinationsPublicController_getBySlug"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/disputes": {
         parameters: {
             query?: never;
@@ -2600,7 +3650,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update a dispute (Admin only) */
+        /** Update a dispute (operations_write entitlement) */
         patch: operations["DisputesController_update"];
         trace?: never;
     };
@@ -2804,6 +3854,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/email-templates/seed-monthly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EmailTemplatesController_seedMonthly"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/email-templates/test-send": {
         parameters: {
             query?: never;
@@ -2814,11 +3880,60 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Send a test email for a template. Requires admin or CRM manager JWT.
+         * Send a test email for a template. Requires the crm_write entitlement
+         *     (admins and crm_managers imply it).
          *     If templateId is provided, renders the template with supplied variables first.
          *     Falls back to raw html if no templateId.
          */
         post: operations["EmailTemplatesController_testSend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/email-templates/transactional": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EmailTemplatesController_getTransactionalCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/email-templates/transactional/{key}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EmailTemplatesController_previewTransactional"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/email-templates/transactional/{key}/test-send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EmailTemplatesController_testSendTransactional"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2925,6 +4040,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/experiences/bookings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SPLIT-1075 — a single experience booking with the schedule + experience
+         *     summary the checkout / checkout-success screens need.
+         *
+         *     ROUTE ORDER MATTERS: this is registered AFTER `bookings/my` (above) so the
+         *     literal route still wins for `/packages/bookings/my`, and it never shadows
+         *     `bookings/:id/history` (three segments). The service returns 404 — not 403 —
+         *     for a non-party so the endpoint cannot enumerate booking ids.
+         * @deprecated
+         */
+        get: operations["ExperiencesController_getBookingDetail[0]"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/experiences/bookings/{id}/cancel": {
         parameters: {
             query?: never;
@@ -2936,6 +4077,34 @@ export interface paths {
         put?: never;
         /** @deprecated */
         post: operations["ExperiencesController_cancelBooking[0]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/experiences/bookings/{id}/checkout-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1075 — mint a Stripe Checkout Session for an experience booking
+         *     (pay-before-accept: the guest AUTHORIZES now, the host's accept CAPTURES).
+         *
+         *     Ownership, payable-status, past-slot, double-charge and host-Connect gates
+         *     all live in the SERVICE so no caller can bypass them. The success/cancel
+         *     URLs are clamped to our own frontend origin through the SAME
+         *     `resolveSafeRedirect` helper the rental and promote checkouts use
+         *     (SPLIT-344/538) — a client-supplied URL is otherwise an open-redirect /
+         *     phishing vector on the page the guest lands on after paying.
+         * @deprecated
+         */
+        post: operations["ExperiencesController_createBookingCheckoutSession[0]"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3114,6 +4283,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/experiences/{id}/gear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @deprecated */
+        get: operations["ExperienceGearController_getGear[0]"];
+        /** @deprecated */
+        put: operations["ExperienceGearController_setGear[0]"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/experiences/{id}/publish": {
         parameters: {
             query?: never;
@@ -3149,6 +4336,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/experiences/{id}/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @deprecated */
+        get: operations["ExperienceRoutesLinkController_getRoutes[0]"];
+        /** @deprecated */
+        put: operations["ExperienceRoutesLinkController_setRoutes[0]"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/experiences/{id}/schedules": {
         parameters: {
             query?: never;
@@ -3162,6 +4367,94 @@ export interface paths {
         /** @deprecated */
         post: operations["ExperiencesController_createSchedule[0]"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/experiences/{id}/schedules/weekly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate recurring weekly schedule slots
+         * @deprecated
+         */
+        post: operations["PackageStaffController_generateWeeklySlots[0]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/experiences/{id}/schedules/{scheduleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update a package schedule slot
+         * @deprecated
+         */
+        put: operations["PackageStaffController_updateSchedule[0]"];
+        post?: never;
+        /**
+         * Delete a package schedule slot
+         * @deprecated
+         */
+        delete: operations["PackageStaffController_deleteSchedule[0]"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/experiences/{id}/staff-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a package's staff assignments
+         * @deprecated
+         */
+        get: operations["PackageStaffController_listForPackage[0]"];
+        put?: never;
+        /**
+         * Nominate a staff member to run a guided package
+         * @deprecated
+         */
+        post: operations["PackageStaffController_requestAssignment[0]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/experiences/{id}/staff-requests/{assignmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke a staff assignment
+         * @deprecated
+         */
+        delete: operations["PackageStaffController_revoke[0]"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3321,6 +4614,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fleet/listings/{listingId}/units/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bulk-create N identical unit stubs on a listing (SPLIT-1005) */
+        post: operations["FleetController_createUnitsBulk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fleet/my-units": {
         parameters: {
             query?: never;
@@ -3363,7 +4673,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update a unit (status, condition, notes) */
+        /** Update a unit (status, notes) */
         put: operations["FleetController_updateUnit"];
         post?: never;
         /** Permanently remove a unit from a listing fleet */
@@ -3382,8 +4692,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Mark a unit as maintenance complete */
+        /** Append an immutable maintenance record for a unit (service/repair/inspection) */
         post: operations["FleetController_recordMaintenanceComplete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fleet/units/{unitId}/maintenance-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List a unit’s maintenance history (append-only, newest first) */
+        get: operations["FleetController_getMaintenanceRecords"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3539,7 +4866,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Admin resolves a disputed charge (approve → capture; deny → cancel) */
+        /** Staff resolves a disputed charge (approve → capture; deny → cancel) — operations_write entitlement */
         post: operations["IncidentalChargesController_resolve"];
         delete?: never;
         options?: never;
@@ -3558,6 +4885,75 @@ export interface paths {
         put?: never;
         /** Renter accepts (capture) or disputes (escalate) a charge */
         post: operations["IncidentalChargesController_respond"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insurance-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register a new insurance policy for the vendor */
+        post: operations["InsurancePolicyController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insurance-policies/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the current vendor's insurance policies */
+        get: operations["InsurancePolicyController_findMine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insurance-policies/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update an own policy (resets it to pending review) */
+        put: operations["InsurancePolicyController_update"];
+        post?: never;
+        /** Delete an own policy (only while pending or rejected) */
+        delete: operations["InsurancePolicyController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insurance-policies/{id}/document-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a short-lived signed URL for the policy document (owner or admin) */
+        get: operations["InsurancePolicyController_getDocumentUrl"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3727,6 +5123,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/listings/rate-rules/{ruleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @deprecated */
+        delete: operations["ListingController_removeRateRule[0]"];
+        options?: never;
+        head?: never;
+        /** @deprecated */
+        patch: operations["ListingController_updateRateRule[0]"];
+        trace?: never;
+    };
     "/api/v1/listings/search/bounds": {
         parameters: {
             query?: never;
@@ -3831,6 +5245,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/listings/{id}/care-guide/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @deprecated */
+        post: operations["ListingController_regenerateCareGuide[0]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/listings/{id}/duplicate": {
         parameters: {
             query?: never;
@@ -3842,6 +5273,23 @@ export interface paths {
         put?: never;
         /** @deprecated */
         post: operations["ListingController_duplicate[0]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/listings/{id}/experiences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @deprecated */
+        get: operations["ListingRoutesController_getUpgrades[0]"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3877,6 +5325,87 @@ export interface paths {
         /** @deprecated */
         post: operations["ListingController_publish[0]"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/listings/{id}/rate-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @deprecated */
+        get: operations["ListingController_getRateRules[0]"];
+        put?: never;
+        /** @deprecated */
+        post: operations["ListingController_createRateRule[0]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/listings/{id}/rate-rules/starter-seasons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @deprecated */
+        post: operations["ListingController_applyStarterSeasons[0]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/listings/{id}/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Splitt Routes v2 (SPLIT-1156): reads the MERGE of v2 `Route` links
+         *     (`ListingRouteLink`, active + visible) and v1 `ListingRoute` rows
+         *     (published), new routes first — `RoutesService.getPublicListingRoutes`
+         *     does its OWN existence check (404 on a bogus listing id) and already
+         *     returns the exact `{routes: [...]}` shape this handler used to build by
+         *     hand, so it fully replaces the old `assertListingExists` +
+         *     `getPublishedRoutes` two-step.
+         * @deprecated
+         */
+        get: operations["ListingRoutesController_getRoutes[0]"];
+        /** @deprecated */
+        put: operations["ListingRoutesLinkController_setRoutes[0]"];
+        /** @deprecated */
+        post: operations["ListingRoutesController_createRoute[0]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/listings/{id}/routes/{routeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @deprecated */
+        put: operations["ListingRoutesController_updateRoute[0]"];
+        post?: never;
+        /** @deprecated */
+        delete: operations["ListingRoutesController_removeRoute[0]"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3928,6 +5457,24 @@ export interface paths {
         put?: never;
         /** @deprecated */
         post: operations["BlackoutController_create[0]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/listings/{listingId}/calendar-feeds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @deprecated */
+        get: operations["CalendarFeedController_list[0]"];
+        put?: never;
+        /** @deprecated */
+        post: operations["CalendarFeedController_create[0]"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4001,7 +5548,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Admin override for content moderation */
+        /** Staff override for content moderation */
         patch: operations["ModerationController_adminOverride"];
         trace?: never;
     };
@@ -4082,6 +5629,22 @@ export interface paths {
         get?: never;
         put: operations["NotificationController_markAllAsRead"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/test-push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["NotificationController_testPush"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4184,6 +5747,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/packages/bookings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SPLIT-1075 — a single experience booking with the schedule + experience
+         *     summary the checkout / checkout-success screens need.
+         *
+         *     ROUTE ORDER MATTERS: this is registered AFTER `bookings/my` (above) so the
+         *     literal route still wins for `/packages/bookings/my`, and it never shadows
+         *     `bookings/:id/history` (three segments). The service returns 404 — not 403 —
+         *     for a non-party so the endpoint cannot enumerate booking ids.
+         */
+        get: operations["ExperiencesController_getBookingDetail[1]"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/packages/bookings/{id}/cancel": {
         parameters: {
             query?: never;
@@ -4194,6 +5782,33 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ExperiencesController_cancelBooking[1]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packages/bookings/{id}/checkout-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1075 — mint a Stripe Checkout Session for an experience booking
+         *     (pay-before-accept: the guest AUTHORIZES now, the host's accept CAPTURES).
+         *
+         *     Ownership, payable-status, past-slot, double-charge and host-Connect gates
+         *     all live in the SERVICE so no caller can bypass them. The success/cancel
+         *     URLs are clamped to our own frontend origin through the SAME
+         *     `resolveSafeRedirect` helper the rental and promote checkouts use
+         *     (SPLIT-344/538) — a client-supplied URL is otherwise an open-redirect /
+         *     phishing vector on the page the guest lands on after paying.
+         */
+        post: operations["ExperiencesController_createBookingCheckoutSession[1]"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4360,6 +5975,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/packages/{id}/gear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExperienceGearController_getGear[1]"];
+        put: operations["ExperienceGearController_setGear[1]"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/packages/{id}/publish": {
         parameters: {
             query?: never;
@@ -4392,6 +6023,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/packages/{id}/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExperienceRoutesLinkController_getRoutes[1]"];
+        put: operations["ExperienceRoutesLinkController_setRoutes[1]"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/packages/{id}/schedules": {
         parameters: {
             query?: never;
@@ -4408,6 +6055,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/packages/{id}/schedules/weekly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate recurring weekly schedule slots */
+        post: operations["PackageStaffController_generateWeeklySlots[1]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packages/{id}/schedules/{scheduleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update a package schedule slot */
+        put: operations["PackageStaffController_updateSchedule[1]"];
+        post?: never;
+        /** Delete a package schedule slot */
+        delete: operations["PackageStaffController_deleteSchedule[1]"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packages/{id}/staff-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List a package's staff assignments */
+        get: operations["PackageStaffController_listForPackage[1]"];
+        put?: never;
+        /** Nominate a staff member to run a guided package */
+        post: operations["PackageStaffController_requestAssignment[1]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packages/{id}/staff-requests/{assignmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke a staff assignment */
+        delete: operations["PackageStaffController_revoke[1]"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/admin/disputes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Newest-first admin list of card disputes, joined to a booking summary. */
+        get: operations["PaymentController_listDisputes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/admin/disputes/{disputeId}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Aggregated read-only evidence bundle for a single disputed booking. */
+        get: operations["PaymentController_getDisputeEvidence"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payments/admin/revenue": {
         parameters: {
             query?: never;
@@ -4415,10 +6166,69 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get platform revenue statistics (admin only) */
+        /** Get platform revenue statistics (finance entitlement) */
         get: operations["PaymentController_getPlatformRevenue"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/admin/test/close-dispute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Staging-only E2E enabler — closes a TEST-mode dispute with a given
+         *     outcome (fires the real `charge.dispute.closed` webhook). Same
+         *     stripeKeyMode()==='test' hard gate as simulate-dispute above.
+         */
+        post: operations["PaymentController_closeDisputeSimulation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/admin/test/simulate-dispute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Staging-only E2E enabler. Card numbers must never be typed into a
+         *     browser, so the E2E drives Stripe's TEST-mode dispute rails via this API
+         *     instead. The service hard-gates on `stripeKeyMode() === 'test'` — a live
+         *     environment always gets a 403 here regardless of caller entitlement.
+         */
+        post: operations["PaymentController_simulateDispute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/admin/webhook-endpoints/sync-dispute-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PaymentController_syncDisputeWebhookEvents"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4489,7 +6299,7 @@ export interface paths {
         /** Get commission configuration */
         get: operations["PaymentController_getCommissionConfig"];
         put?: never;
-        /** Update commission configuration (admin only) */
+        /** Update commission configuration (finance_write entitlement) */
         post: operations["PaymentController_updateCommissionConfig"];
         delete?: never;
         options?: never;
@@ -4756,6 +6566,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/rentals/rate-rules/{ruleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ListingController_removeRateRule[1]"];
+        options?: never;
+        head?: never;
+        patch: operations["ListingController_updateRateRule[1]"];
+        trace?: never;
+    };
     "/api/v1/rentals/search/bounds": {
         parameters: {
             query?: never;
@@ -4852,6 +6678,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/rentals/{id}/care-guide/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ListingController_regenerateCareGuide[1]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/rentals/{id}/duplicate": {
         parameters: {
             query?: never;
@@ -4862,6 +6704,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ListingController_duplicate[1]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rentals/{id}/experiences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListingRoutesController_getUpgrades[1]"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4895,6 +6753,79 @@ export interface paths {
         put?: never;
         post: operations["ListingController_publish[1]"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rentals/{id}/rate-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListingController_getRateRules[1]"];
+        put?: never;
+        post: operations["ListingController_createRateRule[1]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rentals/{id}/rate-rules/starter-seasons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ListingController_applyStarterSeasons[1]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rentals/{id}/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Splitt Routes v2 (SPLIT-1156): reads the MERGE of v2 `Route` links
+         *     (`ListingRouteLink`, active + visible) and v1 `ListingRoute` rows
+         *     (published), new routes first — `RoutesService.getPublicListingRoutes`
+         *     does its OWN existence check (404 on a bogus listing id) and already
+         *     returns the exact `{routes: [...]}` shape this handler used to build by
+         *     hand, so it fully replaces the old `assertListingExists` +
+         *     `getPublishedRoutes` two-step.
+         */
+        get: operations["ListingRoutesController_getRoutes[1]"];
+        put: operations["ListingRoutesLinkController_setRoutes[1]"];
+        post: operations["ListingRoutesController_createRoute[1]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rentals/{id}/routes/{routeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ListingRoutesController_updateRoute[1]"];
+        post?: never;
+        delete: operations["ListingRoutesController_removeRoute[1]"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4942,6 +6873,22 @@ export interface paths {
         get: operations["BlackoutController_list[1]"];
         put?: never;
         post: operations["BlackoutController_create[1]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rentals/{listingId}/calendar-feeds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CalendarFeedController_list[1]"];
+        put?: never;
+        post: operations["CalendarFeedController_create[1]"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5055,6 +7002,134 @@ export interface paths {
         put: operations["ReviewController_editResponse"];
         post: operations["ReviewController_respond"];
         delete: operations["ReviewController_removeResponse"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RoutesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/routes/import/gpx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RoutesController_importGpx"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/routes/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RoutesController_getMine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/routes/public/{shareSlug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RoutesPublicController_getBySlug"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/routes/public/{shareSlug}/gpx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RoutesPublicController_downloadGpx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/routes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RoutesController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["RoutesController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["RoutesController_update"];
+        trace?: never;
+    };
+    "/api/v1/saved-trips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SavedTripsController_findAllForUser"];
+        put?: never;
+        post: operations["SavedTripsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-trips/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["SavedTripsController_remove"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5252,6 +7327,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/staff/packages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List packages this user is an approved staff member for */
+        get: operations["StaffPackagesController_listMyPackages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trips/email-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-974 — "email me this plan". The rest of this controller is
+         *     deliberately public; this one route needs a real recipient, so it opts
+         *     INTO auth at the method level (JwtAuthGuard runs alongside the class-level
+         *     SharedRateLimitGuard — Nest applies both). Its own `trips-email` bucket
+         *     (5/10min, checked via getAllAndOverride — same override precedent as
+         *     `geocodeSuggest`'s `trips-suggest` bucket) keeps a burst of email sends
+         *     from draining the shared `trips-public` budget for every other visitor;
+         *     the class-level @Throttle burst brake still applies underneath it.
+         */
+        post: operations["TripsController_emailPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trips/geocode-suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TripsController_geocodeSuggest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trips/ideas/{listingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TripsController_ideas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trips/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TripsController_plan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trips/pois": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TripsController_pois"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/trust/booking/{bookingId}/risk": {
         parameters: {
             query?: never;
@@ -5330,6 +7512,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["UploadController_uploadFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/accept-terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UserController_acceptTerms"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5456,6 +7654,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/me/deletion-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UserController_requestDeletionCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/me/deletion-eligibility": {
         parameters: {
             query?: never;
@@ -5552,6 +7766,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/resend-verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UserController_resendVerification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/reset-password": {
         parameters: {
             query?: never;
@@ -5562,6 +7792,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["UserController_resetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/tos-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["UserController_getTosStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/verify-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UserController_verifyEmail"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5741,7 +8003,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * SPLIT-737: serve the DB-backed vendor waiver ({ id, name, content, version }
+         *     or null) so the wizard renders the exact terms the signature is recorded
+         *     against — fetched directly by requiredFor, bypassing the role-gated
+         *     /waivers/required which won't match a still-RENTER applicant.
+         */
+        get: operations["VendorOnboardingController_getWaiver"];
         put?: never;
         post: operations["VendorOnboardingController_signWaiver"];
         delete?: never;
@@ -5787,6 +8055,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/vendor-onboarding/{id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-803: delete an un-approved application from the pipeline. Resets
+         *     the applicant's onboarding status to NOT_STARTED (excluded from
+         *     `listApplications`) WITHOUT deleting the user account — they can
+         *     re-apply later. 400s if the target is already an ACTIVE vendor.
+         */
+        post: operations["VendorOnboardingController_deleteApplication"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/vendor-onboarding/{id}/initiate": {
         parameters: {
             query?: never;
@@ -5799,7 +8089,11 @@ export interface paths {
         /**
          * Admin-initiated onboarding: move a renter into the pipeline (PROFILE_PENDING)
          *     so they're prompted to complete profile → Stripe → waiver. Reuses the same
-         *     transition as self-service start.
+         *     transition as self-service start — but unlike self-service, this IS an
+         *     admin admitting someone else, so it opts into the same "you're approved"
+         *     admission notice `admit()` sends. SPLIT-922: this route previously called
+         *     start() with no opts and sent nothing, unlike the sibling /admit endpoint
+         *     performing the identical transition.
          */
         post: operations["VendorOnboardingController_initiate"];
         delete?: never;
@@ -5878,6 +8172,54 @@ export interface paths {
          *     Staff are excluded (account-level config), matching report-subscription scoping.
          */
         patch: operations["VendorController_setAutoApprove"];
+        trace?: never;
+    };
+    "/api/v1/vendor/calendar/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["VendorCalendarController_getSubscription"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vendor/calendar/subscription/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["VendorCalendarController_rotateSubscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vendor/calendar/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["VendorCalendarController_getFeed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/vendor/earnings": {
@@ -6202,23 +8544,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/verifications/biometric-session": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Create a Stripe Identity verification session */
-        post: operations["VerificationController_createBiometricSession"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/verifications/boater-license-status": {
         parameters: {
             query?: never;
@@ -6230,6 +8555,23 @@ export interface paths {
         get: operations["VerificationController_getBoaterLicenseStatus"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/verifications/finalize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** SPLIT-871: finalize a direct-to-Blob KYC upload — validates ownership + content, recompresses images, and creates the verification record. */
+        post: operations["VerificationController_finalizeVerification"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6260,25 +8602,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get aggregate verification status for the current user */
+        /** Get aggregate verification status for the current user. SPLIT-869: `verified` is true iff the user holds a VERIFIED driver's license — the sole identity requirement. A VERIFIED selfie alone (with no verified license) does NOT count. */
         get: operations["VerificationController_getVerificationStatus"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/verifications/stripe-session/{sessionId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Retrieve status of a Stripe Identity session */
-        get: operations["VerificationController_getStripeSession"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6304,6 +8629,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/verifications/upload-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** SPLIT-871: issue a client token for a direct-to-Blob KYC document upload (up to 20MB, bypassing the multipart 15MB/serverless body-size path). Complete with POST /verifications/finalize. */
+        post: operations["VerificationController_createUploadToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/verifications/{id}": {
         parameters: {
             query?: never;
@@ -6313,6 +8655,23 @@ export interface paths {
         };
         /** Get a specific verification by ID */
         get: operations["VerificationController_getVerification"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/verifications/{id}/document-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a short-lived signed URL for a KYC document (admin only) */
+        get: operations["VerificationController_getVerificationDocumentUrl"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6481,6 +8840,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/waivers/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EWaiversController_getWaiverVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/web-analytics/admin/overview": {
         parameters: {
             query?: never;
@@ -6491,6 +8866,84 @@ export interface paths {
         get: operations["WebAnalyticsController_getOverview"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/web-analytics/admin/timeseries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SPLIT-1246 — Google-Analytics-style bucketed time series for the admin
+         *     analytics dashboard, with the SAME free `startDate`/`endDate` filtering
+         *     and default (last 30 days) as `getOverview`/`getVitalsOverview` above,
+         *     plus `?granularity=day|week|month` (default `day`).
+         *
+         *     `startDate > endDate` and an over-long range both 400 from
+         *     `WebAnalyticsService.getTimeseries` itself (it needs the DEFAULTED
+         *     start/end to check either, since an absent `startDate`/`endDate` is
+         *     always a valid last-30-days window) — only the granularity allowlist is
+         *     checked here, before the service is even called.
+         */
+        get: operations["WebAnalyticsController_getTimeseries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/web-analytics/admin/vitals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SPLIT-1245 — Core Web Vitals admin readout, windowed on `hourBucket`.
+         *     Accepts optional ?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD, same
+         *     defaulting (last 30 days) and same 400-on-garbage-date behavior as
+         *     `getOverview` above (`parseOptionalDate`).
+         */
+        get: operations["WebAnalyticsController_getVitalsOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/web-analytics/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-982 (Consent v2) — record an analytics/personalization consent
+         *     decision. Public, same session-resolution + optional-bearer + throttle
+         *     as every sibling tracking route above: consent must be recordable BEFORE
+         *     a visitor ever authenticates, and an Essential-only decline (both flags
+         *     false) is recorded exactly like an accept — that proof-of-choice is the
+         *     whole point. Persisted onto the resolved session's `metadata.consent`
+         *     jsonb (no session schema change); when a valid bearer ALSO resolved a
+         *     user on this call, the decision is additionally stamped onto that user's
+         *     own `personalizationConsent`/`consentVersion`/`consentDecidedAt` columns
+         *     so it survives independently of any one session/device.
+         */
+        post: operations["WebAnalyticsController_trackConsent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6531,6 +8984,56 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["WebAnalyticsController_trackPageview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/web-analytics/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1096 — record an aggregate-only QR-code scan for one of the three
+         *     printed convention codes. Today `trackPageview()` is a client-side no-op
+         *     until the visitor accepts the cookie banner (SPLIT-27), so a scanner who
+         *     ignores the banner currently produces NOTHING at all — no session, no
+         *     row. This route exists precisely to be reachable BEFORE any consent
+         *     decision: it is deliberately the only tracking route on this controller
+         *     that does NOT call {@link resolveSession} — it sets no cookie, creates no
+         *     session row, and stores no identifier of any kind, only an hourly
+         *     aggregate count keyed on (source, medium, content, hourBucket). That
+         *     total absence of per-visitor data is what keeps it OUTSIDE the SPLIT-27
+         *     consent scope — see `CampaignScanPing.tsx` on the frontend for the
+         *     matching "do not gate this on consent" rationale. Do not add a
+         *     resolveSession call or a cookie write here; doing so would both defeat
+         *     the point (a declined-banner scanner would go right back to producing
+         *     nothing) and start writing identifiers this table was designed never to
+         *     hold.
+         *
+         *     Public (no `@UseGuards`, matching the five sibling tracking routes above
+         *     — only `admin/overview` below is guarded). `@Throttle(TRACKING_THROTTLE)`
+         *     — the SAME generous per-route throttle as every other tracking endpoint
+         *     on this controller, deliberately NOT tightened and deliberately NOT
+         *     upgraded to `@SharedRateLimit`: a convention venue puts hundreds of
+         *     legitimate scanners behind one shared NAT egress IP, and a throttled
+         *     `sendBeacon` just dies silently (the beacon's return value is only
+         *     checked client-side to decide whether to retry, never surfaced to a
+         *     user) — a tighter limit would convert the event's rush hour into an
+         *     invisible undercount, defeating the entire point of this feature. The
+         *     DTO's strict `@IsIn` allowlist (capping cardinality at 3 rows/hour) is
+         *     the real abuse control here, not the per-IP throttle.
+         *
+         *     `@HttpCode(204)` + no return body: the frontend fires this via
+         *     `navigator.sendBeacon`, which never reads the response.
+         */
+        post: operations["WebAnalyticsController_trackScan"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6581,10 +9084,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/web-analytics/vitals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1245 — record an aggregate-only Core Web Vitals sample. Replaces
+         *     the frontend's prior use of `POST /web-analytics/event` (`trackEvent`)
+         *     for vitals reporting, which measured at 97.2% of PROD `click_events`
+         *     rows (see `WebVitalsHourly`'s doc-comment) — a per-sample click_events
+         *     row bought nothing a distribution doesn't already give you.
+         *
+         *     Same "outside the SPLIT-27 consent gate" shape as `POST
+         *     /web-analytics/scan` (SPLIT-1096) and for the identical reason: this
+         *     route does NOT call {@link resolveSession} — no cookie is set, no
+         *     session row is created, and no identifier of any kind is stored, only a
+         *     server-bucketed hourly aggregate keyed on (metric, route, hourBucket).
+         *     Do not add a `resolveSession` call or a cookie write here — doing so
+         *     would both add cardinality this table exists specifically to avoid and
+         *     start writing identifiers this table was designed never to hold (see
+         *     `WebVitalsHourly`'s "do not add a session/identifier column" warning).
+         *
+         *     Public (no `@UseGuards`). `@Throttle(TRACKING_THROTTLE)` — the same
+         *     generous per-route throttle as every sibling tracking route; the DTO's
+         *     strict `@IsIn` allowlists (metric ∈ 5 values, route ∈ the bounded
+         *     `VITALS_ROUTES` set) are the real cardinality control, not the per-IP
+         *     throttle, same rationale as `trackScan`'s doc-comment.
+         *
+         *     `@HttpCode(204)` + no return body, matching `trackScan` — a vitals
+         *     report is fire-and-forget from the client's perspective.
+         */
+        post: operations["WebAnalyticsController_trackVital"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptRescheduleProposalDto: {
+            expectedProposalToken?: string;
+        };
         AddEvidenceDto: {
             /**
              * Format: uuid
@@ -6671,6 +9219,15 @@ export interface components {
             /** Format: date-time */
             date?: string;
         };
+        ApplyStarterSeasonsDto: {
+            /**
+             * @description Replace this listing's existing STARTER rules for that year first. Vendor-authored rules are never touched.
+             * @default false
+             */
+            replaceExisting: boolean;
+            /** @description Calendar year to generate the pack for. Must be the current year or up to 3 years ahead. */
+            year: number;
+        };
         ApplyVendorDto: {
             /** @description Free-text "what gear do you want to list?" — captured in the audit trail. */
             businessInterest?: string;
@@ -6693,6 +9250,7 @@ export interface components {
             hasAbandonedCart?: boolean;
             hasBookings?: boolean;
             hasStripeAccount?: boolean;
+            homeRegion?: string;
             isEmailVerified?: boolean;
             isVerified?: boolean;
             lastActiveBefore?: number;
@@ -6705,13 +9263,33 @@ export interface components {
             minBookings?: number;
             minTotalSpent?: number;
             minTrustScore?: number;
+            plannedTripWindow?: components["schemas"]["PlannedTripWindowDto"];
             registeredBeforeDays?: number;
             registeredWithinDays?: number;
             roles?: string[];
+            topActivity?: string;
+            topCategory?: string;
+            viewedListingWithinDays?: number;
+        };
+        AvailabilityConflictRangeDto: {
+            /**
+             * Format: date
+             * @description End of the blocked range (exclusive).
+             * @example 2026-06-20
+             */
+            endDate: string;
+            /**
+             * Format: date
+             * @description Start of the blocked range.
+             * @example 2026-06-20
+             */
+            startDate: string;
         };
         BlogPost: {
             author: string;
             content: string;
+            /** @enum {string} */
+            contentFormat: "text" | "html";
             /** Format: date-time */
             createdAt: string;
             excerpt: string;
@@ -6719,6 +9297,12 @@ export interface components {
             imageUrl: string;
             /** Format: date-time */
             publishedAt: string | null;
+            /**
+             * @description SPLIT-1070 — URL-safe permalink derived from `title` on create and then
+             *     IMMUTABLE (renaming a post must not break inbound links). Nullable because
+             *     every row that predates this column has no slug; new posts always get one.
+             */
+            slug: string | null;
             /** @enum {string} */
             status: "draft" | "published" | "archived";
             tags: string[];
@@ -6732,7 +9316,12 @@ export interface components {
              * @example 195.00
              */
             amountDue?: string | null;
+            bringingPets: boolean;
             cancellationPolicy: string;
+            /** @enum {string|null} */
+            cancellationReason: "severe_weather" | "dates_unavailable" | "draft_abandoned_with_authorization" | null;
+            /** Format: date-time */
+            chargebackDisputedAt: string | null;
             coverageDetails: {
                 deductible: number;
                 isLiabilityIncluded: boolean;
@@ -6740,13 +9329,17 @@ export interface components {
             };
             /** Format: date-time */
             createdAt: string;
+            dateChangeSeq: number;
             /**
              * Format: decimal
              * @example 195.00
              */
             depositAmount: string;
+            /** Format: date-time */
+            depositReauthAt: string | null;
+            depositReauthCount: number;
             /** @enum {string} */
-            depositStatus: "none" | "held" | "released" | "claimed";
+            depositStatus: "none" | "held" | "released" | "claimed" | "expired";
             durationHours: number;
             /**
              * Format: date
@@ -6755,12 +9348,37 @@ export interface components {
             endDate: string;
             endTime: string;
             id: string;
+            insurancePolicyId: string;
             listing: components["schemas"]["Listing"];
             listingId: string;
+            numberOfGuests: number | null;
+            overdueNote: string | null;
+            /** Format: date-time */
+            overdueReportedAt: string | null;
+            /** @description fix(review) FIX-G: in-flight date-change settlement breadcrumb ({seq, deltaCents, amount, at}); non-null only during a settlement or after a crash mid-settlement (orphaned-charge suspect). */
+            pendingDateChange: {
+                [key: string]: unknown;
+            } | null;
             /** @description Server-computed itemized price breakdown (money fields are numbers inside this jsonb blob, not decimal strings). */
             priceBreakdown: {
                 [key: string]: unknown;
             } | null;
+            /** Format: date-time */
+            proposalCreatedAt: string | null;
+            proposalCreatedBy: string | null;
+            /** Format: date-time */
+            proposalExpiresAt: string | null;
+            proposalNote: string | null;
+            /**
+             * Format: date
+             * @example 2026-06-20
+             */
+            proposedEndDate?: string | null;
+            /**
+             * Format: date
+             * @example 2026-06-20
+             */
+            proposedStartDate?: string | null;
             /** @enum {string} */
             protectionPlan: "none" | "basic" | "standard" | "premier";
             /**
@@ -6768,11 +9386,19 @@ export interface components {
              * @example 195.00
              */
             protectionPremium: string;
+            quantity: number;
             /**
              * Format: decimal
              * @example 195.00
              */
             refundAmount?: string | null;
+            /**
+             * Format: decimal
+             * @example 195.00
+             */
+            refundOwedAmount?: string | null;
+            /** @enum {string} */
+            refundOwedContext: "shortening" | "termination";
             renter: components["schemas"]["User"];
             renterId: string;
             renterNotes: string;
@@ -6787,7 +9413,11 @@ export interface components {
             startDate: string;
             startTime: string;
             /** @enum {string} */
-            status: "pending" | "confirmed" | "cancelled" | "completed" | "rejected";
+            status: "draft" | "pending" | "confirmed" | "cancelled" | "completed" | "rejected";
+            /** @description SPLIT-1266 — snapshot of the listing's check-in/out times at booking time: { checkInTime?, checkInEndTime?, checkOutTime? } (HH:MM). Null for a non-nightly booking. */
+            staySnapshot: {
+                [key: string]: unknown;
+            } | null;
             stripeDepositPaymentIntentId: string;
             /**
              * Format: decimal
@@ -6796,8 +9426,30 @@ export interface components {
             totalPrice: string;
             unit: components["schemas"]["ListingUnit"];
             unitId: string;
+            unitIds: string[] | null;
+            /** @description SPLIT-723: write-once identity snapshot of the assigned fleet unit ({unitId, label, serialNumber, vin, make, model, year}); null until a unit is assigned. */
+            unitSnapshot: {
+                [key: string]: unknown;
+            } | null;
+            /** @description SPLIT-1005: write-once identity snapshots of every fleet unit assigned to this booking (same shape as unitSnapshot); null until units are assigned. */
+            unitSnapshots: Record<string, never>[] | null;
             /** Format: date-time */
             updatedAt: string;
+            /**
+             * @description SPLIT-912 — the vendor's PRIVATE operational note on this booking ("renter
+             *     may arrive late", "bringing own trailer", "swap to unit 3"). Written and read
+             *     only by the listing owner (or an admin); the renter must NEVER receive it.
+             *
+             *     ⚠️ `withPublicParties` destructures this OUT of its spread, so it is stripped
+             *     from every booking projection by default and re-attached only on explicitly
+             *     vendor-context reads. Do not "simplify" that back into `...rest` — the renter
+             *     dashboard and GET /bookings/:id both flow through that projection, and the
+             *     field would be in the JSON payload even where no UI renders it.
+             *
+             *     Deliberately NOT reusing `renterNotes` above: that column is renter-supplied
+             *     by intent (and currently dead — nothing writes or reads it).
+             */
+            vendorNotes: string | null;
             /** @enum {string} */
             verificationStatus: "none" | "pickup_pending" | "pickup_verified" | "return_pending" | "return_verified" | "disputed";
         };
@@ -6829,7 +9481,7 @@ export interface components {
              * @description Security deposit status.
              * @enum {string}
              */
-            depositStatus: "none" | "held" | "released" | "claimed";
+            depositStatus: "none" | "held" | "released" | "claimed" | "expired";
             /** @description Computed duration in hours for hourly bookings. */
             durationHours?: number | null;
             /**
@@ -6846,6 +9498,23 @@ export interface components {
             listing: components["schemas"]["Listing"] | null;
             /** @description Listing id (FK scalar, always present). */
             listingId: string;
+            /** @description SPLIT-738: optional vendor note attached when flagging a non-return, or null. */
+            overdueNote?: string | null;
+            /**
+             * Format: date-time
+             * @description SPLIT-738: when the vendor flagged this booking as NOT RETURNED (overdue). Non-null ⇒ the booking is excluded from auto-completion and clean-deposit release until the gear is marked returned. Null otherwise.
+             */
+            overdueReportedAt?: string | null;
+            /**
+             * @description SPLIT-722: payment state derived from the booking's LATEST payment transaction — 'paid' (captured), 'authorized' (manual-capture PaymentIntent held, captured at vendor accept), 'unpaid' (no usable payment: checkout never completed, or it failed/was released).
+             * @enum {string}
+             */
+            paymentStatus: "paid" | "authorized" | "unpaid";
+            /**
+             * Format: date-time
+             * @description SPLIT-740: ISO instant a PENDING booking auto-cancels (createdAt + PENDING_EXPIRY_HOURS, default 72h) — the exact deadline the daily pending-expiry sweep enforces, so the client can render a live countdown. Null for any non-PENDING booking.
+             */
+            pendingExpiresAt?: string | null;
             /** @description Server-computed itemized price breakdown (money fields are numbers inside this jsonb blob, not decimal strings). */
             priceBreakdown: {
                 [key: string]: unknown;
@@ -6861,6 +9530,11 @@ export interface components {
              * @example 195.00
              */
             protectionPremium: string;
+            /**
+             * @description SPLIT-1005: number of physical units this booking reserves (1 for every pre-existing single-unit booking).
+             * @example 1
+             */
+            quantity: number;
             /**
              * Format: decimal
              * @description Computed refund amount when cancelled (DECIMAL string).
@@ -6896,7 +9570,13 @@ export interface components {
              * @description Booking lifecycle status.
              * @enum {string}
              */
-            status: "pending" | "confirmed" | "cancelled" | "completed" | "rejected";
+            status: "draft" | "pending" | "confirmed" | "cancelled" | "completed" | "rejected";
+            /**
+             * Format: decimal
+             * @description SPLIT-724: sales/rental tax Stripe computed at checkout (DECIMAL string), read from the LATEST payment transaction. Null unless Stripe Tax was enabled when the session was created — so it is null for every pre-seam / flag-off booking (the receipt renders no tax line); a zero-tax jurisdiction under the flag serializes "0.00".
+             * @example 195.00
+             */
+            taxAmount?: string | null;
             /**
              * Format: decimal
              * @description Total charged price (DECIMAL string).
@@ -6907,6 +9587,14 @@ export interface components {
             unit?: components["schemas"]["ListingUnit"] | null;
             /** @description Assigned fleet unit id (multi-unit listings), or null. */
             unitId?: string | null;
+            /** @description SPLIT-1005: every fleet unit id assigned to this booking (multi-unit quantity support). unitId always mirrors unitIds[0]. Null until units are assigned. */
+            unitIds?: string[] | null;
+            /** @description SPLIT-723: write-once identity snapshot of the assigned unit ({unitId, label, serialNumber, vin, make, model, year}), frozen at assignment time. Null until a unit is assigned. */
+            unitSnapshot: {
+                [key: string]: unknown;
+            } | null;
+            /** @description SPLIT-1005: write-once identity snapshots of every assigned fleet unit (same shape as unitSnapshot). unitSnapshot always mirrors unitSnapshots[0]. Null until units are assigned. */
+            unitSnapshots: Record<string, never>[] | null;
             /**
              * Format: date-time
              * @description Row last-update timestamp.
@@ -6916,6 +9604,8 @@ export interface components {
             vendor: components["schemas"]["PublicOwnerDto"] | null;
             /** @description SPLIT-419: the vendor display name (store name, falling back to the owner's full name). Null when the owner relation is not loaded. */
             vendorName?: string | null;
+            /** @description SPLIT-912 — the vendor's PRIVATE operational note on this booking. Present ONLY on vendor-context reads (the listing owner or an admin: GET /bookings/for-my-listings, GET /bookings/:id as the owner, and the PATCH /bookings/:id/vendor-notes response). The key is ABSENT entirely from any renter-facing payload — it is stripped in the projection, not merely hidden by the client. */
+            vendorNotes?: string | null;
             /**
              * @description Pickup/return verification state.
              * @enum {string}
@@ -6965,6 +9655,7 @@ export interface components {
             toStatus: string;
         };
         BookingVerification: {
+            batteryPct: number;
             booking: components["schemas"]["Booking"];
             bookingId: string;
             checklist: Record<string, never>[];
@@ -6976,12 +9667,24 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             exifMetadata: Record<string, never>;
+            fuelLevelPct: number;
+            hoursReading: number;
             id: string;
             imageKeys: string[];
+            imageMeta: {
+                [key: string]: unknown;
+            };
             isAuthentic: boolean;
             notes: string;
+            odometerReading: number;
+            /** Format: date-time */
+            scannedAt: string;
+            scannedBy: string;
             /** @enum {string} */
             status: "PENDING" | "VERIFIED" | "REJECTED" | "DISPUTED" | "COMPLETED";
+            /** Format: date-time */
+            tokenIat: string;
+            tokenIssuedBy: string;
             /** @enum {string} */
             type: "PICKUP" | "RETURN";
             /** Format: date-time */
@@ -6991,6 +9694,18 @@ export interface components {
             verifiedById: string;
         };
         Buffer: Record<string, never>;
+        BulkCreateUnitsDto: {
+            /**
+             * @description Number of units to create.
+             * @example 5
+             */
+            count: number;
+            /**
+             * @description Label prefix — units are labeled '<label> N'. Defaults to 'Unit'.
+             * @example Kayak
+             */
+            label?: string;
+        };
         BulkPriceAdjustDto: {
             listingIds: string[];
             /** @enum {string} */
@@ -7005,6 +9720,27 @@ export interface components {
             listingIds: string[];
             /** @enum {string} */
             status: "draft" | "available" | "unavailable" | "rented" | "archived";
+        };
+        CalendarFeed: {
+            consecutiveFailures: number;
+            /** Format: date-time */
+            createdAt: string;
+            id: string;
+            isEnabled: boolean;
+            label: string | null;
+            lastSyncError: string | null;
+            /**
+             * @description Stored as varchar, values from {@link CalendarFeedSyncStatus} — see class doc.
+             * @enum {string|null}
+             */
+            lastSyncStatus: "success" | "failed" | null;
+            /** Format: date-time */
+            lastSyncedAt: string | null;
+            listing: components["schemas"]["Listing"];
+            listingId: string;
+            /** Format: date-time */
+            updatedAt: string;
+            url: string;
         };
         Campaign: {
             /** Format: date-time */
@@ -7036,6 +9772,7 @@ export interface components {
                 hasAbandonedCart?: boolean;
                 hasBookings?: boolean;
                 hasStripeAccount?: boolean;
+                homeRegion?: string;
                 isVerified?: boolean;
                 lastActiveBefore?: number;
                 lastActiveWithinDays?: number;
@@ -7045,10 +9782,17 @@ export interface components {
                 minBookings?: number;
                 minTotalSpent?: number;
                 minTrustScore?: number;
+                plannedTripWindow: {
+                    fromDays?: number;
+                    toDays?: number;
+                };
                 registeredBeforeDays?: number;
                 registeredWithinDays?: number;
                 role?: string;
                 roles?: string[];
+                topActivity?: string;
+                topCategory?: string;
+                viewedListingWithinDays?: number;
             };
             /** Format: date-time */
             startsAt: string;
@@ -7080,6 +9824,7 @@ export interface components {
             hasAbandonedCart?: boolean;
             hasBookings?: boolean;
             hasStripeAccount?: boolean;
+            homeRegion?: string;
             isVerified?: boolean;
             lastActiveBefore?: number;
             lastActiveWithinDays?: number;
@@ -7089,18 +9834,50 @@ export interface components {
             minBookings?: number;
             minTotalSpent?: number;
             minTrustScore?: number;
+            plannedTripWindow?: components["schemas"]["PlannedTripWindowDto"];
             registeredBeforeDays?: number;
             registeredWithinDays?: number;
             role?: string;
             roles?: string[];
+            topActivity?: string;
+            topCategory?: string;
+            viewedListingWithinDays?: number;
         };
-        CandidateListingDto: {
-            category?: string;
-            description: string;
-            id: string;
-            imageUrl?: string;
-            name: string;
-            pricePerDay?: number;
+        CancellationPreviewDto: {
+            /** @description The refund the renter TRULY receives if they cancel now: equals `policyRefundAmount` when captured, else 0 (an authorized hold is released; an unpaid booking was never charged). */
+            actualRefundAmount: number;
+            /** @description The booking this preview is for. */
+            bookingId: string;
+            /** @description The cancellation policy that governs the refund (snapshotted on the booking, falling back to the listing's current policy). Null when neither is set. */
+            cancellationPolicy?: string | null;
+            /**
+             * @description ISO-4217 currency code (always USD in the current market).
+             * @example USD
+             */
+            currency: string;
+            /** @description True when the policy yields a 100% refund (the free-cancellation window). */
+            isFullRefund: boolean;
+            /**
+             * @description The booking's payment state, which determines the ACTUAL refund: 'paid' (captured → refund = the policy amount), 'authorized' (manual-capture hold, never charged → the hold is released, actual refund 0), 'unpaid' (no usable payment → actual refund 0).
+             * @enum {string}
+             */
+            paymentState: "paid" | "authorized" | "unpaid";
+            /** @description The policy-computed refund in dollars (for the transparency explainer). This is what a captured booking is actually refunded; see `actualRefundAmount` for the payment-state-aware truth. */
+            policyRefundAmount: number;
+            /** @description The cancellation-policy refund fraction (0, 0.5 or 1) for the current time vs the rental start. */
+            policyRefundFraction: number;
+            /** @description The booking total (2dp number), for context in the UI. */
+            totalPrice: number;
+        };
+        CareGuideDto: {
+            proTips: string[];
+            returnChecklist: string[];
+            safetyWarnings: string[];
+            sections: components["schemas"]["CareGuideSectionDto"][];
+        };
+        CareGuideSectionDto: {
+            instructions: string[];
+            title: string;
         };
         ClaimEvidence: {
             /** @description Optional link to a return/pickup booking-verification photo set. */
@@ -7124,6 +9901,11 @@ export interface components {
             uploadedBy: string;
             uploader: components["schemas"]["User"];
         };
+        CloseDisputeDto: {
+            disputeId: string;
+            /** @enum {string} */
+            outcome: "lost" | "won";
+        };
         CompleteVendorProfileDto: {
             businessAddress: string;
             businessPhone: string;
@@ -7144,6 +9926,7 @@ export interface components {
             updatedAt: string;
         };
         Conversation: {
+            bookingId: string | null;
             /** Format: date-time */
             createdAt: string;
             id: string;
@@ -7164,6 +9947,8 @@ export interface components {
         CreateBlogPostDto: {
             author?: string;
             content: string;
+            /** @enum {string} */
+            contentFormat?: "text" | "html";
             excerpt?: string;
             imageUrl?: string;
             /** @enum {string} */
@@ -7172,18 +9957,26 @@ export interface components {
             title: string;
         };
         CreateBookingDto: {
+            bringingPets?: boolean;
             deliveryRequested?: boolean;
             endDate: string;
             endTime?: string;
             /** Format: uuid */
             listingId: string;
+            numberOfGuests?: number;
             promoCode?: string;
             /** @enum {string} */
             protectionPlan?: "none" | "basic" | "standard" | "premier";
+            quantity?: number;
             selectedAddOns?: components["schemas"]["SelectedAddOnDto"][];
             startDate: string;
             startTime?: string;
             totalPrice: number;
+        };
+        CreateCalendarFeedDto: {
+            label?: string;
+            /** Format: uri */
+            url: string;
         };
         CreateCampaignDto: {
             /**
@@ -7253,6 +10046,8 @@ export interface components {
         };
         CreateConversationDto: {
             /** Format: uuid */
+            bookingId?: string;
+            /** Format: uuid */
             listingId?: string;
             /** Format: uuid */
             participantId: string;
@@ -7266,6 +10061,7 @@ export interface components {
             reason: string;
         };
         CreateEWaiverDto: {
+            categories?: string[] | null;
             content: string;
             description?: string;
             minAge?: number | null;
@@ -7283,6 +10079,12 @@ export interface components {
             /** Format: uuid */
             scheduleId?: string;
         };
+        CreateExperienceCheckoutSessionDto: {
+            /** Format: uri */
+            cancelUrl?: string;
+            /** Format: uri */
+            successUrl?: string;
+        };
         CreateExperienceDto: {
             cancellationPolicy?: string;
             /** @enum {string} */
@@ -7292,6 +10094,16 @@ export interface components {
             description: string;
             duration: number;
             durationUnit: string;
+            /**
+             * @description SPLIT-1214 — the whole-booking price. `Min(0.01)`, not `Min(0)`: a flat
+             *     rate of $0 is not a free package, it is an unset one, and the mode's whole
+             *     point is that this number is the ONLY thing charged. Still `IsOptional`
+             *     because clearing the mode back to per-person may legitimately send null.
+             */
+            flatRatePrice?: number;
+            /** @enum {string} */
+            guidanceType?: "self_guided" | "staff_guided";
+            imageFocalPoints?: components["schemas"]["FocalPointDto"][];
             imageUrls?: string[];
             latitude?: number;
             location?: string;
@@ -7300,7 +10112,81 @@ export interface components {
             meetingPoint?: string;
             minGuests?: number;
             pricePerChild?: number;
+            /**
+             * @description SPLIT-1214: required for a per-person package (the default), OPTIONAL for a
+             *     flat-rate one — that vendor is never asked for a per-head number, so
+             *     demanding one would make the flat-rate wizard unsubmittable. `ValidateIf`
+             *     (not `IsOptional`) so a per-person body still gets the original
+             *     "should not be empty" 400 rather than falling through to the column's
+             *     NOT NULL and surfacing as a 500 (Gotcha #1, the reason this DTO exists).
+             *     The service defaults the absent value to 0.
+             */
             pricePerPerson: number;
+            /**
+             * @description SPLIT-1214: 'per_person' (default) | 'flat_rate'. Whether flat_rate is
+             *     ALLOWED here — it requires a staff-guided package — is not decidable from
+             *     this body alone on a partial update, so that invariant lives in the
+             *     service against the merged state (`pricingModeViolation`).
+             * @enum {string}
+             */
+            pricingMode?: "per_person" | "flat_rate";
+            /** @deprecated */
+            privateGroupPrice?: number;
+            requirements?: string;
+            shortDescription?: string;
+            title: string;
+            videoUrls?: string[];
+            whatToBring?: string[];
+            whatsIncluded?: string[];
+        };
+        CreateExperienceOnBehalfDto: {
+            cancellationPolicy?: string;
+            /** @enum {string} */
+            category?: "tours" | "food" | "outdoor" | "arts" | "fitness" | "wellness" | "music" | "sports" | "workshop" | "photography" | "other";
+            /** Format: uri */
+            coverImage?: string;
+            description: string;
+            duration: number;
+            durationUnit: string;
+            /**
+             * @description SPLIT-1214 — the whole-booking price. `Min(0.01)`, not `Min(0)`: a flat
+             *     rate of $0 is not a free package, it is an unset one, and the mode's whole
+             *     point is that this number is the ONLY thing charged. Still `IsOptional`
+             *     because clearing the mode back to per-person may legitimately send null.
+             */
+            flatRatePrice?: number;
+            /** @enum {string} */
+            guidanceType?: "self_guided" | "staff_guided";
+            /** Format: uuid */
+            hostId: string;
+            imageFocalPoints?: components["schemas"]["FocalPointDto"][];
+            imageUrls?: string[];
+            latitude?: number;
+            location?: string;
+            longitude?: number;
+            maxGuests?: number;
+            meetingPoint?: string;
+            minGuests?: number;
+            pricePerChild?: number;
+            /**
+             * @description SPLIT-1214: required for a per-person package (the default), OPTIONAL for a
+             *     flat-rate one — that vendor is never asked for a per-head number, so
+             *     demanding one would make the flat-rate wizard unsubmittable. `ValidateIf`
+             *     (not `IsOptional`) so a per-person body still gets the original
+             *     "should not be empty" 400 rather than falling through to the column's
+             *     NOT NULL and surfacing as a 500 (Gotcha #1, the reason this DTO exists).
+             *     The service defaults the absent value to 0.
+             */
+            pricePerPerson: number;
+            /**
+             * @description SPLIT-1214: 'per_person' (default) | 'flat_rate'. Whether flat_rate is
+             *     ALLOWED here — it requires a staff-guided package — is not decidable from
+             *     this body alone on a partial update, so that invariant lives in the
+             *     service against the merged state (`pricingModeViolation`).
+             * @enum {string}
+             */
+            pricingMode?: "per_person" | "flat_rate";
+            /** @deprecated */
             privateGroupPrice?: number;
             requirements?: string;
             shortDescription?: string;
@@ -7314,6 +10200,8 @@ export interface components {
             rating: number;
         };
         CreateExperienceScheduleDto: {
+            /** Format: uuid */
+            assignedStaffId?: string;
             customPrice?: number;
             date: string;
             endTime?: string;
@@ -7322,7 +10210,7 @@ export interface components {
             startTime: string;
         };
         CreateIncidentalChargeDto: {
-            /** @description Amount requested from the renter (USD, > 0). */
+            /** @description Amount requested from the renter (USD, > 0). The REAL ceiling is booking-relative and enforced server-side in fileCharge (SPLIT-1191) — this 1,000,000 bound is only a fail-fast sanity check. */
             amount: number;
             /**
              * Format: uuid
@@ -7339,6 +10227,32 @@ export interface components {
              */
             type: "damage" | "fuel" | "cleaning" | "late_return" | "mileage" | "other";
         };
+        CreateInsurancePolicyDto: {
+            /** @description Aggregate coverage limit (USD). Optional. */
+            aggregateLimit?: number;
+            carrier: string;
+            /** @enum {string} */
+            coverageType: "general_liability" | "commercial_property" | "inland_marine" | "other";
+            /** Format: uri */
+            documentUrl?: string;
+            /**
+             * Format: date
+             * @example 2026-01-01
+             */
+            effectiveDate: string;
+            /**
+             * Format: date
+             * @example 2027-01-01
+             */
+            expiryDate: string;
+            /** @description Per-occurrence coverage limit (USD). */
+            perOccurrenceLimit: number;
+            policyNumber: string;
+        };
+        CreateItemizedTaxExportDto: {
+            from?: string;
+            to?: string;
+        };
         CreateLeadDto: {
             /** Format: email */
             email: string;
@@ -7350,18 +10264,25 @@ export interface components {
             addOns?: components["schemas"]["AddOnDto"][];
             address?: string;
             advanceBookingDays?: number;
-            attributes?: Record<string, never>;
+            amenities?: ("hammock" | "wifi" | "heating" | "air_conditioning" | "hot_water" | "linens_towels" | "free_parking" | "kitchen" | "private_bathroom" | "kitchenette" | "refrigerator" | "microwave" | "stove_oven" | "cooking_basics" | "dishes_utensils" | "coffee_maker" | "dishwasher" | "fire_pit" | "grill" | "picnic_table" | "deck_patio" | "hot_tub" | "sauna" | "outdoor_shower" | "lake_access" | "beach_access" | "electric_hookup_30a" | "electric_hookup_50a" | "water_hookup" | "sewer_hookup" | "dump_station" | "potable_water" | "shared_bathhouse" | "hot_showers" | "toilet_flush" | "toilet_vault" | "toilet_composting" | "generator_allowed" | "camp_store" | "boat_launch" | "smoke_detector" | "carbon_monoxide_detector" | "fire_extinguisher" | "first_aid_kit" | "bear_box" | "gated_property" | "exterior_cameras" | "tv" | "washer" | "dryer" | "dedicated_workspace" | "ev_charger" | "crib" | "high_chair" | "board_games" | "cell_service" | "step_free_access")[];
+            arrivalInstructions?: string;
+            attributes?: {
+                [key: string]: unknown;
+            };
             availableEndTime?: string;
             availableStartTime?: string;
             /** @enum {string} */
-            bookingType?: "daily" | "hourly";
+            bookingType?: "daily" | "hourly" | "both" | "nightly";
             bufferDays?: number;
             /** @enum {string} */
             cancellationPolicy?: "flexible" | "moderate" | "strict" | "non_refundable";
+            careGuide?: components["schemas"]["CareGuideDto"];
             category?: string;
+            checkInEndTime?: string;
+            checkInTime?: string;
+            checkOutTime?: string;
             closedDaysOfWeek?: number[];
-            condition?: string;
-            dateBlocks?: Record<string, never>[];
+            dateBlocks?: components["schemas"]["ListingDateBlockDto"][];
             deliveryAvailable?: boolean;
             deliveryFee?: number;
             deliveryRadiusMiles?: number;
@@ -7369,15 +10290,20 @@ export interface components {
             description: string;
             earlyBirdDays?: number;
             earlyBirdPct?: number;
+            estimatedValue?: number;
             generalArea?: string;
             /** Format: uri */
             icalUrl?: string;
+            imageFocalPoints?: components["schemas"]["FocalPointDto"][];
             imageUrls?: string[];
             images?: string[];
             instantBook?: boolean;
+            latitude?: number;
             leadTimeDays?: number;
             location?: string;
+            longitude?: number;
             make?: string;
+            maxGuests?: number;
             maxRentalDays?: number;
             maximumHours?: number;
             minAge?: number;
@@ -7386,13 +10312,47 @@ export interface components {
             model?: string;
             monthlyDiscountPct?: number;
             name: string;
-            pricePerDay: number;
+            pricePerDay?: number;
             pricePerHour?: number;
             pricingType?: string;
-            subAttributes?: Record<string, never>;
+            quantity?: number;
+            requiresIdVerification?: boolean;
+            stayDetails?: components["schemas"]["StayDetailsDto"];
+            subAttributes?: {
+                [key: string]: unknown;
+            };
+            taxAddressLine1?: string;
+            taxCity?: string;
+            taxPostalCode?: string;
+            taxResponsibilityAck?: boolean;
+            taxState?: string;
             timeSlotDuration?: number;
+            /** @enum {string} */
+            weatherPolicy?: "none" | "full_refund";
             weeklyDiscountPct?: number;
             year?: number;
+        };
+        CreateListingRouteDto: {
+            /** @enum {string} */
+            difficulty?: "easy" | "moderate" | "difficult" | "expert";
+            distanceKm?: number;
+            elevationGainM?: number;
+            estimatedDurationMinutes?: number;
+            /** Format: uri */
+            gpxUrl?: string;
+            hazards?: string[];
+            /** Format: uri */
+            mapUrl?: string;
+            permits?: components["schemas"]["RoutePermitDto"][];
+            seasonality?: string;
+            sortOrder?: number;
+            startLatitude?: number;
+            startLongitude?: number;
+            /** @enum {string} */
+            status?: "draft" | "published";
+            summary?: string;
+            title: string;
+            waypoints?: components["schemas"]["RouteWaypointDto"][];
         };
         CreateMessageDto: {
             content: string;
@@ -7431,6 +10391,40 @@ export interface components {
             validFrom?: string;
             validUntil?: string;
         };
+        CreateRateRuleDto: {
+            /**
+             * Format: date
+             * @description EXCLUSIVE — the first night the rule no longer applies to.
+             * @example 2026-06-20
+             */
+            endDate: string;
+            /** @description Minimum nights required when this date is the CHECK-IN night. */
+            minNights?: number | null;
+            /** @description Vendor-facing label, e.g. "Summer peak". */
+            name: string;
+            /** @description Absolute per-night rate in USD. Mutually exclusive with ratePct. */
+            nightlyRate?: number | null;
+            /**
+             * @description Explicit override tier — the highest term of the precedence ordering.
+             * @default 0
+             */
+            priority: number;
+            /** @description Percentage adjustment against the listing base rate. Mutually exclusive with nightlyRate. */
+            ratePct?: number | null;
+            /**
+             * Format: date
+             * @description Inclusive first night the rule applies to.
+             * @example 2026-06-20
+             */
+            startDate: string;
+            /** @description UTC weekdays the rule narrows to (0=Sun … 6=Sat). Omit or send null for every day in the range. */
+            weekdayMask?: number[] | null;
+        };
+        CreateRescheduleProposalDto: {
+            endDate: string;
+            note?: string;
+            startDate: string;
+        };
         CreateReviewDto: {
             comment?: string;
             /** Format: uuid */
@@ -7440,6 +10434,47 @@ export interface components {
             reviewedUserId?: string;
             /** @enum {string} */
             type: "listing" | "user";
+        };
+        CreateRouteDto: {
+            /** @enum {string} */
+            activityType: "road_cycling" | "gravel" | "ebike" | "mtb" | "hike" | "trail_run" | "atv_offroad" | "snowmobile" | "jet_ski" | "kayak_paddle" | "ski_tour" | "other";
+            cuePoints?: components["schemas"]["RouteCueDto"][];
+            /** @enum {string} */
+            difficulty?: "moderate" | "easy" | "challenging" | "expert";
+            elevationProfile?: string[];
+            estimatedDurationMinutes?: number;
+            geometry: number[][];
+            hazards?: string;
+            name: string;
+            permits?: components["schemas"]["RoutePermitDto"][];
+            pois?: components["schemas"]["RoutePoiDto"][];
+            seasonality?: string;
+            /** @enum {string} */
+            source?: "drawn" | "gpx" | "rwgps";
+            /** Format: uri */
+            sourceRef?: string;
+            summary?: string;
+            /** @enum {string} */
+            surface?: "paved" | "mixed" | "unpaved" | "water" | "snow";
+            unpavedPct?: number;
+            /**
+             * Format: uuid
+             * @description Privileged-only on-behalf target — see the class doc comment.
+             */
+            vendorId?: string;
+        };
+        CreateSavedTripDto: {
+            activities: string[];
+            destination: string;
+            duration?: number;
+            endDate?: string;
+            experienceLevel?: string;
+            month?: string;
+            numPeople: number;
+            planSnapshot?: {
+                [key: string]: unknown;
+            };
+            startDate?: string;
         };
         CreateSearchAlertDto: {
             category?: string;
@@ -7482,6 +10517,11 @@ export interface components {
             /** Format: uuid */
             serviceId: string;
         };
+        CreateStaffAssignmentRequestDto: {
+            note?: string;
+            /** Format: email */
+            staffEmail: string;
+        };
         CreateTemplateDto: {
             bodyHtml: string;
             bodyText?: string;
@@ -7495,8 +10535,16 @@ export interface components {
             variables?: string[];
         };
         CreateUnitDto: {
-            /** @enum {string} */
-            condition?: "excellent" | "good" | "fair" | "needs_maintenance";
+            /**
+             * @description What the vendor paid to acquire this unit (insurance/claims basis).
+             * @example 8499.99
+             */
+            acquisitionValue?: number;
+            /**
+             * @description Hull Identification Number (boats, jet skis / PWC).
+             * @example YAM12345D404
+             */
+            hin?: string;
             /** @example Unit #1 */
             label?: string;
             /**
@@ -7504,18 +10552,39 @@ export interface components {
              * @example 100
              */
             maintenanceIntervalHours?: number;
+            /** @example Polaris */
+            make?: string;
+            /** @example Sportsman 570 */
+            model?: string;
             notes?: string;
+            /**
+             * @description State/DMV registration number, where required.
+             * @example MN-4832-XZ
+             */
+            registrationNumber?: string;
             /** @example SN-TRK-2023-001 */
             serialNumber?: string;
+            /**
+             * @description Vehicle Identification Number (motorized land vehicles).
+             * @example 1HD1KB4197Y675231
+             */
+            vin?: string;
+            /**
+             * @description Model year.
+             * @example 2024
+             */
+            year?: number;
         };
         CreateUserDto: {
+            dateOfBirth?: string;
             /** Format: email */
             email: string;
             firstName: string;
             lastName: string;
+            marketingConsent?: boolean;
             password: string;
             /** @enum {string} */
-            role?: "renter" | "vendor" | "vendor_owner" | "vendor_manager" | "vendor_staff" | "manager" | "crm_manager" | "admin";
+            role?: "renter" | "vendor" | "vendor_owner" | "vendor_manager" | "vendor_staff" | "crm_manager" | "admin";
             storeName?: string;
             termsAccepted?: boolean;
         };
@@ -7590,7 +10659,16 @@ export interface components {
              */
             vendorFileDeadline: string | null;
         };
+        DecideStaffAssignmentDto: {
+            note?: string;
+        };
         DeleteAccountDto: {
+            /**
+             * @description Exactly 6 digits. Validated for SHAPE only — whether it is the *right* code
+             *     is decided by the constant-time-ish bcrypt compare in
+             *     `TwoFactorService.verifyStepUpCode`, never here.
+             */
+            code: string;
             password: string;
         };
         DeleteDeviceTokenDto: {
@@ -7664,6 +10742,7 @@ export interface components {
             updatedAt: string;
         };
         EWaiver: {
+            categories: string[] | null;
             content: string;
             /** Format: date-time */
             createdAt: string;
@@ -7677,6 +10756,17 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             version: number;
+        };
+        EWaiverVersion: {
+            content: string;
+            /** Format: date-time */
+            createdAt: string;
+            id: string;
+            name: string | null;
+            version: number;
+            waiverId: string;
+            /** @enum {string} */
+            waiverType: "platform" | "vendor";
         };
         EmailTemplate: {
             bodyHtml: string;
@@ -7695,6 +10785,33 @@ export interface components {
             updatedAt: string;
             variables: string[];
         };
+        EmailTripPlanDto: {
+            /**
+             * @example [
+             *       "Boating",
+             *       "Biking"
+             *     ]
+             */
+            activities?: string[];
+            /** @example Lake Minnetonka, MN */
+            destination: string;
+            /** @example 3 */
+            duration?: number;
+            /** @example 2026-07-19 */
+            endDate?: string;
+            gearCategories?: components["schemas"]["TripPlanGearCategoryDto"][];
+            /** @example 4 */
+            numPeople: number;
+            poiHighlights?: components["schemas"]["TripPlanPoiHighlightDto"][];
+            /** @enum {string} */
+            source?: "board" | "fallback";
+            /** @example 2026-07-17 */
+            startDate?: string;
+            /** @example $450–$600 */
+            totalEstimatedBudget?: string;
+            /** @example A weekend on the water with the crew. */
+            tripSummary?: string;
+        };
         EvidenceItemDto: {
             /**
              * Format: uuid
@@ -7712,6 +10829,17 @@ export interface components {
             text?: string;
             /** @enum {string} */
             type: "photo" | "receipt_pdf" | "statement";
+        };
+        ExperienceGearLinkDto: {
+            /** @enum {string} */
+            inclusion?: "included" | "upgrade";
+            /** Format: uuid */
+            listingId: string;
+            quantity?: number;
+            /** @enum {string} */
+            quantityBasis?: "per_departure" | "per_guest";
+            role?: string;
+            sortOrder?: number;
         };
         ExtractTagsDto: Record<string, never>;
         FavoriteListingDto: {
@@ -7756,6 +10884,18 @@ export interface components {
             featuredUntil?: string | null;
             isFeatured: boolean;
         };
+        FinalizeVerificationDto: {
+            /** Format: uri */
+            blobUrl: string;
+            licenseClass?: string;
+            licenseNumber?: string;
+            /** @enum {string} */
+            verificationType: "DRIVERS_LICENSE" | "INSURANCE" | "BOATER_LICENSE" | "BIOMETRIC_LIVENESS";
+        };
+        FocalPointDto: {
+            x: number;
+            y: number;
+        };
         ForgotPasswordDto: {
             /**
              * Format: email
@@ -7763,24 +10903,26 @@ export interface components {
              */
             email: string;
         };
-        GenerateCareGuideDto: {
-            brand?: string;
-            category: string;
-            durationDays: number;
-            gearName: string;
-        };
         GenerateDescriptionDto: {
             category: string;
-            condition?: string;
             make?: string;
             model?: string;
             name?: string;
-            subAttributes?: Record<string, never>;
+            subAttributes?: {
+                [key: string]: unknown;
+            };
             year?: string;
+        };
+        GenerateDescriptionResponseDto: {
+            /** @description Present and false only when AI features are disabled (FEATURE_AI_ENABLED off); absent on the generated branch. */
+            available?: boolean;
+            /** @description The generated 2-3 sentence listing description (AI-enabled branch). Falls back to a deterministic local description on any generation error. */
+            description?: string;
+            /** @description Explanatory message accompanying the disabled branch. */
+            message?: string;
         };
         GenerateListingDto: {
             brand?: string;
-            condition?: string;
             features?: string[];
             gearType: string;
             location?: string;
@@ -7791,12 +10933,16 @@ export interface components {
         GenerateRecommendationsDto: {
             days?: number;
         };
-        GetRecommendationsDto: {
-            candidates: components["schemas"]["CandidateListingDto"][];
-            category?: string;
-            description: string;
-            limit?: number;
-            listingId?: string;
+        GenerateWeeklySlotsDto: {
+            /** Format: uuid */
+            assignedStaffId?: string;
+            customPrice?: number;
+            endTime: string;
+            spotsTotal: number;
+            startDate: string;
+            startTime: string;
+            weekdays: number[];
+            weeks: number;
         };
         GoogleSignInDto: {
             idToken: string;
@@ -7806,6 +10952,14 @@ export interface components {
             url: string;
         };
         ImproveTitleDto: Record<string, never>;
+        ImproveTitleResponseDto: {
+            /** @description Present and false only when AI features are disabled (FEATURE_AI_ENABLED off); absent on the generated branch. */
+            available?: boolean;
+            /** @description Explanatory message accompanying the disabled branch. */
+            message?: string;
+            /** @description The optimised listing title (AI-enabled branch). Falls back to the original title on any generation error. */
+            title?: string;
+        };
         IncidentalCharge: {
             /**
              * Format: decimal
@@ -7887,6 +11041,12 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        IncludedItemDto: {
+            description?: string;
+            /** @enum {string} */
+            icon: "map" | "storage" | "guide" | "safety-gear" | "helmet" | "life-jacket" | "navigation" | "fuel" | "trailer" | "delivery" | "instruction" | "cooler" | "tools" | "pump" | "lock" | "charger" | "permit" | "insurance";
+            label: string;
+        };
         InspectionChecklistItemDto: {
             label: string;
             note?: string;
@@ -7903,15 +11063,28 @@ export interface components {
         Listing: {
             addOns: string[];
             advanceBookingDays: number;
-            attributes: Record<string, never>;
+            amenities: string[] | null;
+            arrivalInstructions: string | null;
+            attributes: {
+                [key: string]: unknown;
+            };
+            availableEndTime: string | null;
+            availableStartTime: string | null;
             availableUnits?: number;
             averageRating: number;
             /** @enum {string} */
-            bookingType: "daily" | "hourly";
+            bookingType: "daily" | "hourly" | "both" | "nightly";
             bufferDays: number;
             /** @enum {string} */
             cancellationPolicy: "flexible" | "moderate" | "strict" | "non_refundable";
+            /** @description SPLIT-914 — the gear's care & usage guide: { sections[{title,instructions[]}], safetyWarnings[], proTips[], returnChecklist[] }. Generated at listing creation, vendor-editable, public. */
+            careGuide: {
+                [key: string]: unknown;
+            } | null;
             category: string;
+            checkInEndTime: string | null;
+            checkInTime: string | null;
+            checkOutTime: string | null;
             closedDaysOfWeek: number[] | null;
             /** Format: date-time */
             createdAt: string;
@@ -7930,7 +11103,7 @@ export interface components {
             description: string;
             earlyBirdDays: number;
             earlyBirdPct: number;
-            embedding: number[];
+            embedding: number[] | null;
             /**
              * Format: decimal
              * @example 195.00
@@ -7940,7 +11113,13 @@ export interface components {
             featuredUntil: string | null;
             icalUrl: string;
             id: string;
+            imageFocalPoints: {
+                x: number;
+                y: number;
+            }[];
             imageUrls: string[];
+            /** @description SPLIT — Adventure Bundles: Polaris-style what's-included chips: Array<{ icon: IncludedIconKey; label; description? }>. Vendor-editable, public. */
+            includedItems: Record<string, never>[] | null;
             instantBook: boolean;
             isFeatured: boolean;
             isHidden: boolean;
@@ -7952,9 +11131,14 @@ export interface components {
             leadTimeDays: number;
             location: string;
             longitude: number;
+            make?: string | null;
+            maxGuests: number | null;
             maxRentalDays: number;
+            maximumHours: number | null;
             minAge: number | null;
             minRentalDays: number;
+            minimumHours: number | null;
+            model?: string | null;
             moderationReason: string;
             /** @enum {string} */
             moderationStatus: "pending" | "approved" | "rejected" | "flagged" | "bypassed";
@@ -7972,6 +11156,7 @@ export interface components {
              * @example 195.00
              */
             pricePerHour?: string | null;
+            requiresIdVerification: boolean;
             reviews: components["schemas"]["Review"][];
             /** @enum {string|null} */
             sponsorTier: "STARTER" | "FEATURED" | "PREMIUM" | null;
@@ -7979,18 +11164,173 @@ export interface components {
             sponsoredUntil: string | null;
             /** @enum {string} */
             status: "draft" | "available" | "unavailable" | "rented" | "archived";
+            /** @description SPLIT-1266 — structured stay specifics: sleeps{bedrooms,beds,bathrooms,bedTypes[{type,count}]}, site{maxRigLength,maxVehicles,maxTents,padSurface,pullThrough}, rules{petsAllowed,smokingAllowed,firesAllowed,eventsAllowed,quietHoursStart,quietHoursEnd}, fees{cleaningFee,petFee}. Vendor-editable, public — never store PII here. */
+            stayDetails: {
+                [key: string]: unknown;
+            } | null;
+            taxAddressLine1: string | null;
+            taxCity: string | null;
+            taxPostalCode: string | null;
+            /** Format: date-time */
+            taxResponsibilityAckAt: string | null;
+            taxState: string | null;
+            timeSlotDuration: number | null;
             timezone?: string;
             totalReviews: number;
             /** Format: date-time */
             updatedAt: string;
             videoUrls: string[];
-            weeklyDiscountPct: number;
-        };
-        ListingUnit: {
             /** @enum {string} */
-            condition: "excellent" | "good" | "fair" | "needs_maintenance";
+            weatherPolicy: "none" | "full_refund";
+            weeklyDiscountPct: number;
+            year?: number | null;
+        };
+        ListingAvailabilityConflictDto: {
+            /** @description How many overlapping bookings/blocks this conflict represents. */
+            count: number;
+            /** @description Human-readable conflict message. */
+            message: string;
+            /** @description The blocked date sub-ranges backing this conflict. */
+            ranges: components["schemas"]["AvailabilityConflictRangeDto"][];
+            /**
+             * @description The conflict source: 'booking' or 'maintenance'.
+             * @enum {string}
+             */
+            type: "booking" | "maintenance";
+        };
+        ListingAvailabilityResponseDto: {
+            /** @description The overlapping bookings/maintenance blocks; omitted when available. */
+            conflicts?: components["schemas"]["ListingAvailabilityConflictDto"][];
+            /** @description Whether the listing is available for the requested date/time window. */
+            isAvailable: boolean;
+        };
+        ListingBrowseResponseDto: {
+            /** @description The current page of listings (owner projected to public-safe fields). */
+            data: components["schemas"]["Listing"][];
+            /** @description The page size. */
+            limit: number;
+            /** @description The current 1-based page number. */
+            page: number;
+            /** @description Zero-result relaxation suggestions; present only when the query returned no listings. */
+            suggestions?: components["schemas"]["ListingBrowseSuggestionDto"][];
+            /** @description Total matching listings across all pages. */
+            total: number;
+        };
+        ListingBrowseSuggestionDto: {
+            /** @description Human-readable suggestion label. */
+            label: string;
+            /** @description How many listings this relaxed query would return. */
+            resultCount: number;
+            /** @description The relaxation kind (e.g. 'price', 'location', 'category', 'dates'). */
+            type: string;
+        };
+        ListingCollectionResponseDto: {
+            /** @description The number of listings in `data`. */
+            count: number;
+            /** @description The matching listings (owner projected to public-safe fields). */
+            data: components["schemas"]["Listing"][];
+            /**
+             * @description Always true on success.
+             * @example true
+             */
+            success: boolean;
+        };
+        ListingDateBlockDto: {
+            customPrice?: number;
+            endDate: string;
+            startDate: string;
+            /** @enum {string} */
+            type: "blocked" | "instant-book";
+        };
+        ListingPricingStatsResponseDto: {
+            /**
+             * @description Mean daily price across the matching public listings.
+             * @example 84.5
+             */
+            averagePrice: number;
+            /** @description The category the stats were computed for. */
+            category: string;
+            /** @description Number of public listings in the sample (0 when none match). */
+            count: number;
+            /** @description The location filter applied, or null when unfiltered. */
+            location?: string | null;
+            /**
+             * @description Highest daily price in the sample.
+             * @example 320
+             */
+            maxPrice: number;
+            /**
+             * @description Median daily price across the matching public listings.
+             * @example 75
+             */
+            medianPrice: number;
+            /**
+             * @description Lowest daily price in the sample.
+             * @example 20
+             */
+            minPrice: number;
+            /**
+             * @description A suggested competitive daily price (median × 0.95).
+             * @example 71.25
+             */
+            suggestedPrice: number;
+        };
+        ListingRateRule: {
             /** Format: date-time */
             createdAt: string;
+            /**
+             * Format: date
+             * @description EXCLUSIVE — the first night the rule no longer applies to.
+             * @example 2026-06-20
+             */
+            endDate: string;
+            id: string;
+            listing: components["schemas"]["Listing"];
+            listingId: string;
+            /** @description Per-date minimum nights, evaluated on the CHECK-IN night only. 1..90. */
+            minNights: number | null;
+            /** @description Vendor-facing label, e.g. "Summer peak" or "MEA break". */
+            name: string;
+            /**
+             * Format: decimal
+             * @description Absolute per-night rate. Mutually exclusive with {@link ratePct}.
+             * @example 195.00
+             */
+            nightlyRate?: string | null;
+            /** @description Explicit vendor escape hatch — highest term in the precedence ordering. */
+            priority: number;
+            /**
+             * @description Relative delta against `listing.pricePerDay`, in percent. −90..+500.
+             *     Mutually exclusive with {@link nightlyRate}.
+             */
+            ratePct: number | null;
+            /** @enum {string} */
+            source: "vendor" | "starter";
+            /**
+             * Format: date
+             * @description Inclusive first night the rule can apply to.
+             * @example 2026-06-20
+             */
+            startDate: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /**
+             * @description UTC weekdays (0=Sun … 6=Sat) the rule applies to within its range.
+             *     NULL = every day. Deliberately UTC to match the day-count arithmetic in
+             *     `computeBaseRentalPrice`, which is UTC-instant based.
+             */
+            weekdayMask: number[] | null;
+        };
+        ListingUnit: {
+            /**
+             * Format: decimal
+             * @description SPLIT-723: vendor-declared acquisition value of this unit (insurance/claims basis). DECIMAL — serialized as a string.
+             * @example 195.00
+             */
+            acquisitionValue?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            hin: string | null;
             id: string;
             label: string;
             /** Format: date-time */
@@ -7998,13 +11338,18 @@ export interface components {
             listing: components["schemas"]["Listing"];
             listingId: string;
             maintenanceIntervalHours: number;
+            make: string | null;
+            model: string | null;
             notes: string;
+            registrationNumber: string | null;
             serialNumber: string;
             /** @enum {string} */
             status: "available" | "rented" | "maintenance" | "retired";
             totalRentalHours: number;
             /** Format: date-time */
             updatedAt: string;
+            vin: string | null;
+            year: number | null;
         };
         LoginDto: {
             /**
@@ -8031,6 +11376,8 @@ export interface components {
             listing: components["schemas"]["Listing"];
             listingId: string;
             reason: string;
+            sourceFeed: components["schemas"]["CalendarFeed"] | null;
+            sourceFeedId: string | null;
             /**
              * Format: date
              * @example 2026-06-20
@@ -8043,6 +11390,9 @@ export interface components {
         };
         MarkMessagesAsReadDto: {
             messageIds: string[];
+        };
+        MarkNotReturnedDto: {
+            note?: string;
         };
         Message: {
             content: string;
@@ -8090,6 +11440,10 @@ export interface components {
             vendorId: string;
         };
         ModerateReviewDto: Record<string, never>;
+        ModerationDto: {
+            /** @enum {string} */
+            moderationStatus: "visible" | "hidden";
+        };
         ModifyBookingDatesDto: {
             endDate: string;
             endTime?: string;
@@ -8105,13 +11459,43 @@ export interface components {
             message: string;
             recipientId: string;
             /** @enum {string} */
-            type: "NEW_MESSAGE" | "BOOKING_REQUEST" | "BOOKING_CONFIRMED" | "BOOKING_REJECTED" | "NEW_REVIEW" | "SEARCH_ALERT" | "PICKUP_REMINDER" | "RETURN_REMINDER" | "RISK_REVIEW" | "DAMAGE_CLAIM" | "DISPUTE_UPDATE";
+            type: "NEW_MESSAGE" | "BOOKING_REQUEST" | "BOOKING_CONFIRMED" | "BOOKING_REJECTED" | "NEW_REVIEW" | "SEARCH_ALERT" | "PICKUP_REMINDER" | "RETURN_REMINDER" | "RISK_REVIEW" | "DAMAGE_CLAIM" | "DISPUTE_UPDATE" | "BOOKING_CANCELLED" | "BOOKING_DATE_CHANGED" | "BOOKING_OVERDUE" | "INSURANCE_EXPIRING" | "RESCHEDULE_PROPOSAL" | "KYC_APPROVED" | "KYC_REJECTED" | "KYC_INFO_REQUESTED" | "LISTING_PROMOTED" | "LISTING_PROMOTION_ENDED" | "VENDOR_APPLICATION_APPROVED" | "VENDOR_ONBOARDING_APPROVED" | "VENDOR_ONBOARDING_SUBMITTED" | "VENDOR_APPLICATION_RECEIVED" | "CHARGEBACK_DISPUTE" | "PACKAGE_STAFF_ASSIGNMENT_REQUESTED" | "PACKAGE_STAFF_ASSIGNMENT_APPROVED" | "PACKAGE_STAFF_ASSIGNMENT_REJECTED";
         };
         OAuthExchangeDto: {
             code: string;
         };
+        OtpSendDto: {
+            /** @description The opaque login-challenge token. */
+            challengeToken: string;
+        };
+        OtpVerifyDto: {
+            /** @description The opaque login-challenge token. */
+            challengeToken: string;
+            /** @description The six-digit code emailed to the account. */
+            code: string;
+        };
         ParseSearchDto: {
             query: string;
+        };
+        PasskeyDeleteDto: {
+            /** @description Current account password (re-auth). */
+            password: string;
+        };
+        PasskeyRegisterOptionsDto: {
+            /** @description Current account password (re-auth). */
+            password: string;
+        };
+        PasskeyRegisterVerifyDto: {
+            /** @description The RegistrationResponseJSON produced by @simplewebauthn/browser startRegistration(). */
+            credential: Record<string, never>;
+            /** @description User-chosen label for this passkey. */
+            name?: string;
+            /** @description The opaque registration-challenge token. */
+            registrationToken: string;
+        };
+        PasskeyRenameDto: {
+            /** @description New label for this passkey. */
+            name: string;
         };
         PayoutDetailDto: {
             /**
@@ -8237,6 +11621,10 @@ export interface components {
              */
             numPeople: number;
         };
+        PlannedTripWindowDto: {
+            fromDays: number;
+            toDays: number;
+        };
         PrefillListingDto: {
             /**
              * @description Optional free-text nudge from the vendor (e.g. "2021 Trek Marlin, size L").
@@ -8341,18 +11729,42 @@ export interface components {
             acceptsPayments: boolean;
             /** @description Average review rating. */
             averageRating: number;
+            /** @description SPLIT-992: the owner's own bio. Absent means render nothing — no placeholder copy is substituted. */
+            bio?: string | null;
             /** @description First name. */
             firstName: string;
             /** @description Owner (vendor) user id. */
             id: string;
+            /** @description SPLIT-991: whether this owner has completed ID verification (KYC). Clients MUST gate any verified badge on `=== true` — unlike `acceptsPayments` above, this field fails CLOSED, so an absent value means "show no badge", never "verified". */
+            isVerified: boolean;
             /** @description Last name. */
             lastName: string;
+            /**
+             * Format: date-time
+             * @description SPLIT-992: the owner account-creation timestamp, for a real tenure line. Clients suppress the line entirely under one full year rather than rounding up.
+             */
+            memberSince?: string | null;
             /** @description Public avatar URL, or null. */
             profileImageUrl?: string | null;
             /** @description Public store name, or null. */
             storeName?: string | null;
             /** @description Total number of reviews. */
             totalReviews: number;
+        };
+        QuoteBookingDto: {
+            bringingPets?: boolean;
+            deliveryRequested?: boolean;
+            endDate: string;
+            endTime?: string;
+            /** Format: uuid */
+            listingId: string;
+            numberOfGuests?: number;
+            /** @enum {string} */
+            protectionPlan?: "none" | "basic" | "standard" | "premier";
+            quantity?: number;
+            selectedAddOns?: components["schemas"]["SelectedAddOnDto"][];
+            startDate: string;
+            startTime?: string;
         };
         ReactivateAccountDto: {
             /** Format: email */
@@ -8386,6 +11798,32 @@ export interface components {
             /** @description Number of vendors with ledger activity that were checked this run. */
             vendorsChecked: number;
         };
+        RecordMaintenanceDto: {
+            /** @description Uploaded receipt/photo URLs (upload-host allow-listed). */
+            attachmentUrls?: string[];
+            /**
+             * @description Parts/labor cost of this maintenance event (USD).
+             * @example 129.99
+             */
+            cost?: number;
+            /** @example Replaced air filter and spark plugs; topped up coolant. */
+            description: string;
+            /**
+             * @description Hour-meter / odometer reading at the time of service.
+             * @example 340
+             */
+            hoursReadingAt?: number;
+            /**
+             * @example service
+             * @enum {string}
+             */
+            kind: "service" | "repair" | "inspection";
+            /**
+             * @description When the maintenance was actually performed (defaults to now if omitted).
+             * @example 2026-07-09T14:30:00.000Z
+             */
+            performedAt?: string;
+        };
         RefreshTokenDto: {
             /** @description The opaque refresh token issued at login. */
             refreshToken: string;
@@ -8402,9 +11840,26 @@ export interface components {
             /** @enum {string} */
             platform?: "ios" | "android";
         };
+        RejectAccessGrantDto: {
+            reason?: string;
+        };
+        RejectBookingDto: {
+            reason?: string;
+        };
+        RejectInsurancePolicyDto: {
+            /** @description Reason for rejection, surfaced to the vendor. */
+            rejectionReason: string;
+        };
         RejectVerificationDto: {
             /** @description Reason for rejection, surfaced to the user. */
             rejectionReason: string;
+        };
+        RequestDeletionCodeDto: {
+            password: string;
+        };
+        RequestMoreInfoDto: {
+            /** @description What the user needs to fix or resubmit, surfaced to them. */
+            note: string;
         };
         RequestPayoutDto: {
             amount?: number;
@@ -8467,6 +11922,36 @@ export interface components {
             /** Format: date-time */
             vendorRespondedAt?: string | null;
             vendorResponse?: string | null;
+        };
+        RouteCueDto: {
+            dM: number;
+            lat?: number;
+            lng?: number;
+            text: string;
+            type?: string;
+        };
+        RoutePermitDto: {
+            authority?: string;
+            cost?: string;
+            name: string;
+            notes?: string;
+            required: boolean;
+            /** Format: uri */
+            url?: string;
+        };
+        RoutePoiDto: {
+            /** @enum {string} */
+            kind: "custom" | "fuel" | "water" | "trailhead" | "parking" | "viewpoint" | "restroom" | "camping" | "hazard" | "food" | "repair" | "rest" | "launch";
+            lat: number;
+            lng: number;
+            name: string;
+            note?: string;
+        };
+        RouteWaypointDto: {
+            lat: number;
+            lng: number;
+            name: string;
+            note?: string;
         };
         SelectedAddOnDto: {
             name: string;
@@ -8568,34 +12053,109 @@ export interface components {
             enabled: boolean;
         };
         SetEntitlementsDto: {
-            entitlements: ("admin" | "crm" | "finance" | "operations")[];
+            entitlements: ("admin" | "crm" | "crm_write" | "finance" | "finance_write" | "operations" | "operations_write" | "users" | "users_write" | "catalog" | "catalog_write" | "content" | "content_write" | "vendor_onboarding" | "vendor_onboarding_write")[];
+        };
+        SetExperienceGearDto: {
+            links: components["schemas"]["ExperienceGearLinkDto"][];
         };
         SetModerationBypassDto: {
             enabled: boolean;
         };
         SetRoleDto: {
             /** @enum {string} */
-            role: "renter" | "vendor" | "vendor_owner" | "vendor_manager" | "vendor_staff" | "manager" | "crm_manager" | "admin";
+            role: "renter" | "vendor" | "vendor_owner" | "vendor_manager" | "vendor_staff" | "crm_manager" | "admin";
+        };
+        SetRouteLinksDto: {
+            routeIds: string[];
+            /** Format: uuid */
+            vendorId?: string;
+        };
+        SetStaffDto: {
+            /**
+             * @description SPLIT-1224. Deliberate escape hatch past the corporate-email gate on
+             *     designation (isStaff:true) — lets an admin designate a non-corporate
+             *     email address as a Splitt employee for a genuine exception (e.g. a
+             *     contractor). Same `enableImplicitConversion` landmine as `isStaff` above
+             *     — this is OPTIONAL, so the raw-body check in the controller must also
+             *     tolerate an absent value, not just reject a non-boolean one. Every use
+             *     (a designation the override actually let through) is audited under the
+             *     distinct `access.staff.designate.override` action, separate from the
+             *     routine `access.staff.set` the `@Audited` decorator always records.
+             */
+            allowNonCorporate?: boolean;
+            isStaff: boolean;
+            staffTitle?: string;
         };
         SetSuspensionDto: {
             reason?: string;
             suspended: boolean;
         };
         SetUserAccessDto: {
-            entitlements: ("admin" | "crm" | "finance" | "operations")[];
+            entitlements: ("admin" | "crm" | "crm_write" | "finance" | "finance_write" | "operations" | "operations_write" | "users" | "users_write" | "catalog" | "catalog_write" | "content" | "content_write" | "vendor_onboarding" | "vendor_onboarding_write")[];
             /** @enum {string} */
-            role: "renter" | "vendor" | "vendor_owner" | "vendor_manager" | "vendor_staff" | "manager" | "crm_manager" | "admin";
+            role: "renter" | "vendor" | "vendor_owner" | "vendor_manager" | "vendor_staff" | "crm_manager" | "admin";
         };
         SetVisibilityDto: {
             isHidden: boolean;
         };
         SignVendorWaiverDto: {
             signature: string;
+            /**
+             * Format: uuid
+             * @description SPLIT-737 (TOCTOU guard): the id + version of the vendor waiver the client
+             *     actually rendered. OPTIONAL for back-compat — an older FE that POSTs only
+             *     `{ signature }` still signs the currently-active waiver. When present,
+             *     `signWaiver` asserts they match the freshly-resolved active waiver and
+             *     throws 409 on a mismatch, so the frozen contentSnapshot can never attest to
+             *     terms the vendor never saw.
+             */
+            waiverId?: string;
+            waiverVersion?: number;
         };
         SignWaiverDto: {
             /** Format: uuid */
             bookingId?: string;
             signature: string;
+        };
+        SimulateDisputeDto: {
+            /** Format: uuid */
+            bookingId: string;
+        };
+        StayBedTypeDto: {
+            count: number;
+            /** @enum {string} */
+            type: "double" | "king" | "queen" | "single" | "bunk" | "sofa_bed" | "futon" | "floor_mattress" | "cot" | "hammock";
+        };
+        StayDetailsDto: {
+            fees?: components["schemas"]["StayFeesDto"];
+            rules?: components["schemas"]["StayRulesDto"];
+            site?: components["schemas"]["StaySiteDto"];
+            sleeps?: components["schemas"]["StaySleepsDto"];
+        };
+        StayFeesDto: {
+            cleaningFee?: number;
+            petFee?: number;
+        };
+        StayRulesDto: {
+            eventsAllowed?: boolean;
+            firesAllowed?: boolean;
+            petsAllowed?: boolean;
+            quietHoursEnd?: string;
+            quietHoursStart?: string;
+            smokingAllowed?: boolean;
+        };
+        StaySiteDto: {
+            maxRigLength?: number;
+            maxTents?: number;
+            maxVehicles?: number;
+            padSurface?: string;
+            pullThrough?: boolean;
+        };
+        StaySleepsDto: {
+            bathrooms?: number;
+            bedTypes?: components["schemas"]["StayBedTypeDto"][];
+            bedrooms?: number;
+            beds?: number;
         };
         SubmitInspectionChecklistDto: {
             checklist: components["schemas"]["InspectionChecklistItemDto"][];
@@ -8605,15 +12165,9 @@ export interface components {
             type: "PICKUP" | "RETURN";
         };
         SuggestPriceDto: {
-            /** @description Optional free-text attributes (e.g. "carbon frame, tubeless"). */
-            attributes?: string;
             category: string;
             /** @description Optional city — a narrower location alias used the same way as `location`. */
             city?: string;
-            /** @description Optional condition (e.g. "like new", "good") — enriches the rationale. */
-            condition?: string;
-            /** @description Optional description — only used to enrich the LLM rationale. */
-            description?: string;
             /**
              * @description Optional listing location (free-text, e.g. "Minneapolis, MN"). When present
              *     it narrows comparables via a case-insensitive ILIKE match (the same text
@@ -8621,10 +12175,6 @@ export interface components {
              *     radius). `city` is the narrower alias; either may be supplied.
              */
             location?: string;
-            /** @description Optional free-text specs (e.g. "2-person, 3-season, 4lb"). */
-            specs?: string;
-            /** @description Optional listing title — only used to enrich the LLM rationale. */
-            title?: string;
         };
         SystemSetting: {
             description: string;
@@ -8639,11 +12189,20 @@ export interface components {
             templateId?: string;
             /** Format: email */
             to: string;
+            variables?: {
+                [key: string]: unknown;
+            };
         };
         TieredRateDto: {
             description?: string;
             minAmount: number;
             rate: number;
+        };
+        TrackConsentDto: {
+            analytics: boolean;
+            personalization: boolean;
+            /** @description Published consent-schema version; currently only `2` is accepted. */
+            version: number;
         };
         TrackEventDto: {
             /**
@@ -8664,9 +12223,38 @@ export interface components {
             label?: string;
             /** @description Listing associated with this click, if applicable */
             listingId?: string;
-            metadata?: Record<string, never>;
+            metadata?: {
+                [key: string]: unknown;
+            };
             /** @description Page path where the click occurred */
             page?: string;
+            /**
+             * @description SPLIT-1247/1248 — session token carried in the BODY, for `navigator
+             *     .sendBeacon` callers only.
+             *
+             *     Why this field has to exist: the unload-time events (`pay_redirect`,
+             *     `checkout_abandon`) are sent with `sendBeacon`, because an in-flight axios
+             *     POST is cancelled when the document unloads — which is exactly what happens
+             *     on the Stripe redirect and on every abandonment. `sendBeacon` CANNOT set
+             *     request headers, so those callers cannot send the usual `X-SMG-Session`
+             *     header, and the `smg_session` cookie is `SameSite=Lax` across a different
+             *     `*.vercel.app` origin (public-suffix list → cross-site) so browsers never
+             *     attach it to these requests either. The body is the only channel left.
+             *
+             *     ⚠️ This field is REQUIRED for the beacon path to work at all. The global
+             *     `ValidationPipe` runs with `forbidNonWhitelisted: true` (set in BOTH
+             *     `main.ts` AND the Vercel entry `api/index.ts`), so a beacon body carrying an
+             *     undeclared `sessionToken` is rejected with a 400 and the event is lost
+             *     silently — `sendBeacon`'s boolean return only says the request was QUEUED,
+             *     never that the server accepted it, so nothing surfaces client-side. Do not
+             *     remove this field without also removing the beacon transport.
+             *
+             *     `WebAnalyticsController.resolveSession` consults it LAST, after the cookie
+             *     and the `X-SMG-Session` header, so header-bearing callers are unaffected.
+             *     It is deliberately NOT persisted: `trackClickEvent` maps DTO → entity field
+             *     by field (no spread), and the resolved `sessionId` is what gets stored.
+             */
+            sessionToken?: string;
             targetUrl?: string;
         };
         TrackPageviewDto: {
@@ -8674,7 +12262,9 @@ export interface components {
             category?: string;
             /** @description Set when the user is viewing a listing detail page */
             listingId?: string;
-            metadata?: Record<string, never>;
+            metadata?: {
+                [key: string]: unknown;
+            };
             pageTitle?: string;
             path: string;
             /**
@@ -8684,6 +12274,11 @@ export interface components {
              */
             previousPageTime?: number;
             referrer?: string;
+        };
+        TrackScanDto: {
+            content: string;
+            medium: string;
+            source: string;
         };
         TrackSearchClickDto: {
             clickedResultId: string;
@@ -8695,9 +12290,13 @@ export interface components {
         TrackSearchDto: {
             category?: string;
             /** @description Active filter values applied to this search */
-            filters?: Record<string, never>;
+            filters?: {
+                [key: string]: unknown;
+            };
             location?: string;
-            metadata?: Record<string, never>;
+            metadata?: {
+                [key: string]: unknown;
+            };
             query: string;
             resultsCount?: number;
             /**
@@ -8705,6 +12304,21 @@ export interface components {
              *     main_search | ai_search | category_browse | autocomplete | search_alert
              */
             source?: string;
+        };
+        TrackVitalDto: {
+            /** @enum {string} */
+            metric: "LCP" | "CLS" | "INP" | "FCP" | "TTFB";
+            /** @enum {string} */
+            route: "other" | "/" | "/rentals" | "/rentals/[id]" | "/packages" | "/packages/[id]" | "/checkout/[bookingId]" | "/checkout/success" | "/login" | "/register" | "/plan-a-trip" | "/blog" | "/about" | "/partners" | "/profile" | "/bookings" | "/favorites" | "/notifications";
+            /**
+             * @description The raw metric value in its native unit (ms for LCP/INP/FCP/TTFB,
+             *     ×1000-scaled CLS — see `vitals-thresholds.ts`). Upper-bounded at one
+             *     hour in milliseconds: a legitimate vitals sample is always far smaller
+             *     than this, so the cap exists purely to reject a garbage/hostile payload
+             *     before it skews `sumValue`'s running mean, not to model a real-world
+             *     value anywhere near it.
+             */
+            value: number;
         };
         TransactionDetailDto: {
             /**
@@ -8743,10 +12357,16 @@ export interface components {
              */
             status: "pending" | "processing" | "completed" | "failed" | "cancelled";
             /**
+             * Format: decimal
+             * @description SPLIT-724: sales/rental tax computed at checkout (DECIMAL string), or null when no tax was computed (pre-seam / flag-off default).
+             * @example 195.00
+             */
+            taxAmount?: string | null;
+            /**
              * @description Transaction type.
              * @enum {string}
              */
-            type: "payment" | "refund" | "payout" | "platform_fee" | "deposit" | "deposit_release" | "deposit_claim";
+            type: "payment" | "refund" | "payout" | "platform_fee" | "deposit" | "deposit_release" | "deposit_claim" | "date_change";
             /**
              * Format: decimal
              * @description Vendor payout share (DECIMAL string).
@@ -8790,10 +12410,25 @@ export interface components {
              */
             status: "pending" | "processing" | "completed" | "failed" | "cancelled";
             /**
+             * Format: decimal
+             * @description SPLIT-724: sales/rental tax computed at checkout (DECIMAL string), or null when no tax was computed (pre-seam / flag-off default).
+             * @example 195.00
+             */
+            taxAmount?: string | null;
+            /**
              * @description Transaction type.
              * @enum {string}
              */
-            type: "payment" | "refund" | "payout" | "platform_fee" | "deposit" | "deposit_release" | "deposit_claim";
+            type: "payment" | "refund" | "payout" | "platform_fee" | "deposit" | "deposit_release" | "deposit_claim" | "date_change";
+        };
+        TransactionalPreviewDto: {
+            props?: {
+                [key: string]: unknown;
+            };
+        };
+        TransactionalTestSendDto: {
+            /** Format: email */
+            to: string;
         };
         TranslateDto: Record<string, never>;
         TriggerReportsDto: {
@@ -8821,8 +12456,85 @@ export interface components {
              */
             month?: "january" | "february" | "march" | "april" | "may" | "june" | "july" | "august" | "september" | "october" | "november" | "december";
         };
+        TripPlanGearCategoryDto: {
+            /** @example Camping */
+            category: string;
+            /** @example 3 */
+            itemCount?: number;
+            /** @example High */
+            priority?: string;
+        };
+        TripPlanPoiHighlightDto: {
+            /** @example Food & Drink */
+            group?: string;
+            /** @example Lakeside Grill */
+            name: string;
+        };
+        TwoFactorDisableConfirmDto: {
+            /** @description The six-digit code emailed to the account. */
+            code: string;
+        };
+        TwoFactorDisableStartDto: {
+            /** @description Current account password (re-auth). */
+            password: string;
+        };
+        TwoFactorEnrollConfirmDto: {
+            /** @description The six-digit code emailed to the account. */
+            code: string;
+        };
+        TwoFactorEnrollStartDto: {
+            /** @description Current account password (re-auth). */
+            password: string;
+        };
+        UnitMaintenanceRecord: {
+            /**
+             * @description Uploaded receipts/photos substantiating the work (optional). Stored inline
+             *     as jsonb — small, always fetched with the record — exactly like
+             *     IncidentalCharge.evidence. URLs are upload-host allow-listed at the DTO.
+             */
+            attachmentUrls: string[] | null;
+            /**
+             * Format: decimal
+             * @description SPLIT-748: cost of this maintenance event. DECIMAL — serialized as a string.
+             * @example 195.00
+             */
+            cost?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description What was done (required — the substance of the evidence). */
+            description: string;
+            /** @description Hour-meter / odometer reading at the time of service (optional). */
+            hoursReadingAt: number | null;
+            id: string;
+            /** @enum {string} */
+            kind: "service" | "repair" | "inspection";
+            /**
+             * Format: date-time
+             * @description When the maintenance was actually performed (settable; defaults now()).
+             */
+            performedAt: string;
+            /** @description The vendor/staff user who performed (or logged) the maintenance. */
+            performedBy: string;
+            performer: components["schemas"]["User"];
+            unit: components["schemas"]["ListingUnit"];
+            /** @description The physical unit this maintenance event belongs to. */
+            unitId: string;
+        };
         UnsubscribeDto: {
             token: string;
+        };
+        UpcomingHeldBookingDto: {
+            /** @description The held portion of this booking's vendor payout share. */
+            amount: number;
+            /** @description The RENTAL booking whose vendor share is held, or null when this share is backed by an experience (package) booking — see `experienceBookingId`. Exactly one of the two is set. */
+            bookingId: string | null;
+            /** @description SPLIT-1075 — the EXPERIENCE (package) booking whose host share is held, or null for a rental-backed share. */
+            experienceBookingId: string | null;
+            /**
+             * Format: date-time
+             * @description The instant this share releases (terminalAt + holdDays), or null while the booking is still active (not yet knowable).
+             */
+            releaseAt: string | null;
         };
         UpcomingPayoutItemDto: {
             /** @description The booking driving this projected payout. */
@@ -8856,6 +12568,18 @@ export interface components {
         UpcomingPayoutsResponseDto: {
             /** @description Projected payouts for active/confirmed bookings. */
             bookings: components["schemas"]["UpcomingPayoutItemDto"][];
+            /**
+             * @description The held portion of the vendor's CURRENT availableBalance (server-computed) — distinct from `pendingBalance` above.
+             * @example 200
+             */
+            heldBalance: number;
+            /** @description One line per booking contributing to `heldBalance`. */
+            heldBookings: components["schemas"]["UpcomingHeldBookingDto"][];
+            /**
+             * @description Days after a booking reaches a terminal state before its vendor payout share becomes withdrawable (`PAYOUT_HOLD_DAYS`, default 5).
+             * @example 5
+             */
+            holdDays: number;
             /** @description Sum of the projected net payouts below (server-computed). */
             pendingBalance: number;
             /**
@@ -8863,16 +12587,29 @@ export interface components {
              * @example true
              */
             success: boolean;
+            /**
+             * @description The withdrawable portion of the vendor's CURRENT availableBalance (server-computed: availableBalance − heldBalance).
+             * @example 1040.5
+             */
+            withdrawableBalance: number;
         };
         UpdateBlogPostDto: {
             author?: string;
             content?: string;
+            /** @enum {string} */
+            contentFormat?: "text" | "html";
             excerpt?: string;
             imageUrl?: string;
             /** @enum {string} */
             status?: "draft" | "published" | "archived";
             tags?: string[];
             title?: string;
+        };
+        UpdateBookingStatusDto: {
+            /** @enum {string} */
+            reason?: "severe_weather" | "dates_unavailable" | "draft_abandoned_with_authorization";
+            /** @enum {string} */
+            status: "draft" | "pending" | "confirmed" | "cancelled" | "completed" | "rejected";
         };
         UpdateCampaignDto: Record<string, never>;
         UpdateCategoryDto: Record<string, never>;
@@ -8908,6 +12645,7 @@ export interface components {
             minPrice?: number;
         };
         UpdateEWaiverDto: {
+            categories?: string[] | null;
             content?: string;
             description?: string;
             isActive?: boolean;
@@ -8919,22 +12657,49 @@ export interface components {
         UpdateEmailPreferencesDto: {
             marketingEmails?: boolean;
             productUpdateEmails?: boolean;
+            /**
+             * @description SPLIT-982 (Consent v2): self-service "stop building a profile from my
+             *     browsing" toggle, independent of the analytics/personalization consent
+             *     banner decision (`POST /web-analytics/consent`). Either signal alone is
+             *     sufficient to gate personalization.
+             */
+            profilingOptOut?: boolean;
         };
         UpdateExperienceDto: Record<string, never>;
+        UpdateExperienceScheduleDto: {
+            /** Format: uuid */
+            assignedStaffId?: string;
+            customPrice?: number;
+            endTime?: string;
+            notes?: string;
+            spotsTotal?: number;
+            /** @enum {string} */
+            status?: "available" | "full" | "cancelled";
+        };
         UpdateFeatureFlagDto: {
             description?: string;
             enabled?: boolean;
             rolloutPercentage?: number;
         };
+        UpdateInsurancePolicyDto: Record<string, never>;
         UpdateListingDto: {
             addOns?: components["schemas"]["AddOnDto"][];
+            address?: string;
             advanceBookingDays?: number;
+            amenities?: ("hammock" | "wifi" | "heating" | "air_conditioning" | "hot_water" | "linens_towels" | "free_parking" | "kitchen" | "private_bathroom" | "kitchenette" | "refrigerator" | "microwave" | "stove_oven" | "cooking_basics" | "dishes_utensils" | "coffee_maker" | "dishwasher" | "fire_pit" | "grill" | "picnic_table" | "deck_patio" | "hot_tub" | "sauna" | "outdoor_shower" | "lake_access" | "beach_access" | "electric_hookup_30a" | "electric_hookup_50a" | "water_hookup" | "sewer_hookup" | "dump_station" | "potable_water" | "shared_bathhouse" | "hot_showers" | "toilet_flush" | "toilet_vault" | "toilet_composting" | "generator_allowed" | "camp_store" | "boat_launch" | "smoke_detector" | "carbon_monoxide_detector" | "fire_extinguisher" | "first_aid_kit" | "bear_box" | "gated_property" | "exterior_cameras" | "tv" | "washer" | "dryer" | "dedicated_workspace" | "ev_charger" | "crib" | "high_chair" | "board_games" | "cell_service" | "step_free_access")[];
+            arrivalInstructions?: string;
+            availableEndTime?: string;
+            availableStartTime?: string;
             /** @enum {string} */
-            bookingType?: "daily" | "hourly";
+            bookingType?: "daily" | "hourly" | "both" | "nightly";
             bufferDays?: number;
             /** @enum {string} */
             cancellationPolicy?: "flexible" | "moderate" | "strict" | "non_refundable";
+            careGuide?: components["schemas"]["CareGuideDto"];
             category?: string;
+            checkInEndTime?: string;
+            checkInTime?: string;
+            checkOutTime?: string;
             closedDaysOfWeek?: number[];
             deliveryAvailable?: boolean;
             deliveryFee?: number;
@@ -8943,24 +12708,59 @@ export interface components {
             description?: string;
             earlyBirdDays?: number;
             earlyBirdPct?: number;
+            estimatedValue?: number;
             /** Format: uri */
             icalUrl?: string;
+            imageFocalPoints?: components["schemas"]["FocalPointDto"][];
             imageUrls?: string[];
+            /**
+             * @description Adventure Bundles (design §2.4/§3.2) — Polaris-style "what's included"
+             *     chips. `icon` is validated against a closed allowlist by
+             *     {@link IncludedItemDto} (never a free string). Max 12 items — a vendor
+             *     doesn't need more than a dozen highlight chips, and it caps the jsonb
+             *     payload. Full-replace on every PUT that includes the field (mirrors
+             *     `addOns`/`attributes` — Object.assign in `updateListing` overwrites the
+             *     whole array, it does not merge item-by-item).
+             */
+            includedItems?: components["schemas"]["IncludedItemDto"][];
             instantBook?: boolean;
+            latitude?: number;
             leadTimeDays?: number;
             location?: string;
+            longitude?: number;
+            make?: string;
+            maxGuests?: number;
             maxRentalDays?: number;
+            maximumHours?: number;
             minAge?: number | null;
             minRentalDays?: number;
+            minimumHours?: number;
+            model?: string;
             monthlyDiscountPct?: number;
             name?: string;
             pricePerDay?: number;
             pricePerHour?: number;
+            pricingType?: string;
+            requiresIdVerification?: boolean;
             /** @enum {string} */
             status?: "draft" | "available" | "unavailable" | "rented" | "archived";
+            stayDetails?: components["schemas"]["StayDetailsDto"];
+            subAttributes?: {
+                [key: string]: unknown;
+            };
+            taxAddressLine1?: string;
+            taxCity?: string;
+            taxPostalCode?: string;
+            taxResponsibilityAck?: boolean;
+            taxState?: string;
+            timeSlotDuration?: number;
             videoUrls?: string[];
+            /** @enum {string} */
+            weatherPolicy?: "none" | "full_refund";
             weeklyDiscountPct?: number;
+            year?: number;
         };
+        UpdateListingRouteDto: Record<string, never>;
         UpdateMessageTemplateDto: {
             body?: string;
             isActive?: boolean;
@@ -8973,7 +12773,7 @@ export interface components {
         };
         UpdateNotificationPreferenceDto: {
             /** @enum {string} */
-            category: "BOOKING_REMINDER" | "REVIEW_REQUEST" | "LISTING_INQUIRY" | "PRICE_ALERT";
+            category: "BOOKING_REMINDER" | "REVIEW_REQUEST" | "LISTING_INQUIRY" | "PRICE_ALERT" | "NEW_MESSAGE";
             emailEnabled?: boolean;
             inAppEnabled?: boolean;
             pushEnabled?: boolean;
@@ -8991,6 +12791,32 @@ export interface components {
             validFrom?: string;
             validUntil?: string;
         };
+        UpdateRateRuleDto: {
+            /**
+             * Format: date
+             * @description EXCLUSIVE — the first night the rule no longer applies to.
+             * @example 2026-06-20
+             */
+            endDate?: string;
+            /** @description Minimum nights required when this date is the CHECK-IN night. */
+            minNights?: number | null;
+            /** @description Vendor-facing label, e.g. "Summer peak". */
+            name?: string;
+            /** @description Absolute per-night rate in USD. Mutually exclusive with ratePct; setting it clears any stored ratePct. */
+            nightlyRate?: number | null;
+            /** @description Explicit override tier — the highest term of the precedence ordering. */
+            priority?: number;
+            /** @description Percentage adjustment against the listing base rate. Mutually exclusive with nightlyRate; setting it clears any stored nightlyRate. */
+            ratePct?: number | null;
+            /**
+             * Format: date
+             * @description Inclusive first night the rule applies to.
+             * @example 2026-06-20
+             */
+            startDate?: string;
+            /** @description UTC weekdays the rule narrows to (0=Sun … 6=Sat). Send null to clear the mask (back to every day in the range). */
+            weekdayMask?: number[] | null;
+        };
         UpdateReportSubscriptionDto: {
             businessEnabled?: boolean;
             /** @enum {string} */
@@ -9002,6 +12828,10 @@ export interface components {
         UpdateReviewDto: {
             comment?: string;
             rating?: number;
+        };
+        UpdateRouteDto: {
+            /** Format: uuid */
+            destinationId?: string | null;
         };
         UpdateSearchAlertDto: Record<string, never>;
         UpdateServiceBookingDto: {
@@ -9027,8 +12857,16 @@ export interface components {
         };
         UpdateTemplateDto: Record<string, never>;
         UpdateUnitDto: {
-            /** @enum {string} */
-            condition?: "excellent" | "good" | "fair" | "needs_maintenance";
+            /**
+             * @description What the vendor paid to acquire this unit (insurance/claims basis).
+             * @example 8499.99
+             */
+            acquisitionValue?: number;
+            /**
+             * @description Hull Identification Number (boats, jet skis / PWC).
+             * @example YAM12345D404
+             */
+            hin?: string;
             /** @example Unit #1 */
             label?: string;
             /**
@@ -9036,27 +12874,55 @@ export interface components {
              * @example 100
              */
             maintenanceIntervalHours?: number;
+            /** @example Polaris */
+            make?: string;
+            /** @example Sportsman 570 */
+            model?: string;
             notes?: string;
+            /**
+             * @description State/DMV registration number, where required.
+             * @example MN-4832-XZ
+             */
+            registrationNumber?: string;
             /** @example SN-TRK-2023-001 */
             serialNumber?: string;
             /** @enum {string} */
             status?: "available" | "rented" | "maintenance" | "retired";
+            /**
+             * @description Vehicle Identification Number (motorized land vehicles).
+             * @example 1HD1KB4197Y675231
+             */
+            vin?: string;
+            /**
+             * @description Model year.
+             * @example 2024
+             */
+            year?: number;
         };
         UpdateUserDto: {
+            addressLine1?: string;
             bio?: string;
             businessAddress?: string;
             businessPhone?: string;
+            city?: string;
             dateOfBirth?: string;
+            emergencyContactName?: string;
+            emergencyContactPhone?: string;
             firstName?: string;
             lastName?: string;
             phone?: string;
+            postalCode?: string;
             /** Format: uri */
             profileImageUrl?: string;
+            state?: string;
             storeDescription?: string;
             storeName?: string;
         };
         UpdateVendorCommissionDto: {
             customCommissionRate: number | null;
+        };
+        UpdateVendorNotesDto: {
+            vendorNotes?: string | null;
         };
         UpdateVendorWaiverDto: {
             content?: string;
@@ -9065,6 +12931,12 @@ export interface components {
             minAge?: number | null;
             name?: string;
         };
+        UploadVerificationDto: {
+            licenseClass?: string;
+            licenseNumber?: string;
+            /** @enum {string} */
+            verificationType: "DRIVERS_LICENSE" | "INSURANCE" | "BOATER_LICENSE" | "BIOMETRIC_LIVENESS";
+        };
         UpsertFeatureFlagDto: {
             description?: string;
             enabled?: boolean;
@@ -9072,6 +12944,33 @@ export interface components {
             rolloutPercentage?: number;
         };
         User: {
+            /**
+             * @description SPLIT-731 (identity depth): the renter's own postal address + emergency
+             *     contact, self-editable via the profile-update endpoint (UpdateUserDto). Held
+             *     for post-incident insurer/police follow-up on high-value rentals. All
+             *     nullable and — like verifiedLegalName — PII: stripped from every public
+             *     serialization (toJSON + mappers), returned only on the owner's own
+             *     /users/me profile.
+             */
+            addressLine1: string | null;
+            /**
+             * Format: date-time
+             * @description SPLIT-786 — set by the daily account-deletion finalizer
+             *     (AccountDeletionFinalizerService, `cron/daily-maintenance`) the moment a
+             *     soft-deleted account's grace window (ACCOUNT_DELETION_GRACE_PERIOD_DAYS,
+             *     user.service.ts) has elapsed and its PII has been irreversibly anonymized.
+             *     Null until then; once set, the sweep's candidate query excludes the row
+             *     forever (idempotency guard — it is never re-processed). The row itself is
+             *     NEVER hard-deleted (booking.renterId carries `onDelete: CASCADE` — an actual
+             *     DELETE would destroy the user's booking/financial/waiver history, which must
+             *     be retained) — only its PII columns are scrubbed in place. `deletedAt` stays
+             *     set; reactivateAccount's grace-window check means an anonymized row is past
+             *     recovery regardless, but this column is the authoritative "PII is gone"
+             *     marker for the sweep itself. Column added via
+             *     `migrations/*-Split786AccountDeletionFinalizer.ts` (NOT auto-applied —
+             *     synchronize:false in prod).
+             */
+            anonymizedAt: string | null;
             /**
              * @description Vendor-level default for auto-approving bookings (SPLIT-542). When true,
              *     NEW listings this vendor creates inherit instantBook=true; toggling it also
@@ -9088,6 +12987,28 @@ export interface components {
             bio: string;
             businessAddress: string;
             businessPhone: string;
+            /**
+             * @description SPLIT-1178 — the bearer token for this vendor's PRIVATE account-level
+             *     calendar subscription feed (`GET /vendor/calendar/:token`, no auth guard
+             *     — external calendar clients like Google/Apple/Outlook subscribe by URL
+             *     and cannot send a JWT). Minted lazily on first
+             *     `GET /vendor/calendar/subscription` call, rotatable via
+             *     `POST /vendor/calendar/subscription/rotate` (old token immediately stops
+             *     resolving — the lookup is by exact value, so a rotated token 404s).
+             *     UNIQUE so a token collision can never resolve to the wrong vendor.
+             *     Possessing this token is equivalent to read access on every booking/
+             *     maintenance-block detail across the vendor's listings — it must NEVER
+             *     ride along on a raw User entity serialized as an embedded relation, so it
+             *     is stripped in `toJSON()` below exactly like `passwordResetToken`.
+             */
+            calendarFeedToken: string | null;
+            /** Format: date-time */
+            calendarFeedTokenIssuedAt: string | null;
+            city: string | null;
+            /** Format: date-time */
+            consentDecidedAt: string | null;
+            /** @description The published consent-schema version (`TrackConsentDto.version`) affirmed. */
+            consentVersion: number | null;
             /** Format: date-time */
             createdAt: string;
             customCommissionRate: number;
@@ -9102,6 +13023,8 @@ export interface components {
             /** Format: date-time */
             emailVerificationExpires: string | null;
             emailVerificationToken: string | null;
+            emergencyContactName: string | null;
+            emergencyContactPhone: string | null;
             /**
              * @description SPLIT-260: additive internal-staff grants (Entitlement[]). Stored as a
              *     comma-joined text column (TypeORM simple-array), mirroring
@@ -9113,6 +13036,16 @@ export interface components {
             id: string;
             isEmailVerified: boolean;
             isPhoneVerified: boolean;
+            /**
+             * @description SPLIT-763: explicit Splitt-employee designation. Set ONLY via the
+             *     admin-role-only staff endpoint (PATCH /admin/users/:id/staff) — never from
+             *     registration or self-service. Employment is a PRECONDITION for holding any
+             *     entitlement OR a staff persona (admin/crm_manager); the invariants
+             *     are enforced in AdminService so a renter/vendor can never be handed
+             *     platform privileges accidentally. A vendor-family account can never be an
+             *     employee (conflict of interest).
+             */
+            isStaff: boolean;
             /**
              * @description SPLIT-433 (AA-15): platform ban/suspend. When true, the account is barred —
              *     `AuthService.validateUser` refuses to issue a JWT and booking creation is
@@ -9148,12 +13081,38 @@ export interface components {
              * @example 195.00
              */
             pendingBalance: string;
+            /**
+             * @description SPLIT-982 (Consent v2): the renter/vendor's most recent
+             *     analytics/personalization decision, stamped by
+             *     `POST /web-analytics/consent` ONLY when a valid bearer resolved this
+             *     user on that call (anonymous decisions live solely in the
+             *     `user_sessions.metadata.consent` jsonb blob — see
+             *     `web-analytics/entities/user-session.entity.ts`). Null until the user
+             *     has ever made an authenticated consent decision — NEVER defaulted to
+             *     true/false, so "missing" is unambiguously distinguishable from an
+             *     explicit choice everywhere this is read (dispatch gating, persona
+             *     refresh, DSAR).
+             */
+            personalizationConsent: boolean | null;
             phone: string;
             phoneVerificationCode: string;
             /** Format: date-time */
             phoneVerificationExpires: string;
+            postalCode: string | null;
             productUpdateEmailsEnabled: boolean;
             profileImageUrl: string;
+            /**
+             * @description SPLIT-982: explicit self-service "stop building a profile from my
+             *     browsing" toggle (PUT /email-preferences), independent of
+             *     `personalizationConsent` (which records the LAST answer to the consent
+             *     banner). Either signal alone is sufficient to gate personalization —
+             *     see `WebAnalyticsService`'s dispatch gating and
+             *     `PersonaRefreshService.recomputeProfile`. Defaults false (opted IN),
+             *     matching every other consent flag in this entity.
+             */
+            profilingOptOut: boolean;
+            /** Format: date-time */
+            profilingOptOutAt: string | null;
             /** @enum {string} */
             reportFrequency: "daily" | "weekly" | "monthly" | "quarterly" | "annual" | "none";
             /**
@@ -9162,7 +13121,10 @@ export interface components {
              */
             reportSubscribedTypes: string[];
             /** @enum {string} */
-            role: "renter" | "vendor" | "vendor_owner" | "vendor_manager" | "vendor_staff" | "manager" | "crm_manager" | "admin";
+            role: "renter" | "vendor" | "vendor_owner" | "vendor_manager" | "vendor_staff" | "crm_manager" | "admin";
+            /** @description SPLIT-763: display title shown in the admin Employee directory. */
+            staffTitle: string | null;
+            state: string | null;
             storeDescription: string;
             storeName: string;
             /** Format: date-time */
@@ -9183,8 +13145,36 @@ export interface components {
              *     accounts created before this field existed or that never affirmed.
              */
             termsAcceptedAt: string | null;
+            termsAcceptedIp: string | null;
+            termsAcceptedUserAgent: string | null;
+            /**
+             * @description SPLIT-744: versioned legal-acceptance evidence. `termsAcceptedVersion`
+             *     records WHICH published ToS version was affirmed (the {@link TOS_VERSION}
+             *     string at acceptance time), and `termsAcceptedIp` / `termsAcceptedUserAgent`
+             *     the request context that affirmed it. Together with `termsAcceptedAt` they
+             *     form a defensible assent record (who, when, from where, to WHICH terms) and
+             *     let the app detect when a user is owed a re-acceptance prompt (their stored
+             *     version no longer equals the live {@link TOS_VERSION}). All nullable — legacy
+             *     accounts and social/onboarding provisioning that carry no request context
+             *     leave the ip/ua null. Never client-settable; the version comes from the
+             *     server-side constant, never from the request body.
+             */
+            termsAcceptedVersion: string | null;
             totalReviews: number;
             trustScore: number;
+            /**
+             * @description SPLIT-1078 — optional two-factor authentication. `twoFactorEnabled` is the
+             *     single umbrella flag the login gate keys on (email OTP is the baseline
+             *     factor; WebAuthn passkeys, `WebauthnCredential` rows, are additive and can
+             *     never be the ONLY factor). Never self-set directly — only
+             *     `TwoFactorService.confirmEnroll`/`confirmDisable` flip it, each time
+             *     after a verified OTP AND with `revokeAllUserTokens` in the same
+             *     transaction path. `twoFactorEnrolledAt` is stamped alongside `true` and
+             *     cleared alongside `false`.
+             */
+            twoFactorEnabled: boolean;
+            /** Format: date-time */
+            twoFactorEnrolledAt: string | null;
             /** Format: date-time */
             updatedAt: string;
             vendorId: string;
@@ -9201,6 +13191,17 @@ export interface components {
              */
             vendorWaiverSignedAt: string;
             verificationBadges: string[];
+            /**
+             * @description SPLIT-731 (identity depth): the renter's VERIFIED legal name, stamped from
+             *     the decrypted full name on an identity verification when an admin marks it
+             *     VERIFIED (VerificationService.approveVerification). Plaintext parity with
+             *     firstName/lastName so insurer/police/admin review has a name that has been
+             *     proven against a government document. Never self-set (absent from
+             *     UpdateUserDto); never overwritten with null once set. Excluded from every
+             *     public serialization (toJSON strip below + the allowlist mappers); surfaced
+             *     ONLY on the authenticated self profile (toAuthenticatedUserProfile).
+             */
+            verifiedLegalName: string | null;
         };
         UserTransactionsResponseDto: {
             /**
@@ -9222,17 +13223,32 @@ export interface components {
             documentUrl: string;
             encryptedDateOfBirth: components["schemas"]["Buffer"];
             encryptedFullName: components["schemas"]["Buffer"];
+            /**
+             * @description SPLIT-731 (identity depth): the driver's-license number, encrypted at rest
+             *     with the SAME AES-256-GCM path as `encryptedFullName`
+             *     (EncryptionService.encrypt on write, .decrypt on read). Written by the KYC
+             *     document-upload flow when the renter optionally supplies it; readable ONLY
+             *     where the full name is readable — the admin review path
+             *     (VerificationService.getVerificationById, admin/owner gated). Never
+             *     serialized elsewhere. Held for insurer/police follow-up post-incident.
+             */
+            encryptedLicenseNumber: components["schemas"]["Buffer"];
             id: string;
             isManualReview: boolean;
             issuingState: string;
+            /**
+             * @description SPLIT-731: the licence class/endorsement (e.g. `C`, `M`, `A1`). Short,
+             *     low-sensitivity free text — stored in plaintext (unlike the number), capped
+             *     at 8 chars to match the DB column.
+             */
+            licenseClass: string;
             ocrConfidence: number;
-            rawText: string;
             rejectionReason: string;
             /** Format: date-time */
             reviewedAt: string;
             reviewedBy: string;
             /** @enum {string} */
-            status: "PENDING_REVIEW" | "VERIFIED" | "REJECTED" | "LIVENESS_FAILED";
+            status: "PENDING_REVIEW" | "VERIFIED" | "REJECTED" | "LIVENESS_FAILED" | "NEEDS_MORE_INFO";
             /** Format: date-time */
             updatedAt: string;
             user: components["schemas"]["User"];
@@ -9251,6 +13267,16 @@ export interface components {
              * @example 195.00
              */
             availableBalance: string;
+            /**
+             * @description The portion of `availableBalance` still ON HOLD (server-computed): an active (unconfirmed/still-running) booking's share, or a completed/cancelled/rejected booking's share still inside the `holdDays` window after it reached that terminal state.
+             * @example 200
+             */
+            heldBalance: number;
+            /**
+             * @description Days after a booking reaches a terminal state (completed/cancelled/rejected) before its vendor payout share becomes withdrawable (`PAYOUT_HOLD_DAYS`, default 5; 0 disables the hold).
+             * @example 5
+             */
+            holdDays: number;
             /**
              * @description totalEarnings − totalPayouts (server-computed).
              * @example 440.5
@@ -9272,6 +13298,11 @@ export interface components {
              * @example 800
              */
             totalPayouts: number;
+            /**
+             * @description The portion of `availableBalance` currently WITHDRAWABLE via POST /vendor/payouts (server-computed: availableBalance − heldBalance).
+             * @example 1040.5
+             */
+            withdrawableBalance: number;
         };
         VendorEarningsResponseDto: {
             earnings: components["schemas"]["VendorEarningsDto"];
@@ -9297,6 +13328,10 @@ export interface components {
             vendorId: string;
             version: number;
         };
+        VerifyEmailDto: {
+            /** @description Email verification token from the emailed link */
+            token: string;
+        };
         WaiverAgreement: {
             bookingId: string | null;
             contentSnapshot: string | null;
@@ -9315,6 +13350,16 @@ export interface components {
             vendorWaiverId: string | null;
             waiver: components["schemas"]["EWaiver"];
             waiverId: string | null;
+        };
+        WebauthnAuthOptionsDto: {
+            /** @description The opaque login-challenge token. */
+            challengeToken: string;
+        };
+        WebauthnAuthVerifyDto: {
+            /** @description The opaque login-challenge token. */
+            challengeToken: string;
+            /** @description The AuthenticationResponseJSON produced by @simplewebauthn/browser startAuthentication(). */
+            credential: Record<string, never>;
         };
     };
     responses: never;
@@ -9340,6 +13385,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": string;
+                };
+            };
+        };
+    };
+    AdminController_getPendingAccessGrants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_approveAccessGrant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminController_rejectAccessGrant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectAccessGrantDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -9460,7 +13568,7 @@ export interface operations {
                 limit?: number;
                 offset?: number;
                 vendorId?: string;
-                status?: "pending" | "confirmed" | "cancelled" | "completed" | "rejected";
+                status?: "draft" | "pending" | "confirmed" | "cancelled" | "completed" | "rejected";
                 from?: string;
                 to?: string;
             };
@@ -9507,6 +13615,174 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminExperiencesController_list: {
+        parameters: {
+            query?: {
+                hostId?: string;
+                status?: "draft" | "published" | "archived" | "rejected";
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminExperiencesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateExperienceOnBehalfDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminExperiencesController_listVendors: {
+        parameters: {
+            query?: {
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminExperiencesController_listVendorListings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                hostId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminExperiencesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateExperienceDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminExperiencesController_setGear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetExperienceGearDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminExperiencesController_publish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminExperiencesController_addSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateExperienceScheduleDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9577,6 +13853,88 @@ export interface operations {
             };
         };
     };
+    FinanceController_getTaxReport: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    FinanceController_exportTaxReport: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    FinanceController_createItemizedTaxExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateItemizedTaxExportDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    FinanceController_getItemizedTaxExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     FinanceController_getVendorBreakdown: {
         parameters: {
             query: {
@@ -9595,6 +13953,118 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    InsuranceAdminController_list: {
+        parameters: {
+            query?: {
+                status?: "pending_review" | "verified" | "rejected" | "expired";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    InsuranceAdminController_getDocumentUrl: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InsuranceAdminController_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectInsurancePolicyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InsuranceAdminController_verify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminController_getLeads: {
+        parameters: {
+            query?: {
+                /** @description Narrows to one LeadStatus. Omitting it returns every lead (all statuses). */
+                status?: "pending" | "confirmed" | "unsubscribed";
+                /** @description Case-insensitive substring match against the lead's email. */
+                search?: string;
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9703,6 +14173,71 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Listing"];
                 };
+            };
+        };
+    };
+    AdminPackageStaffController_list: {
+        parameters: {
+            query?: {
+                status?: "pending" | "approved" | "rejected" | "revoked";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminPackageStaffController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideStaffAssignmentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminPackageStaffController_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideStaffAssignmentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -9850,6 +14385,25 @@ export interface operations {
             };
         };
     };
+    ReconciliationController_getOverdueRentals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     ReconciliationController_getReports: {
         parameters: {
             query?: {
@@ -9885,6 +14439,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReconciliationReport"];
+                };
+            };
+        };
+    };
+    ReconciliationController_getStuckDeposits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ReconciliationController_getStuckPayouts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ReconciliationController_getUnpayableBalances: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ReconciliationController_getVendorCancelRates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -10015,7 +14645,66 @@ export interface operations {
             };
         };
     };
+    RoutesAdminController_list: {
+        parameters: {
+            query?: {
+                vendorId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RoutesAdminController_setModeration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModerationDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AdminController_seedTestData: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_seedDefaultWaivers: {
         parameters: {
             query?: never;
             header?: never;
@@ -10111,6 +14800,23 @@ export interface operations {
             };
         };
     };
+    AdminController_getAccessReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AdminController_getCommissionOverrides: {
         parameters: {
             query?: never;
@@ -10125,6 +14831,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    AdminController_getUserDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -10147,7 +14874,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -10195,7 +14924,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -10245,6 +14976,29 @@ export interface operations {
             };
         };
     };
+    AdminController_setUserStaff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetStaffDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AdminController_setUserSuspension: {
         parameters: {
             query?: never;
@@ -10272,7 +15026,14 @@ export interface operations {
     };
     AdminController_getPendingVerifications: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Defaults to PENDING_REVIEW when omitted (today's unchanged behavior). */
+                status?: "PENDING_REVIEW" | "VERIFIED" | "REJECTED" | "LIVENESS_FAILED" | "NEEDS_MORE_INFO";
+                /** @description Case-insensitive substring match against the owner's email/first/last name. */
+                search?: string;
+                page?: number;
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -10322,6 +15083,31 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RejectVerificationDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserVerification"];
+                };
+            };
+        };
+    };
+    AdminController_requestMoreInfo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestMoreInfoDto"];
             };
         };
         responses: {
@@ -10425,29 +15211,6 @@ export interface operations {
             };
         };
     };
-    AiController_generateCareGuide: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GenerateCareGuideDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
     AiController_generateDescription: {
         parameters: {
             query?: never;
@@ -10466,7 +15229,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["GenerateDescriptionResponseDto"];
                 };
             };
         };
@@ -10481,29 +15244,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["GenerateListingDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    AiController_getRecommendations: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GetRecommendationsDto"];
             };
         };
         responses: {
@@ -10535,7 +15275,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["ImproveTitleResponseDto"];
                 };
             };
         };
@@ -10648,7 +15388,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": Record<string, never>[];
                 };
             };
         };
@@ -10667,7 +15407,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": Record<string, never>[];
                 };
             };
         };
@@ -11107,6 +15847,295 @@ export interface operations {
             };
         };
     };
+    TwoFactorController_disableConfirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorDisableConfirmDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TwoFactorController_disableStart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorDisableStartDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TwoFactorController_enrollConfirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorEnrollConfirmDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TwoFactorController_enrollStart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorEnrollStartDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TwoFactorController_otpSend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OtpSendDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TwoFactorController_otpVerify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OtpVerifyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TwoFactorController_passkeyOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasskeyRegisterOptionsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TwoFactorController_passkeyVerify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasskeyRegisterVerifyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TwoFactorController_passkeyRename: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasskeyRenameDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TwoFactorController_passkeyDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasskeyDeleteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TwoFactorController_getStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TwoFactorController_webauthnOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebauthnAuthOptionsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TwoFactorController_webauthnVerify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebauthnAuthVerifyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     SocialAuthController_appleAuth: {
         parameters: {
             query?: never;
@@ -11141,7 +16170,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -11196,7 +16227,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -11276,7 +16309,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -11373,6 +16408,27 @@ export interface operations {
             };
         };
     };
+    BlogPublicController_findBySlug: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlogPost"];
+                };
+            };
+        };
+    };
     BlogPublicController_findOne: {
         parameters: {
             query?: never;
@@ -11429,7 +16485,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BookingVerification"][];
+                    "application/json": Record<string, never>[];
                 };
             };
         };
@@ -11571,12 +16627,16 @@ export interface operations {
             };
         };
         responses: {
+            /** @description The created booking. `confirmed` is `true` iff the persisted status is already CONFIRMED — which never happens at create under confirm-on-payment (SPLIT-1087/1160): every booking starts as a pre-payment draft and the Stripe webhook confirms it unconditionally the moment payment completes. Route to checkout regardless; the field is retained for backward compatibility with older mobile clients. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Booking"];
+                    "application/json": components["schemas"]["Booking"] & {
+                        /** @description SPLIT-746, semantics per SPLIT-1087/1160: derived as status === CONFIRMED. Always false on the create response — creation never confirms; payment completion does. Retained for older mobile clients. */
+                        confirmed: boolean;
+                    };
                 };
             };
         };
@@ -11673,6 +16733,59 @@ export interface operations {
             };
         };
     };
+    BookingController_quote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteBookingDto"];
+            };
+        };
+        responses: {
+            /** @description The itemized quote. All money fields are numbers rounded to cents. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        addOnsTotal?: number;
+                        baseBeforeDiscount?: number;
+                        cleaningFee?: number;
+                        deliveryFee?: number;
+                        /** @description Security-deposit HOLD. NOT included in `total`. */
+                        depositAmount?: number;
+                        discountComponents?: {
+                            pct?: number;
+                            /** @example weekly */
+                            type?: string;
+                        }[];
+                        discountPct?: number;
+                        discountedBase: number;
+                        /** @description Per-night lines for the nights a seasonal rate rule governed. Empty for gear and for a flat-priced stay. */
+                        nightlyRates?: {
+                            /** @example 2026-09-04 */
+                            date?: string;
+                            rate?: number;
+                            ruleName?: string | null;
+                        }[];
+                        /** @description Rental length in days/nights. 0 for an hourly-mode booking, which earns no length discount. */
+                        nights: number;
+                        perUnitBase?: number;
+                        petFee?: number;
+                        premium?: number;
+                        quantity: number;
+                        stayFeesTotal?: number;
+                        total: number;
+                    };
+                };
+            };
+        };
+    };
     "BookingController_findBookingsForMyListings[1]": {
         parameters: {
             query?: {
@@ -11758,6 +16871,27 @@ export interface operations {
             };
         };
     };
+    BookingController_cancellationPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancellationPreviewDto"];
+                };
+            };
+        };
+    };
     BookingController_modifyDates: {
         parameters: {
             query?: never;
@@ -11804,6 +16938,52 @@ export interface operations {
             };
         };
     };
+    BookingController_markNotReturned: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkNotReturnedDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingResponseDto"];
+                };
+            };
+        };
+    };
+    BookingController_markReturned: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingResponseDto"];
+                };
+            };
+        };
+    };
     BookingController_updateProtection: {
         parameters: {
             query?: never;
@@ -11834,9 +17014,105 @@ export interface operations {
             };
             cookie?: never;
         };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectBookingDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingResponseDto"];
+                };
+            };
+        };
+    };
+    BookingController_proposeReschedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRescheduleProposalDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    BookingController_withdrawReschedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    BookingController_acceptReschedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptRescheduleProposalDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    BookingController_declineReschedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11855,14 +17131,18 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBookingStatusDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["BookingResponseDto"];
                 };
             };
         };
@@ -11889,6 +17169,69 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    BookingController_updateVendorNotes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateVendorNotesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingResponseDto"];
+                };
+            };
+        };
+    };
+    CalendarFeedController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CalendarFeedController_sync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -12698,6 +18041,42 @@ export interface operations {
             };
         };
     };
+    DestinationsPublicController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DestinationsPublicController_getBySlug: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     DisputesController_findAll: {
         parameters: {
             query?: never;
@@ -13150,6 +18529,23 @@ export interface operations {
             };
         };
     };
+    EmailTemplatesController_seedMonthly: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     EmailTemplatesController_testSend: {
         parameters: {
             query?: never;
@@ -13160,6 +18556,71 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["TestSendDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    EmailTemplatesController_getTransactionalCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    EmailTemplatesController_previewTransactional: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransactionalPreviewDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    EmailTemplatesController_testSendTransactional: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransactionalTestSendDto"];
             };
         };
         responses: {
@@ -13278,13 +18739,15 @@ export interface operations {
     };
     "ExperiencesController_findAll[0]": {
         parameters: {
-            query: {
-                location: string;
-                minPrice: string;
-                maxPrice: string;
-                date: string;
-                limit: string;
-                offset: string;
+            query?: {
+                offset?: number;
+                limit?: number;
+                maxDuration?: number;
+                groupSize?: number;
+                maxPrice?: number;
+                minPrice?: number;
+                location?: string;
+                category?: "tours" | "food" | "outdoor" | "arts" | "fitness" | "wellness" | "music" | "sports" | "workshop" | "photography" | "other";
             };
             header?: never;
             path?: never;
@@ -13359,6 +18822,25 @@ export interface operations {
             };
         };
     };
+    "ExperiencesController_getBookingDetail[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "ExperiencesController_cancelBooking[0]": {
         parameters: {
             query?: never;
@@ -13371,6 +18853,29 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "ExperiencesController_createBookingCheckoutSession[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateExperienceCheckoutSessionDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13607,6 +19112,48 @@ export interface operations {
             };
         };
     };
+    "ExperienceGearController_getGear[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "ExperienceGearController_setGear[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetExperienceGearDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "ExperiencesController_publish[0]": {
         parameters: {
             query?: never;
@@ -13668,6 +19215,48 @@ export interface operations {
             };
         };
     };
+    "ExperienceRoutesLinkController_getRoutes[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "ExperienceRoutesLinkController_setRoutes[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetRouteLinksDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "ExperiencesController_getSchedules[0]": {
         parameters: {
             query: {
@@ -13705,6 +19294,135 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "PackageStaffController_generateWeeklySlots[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateWeeklySlotsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "PackageStaffController_updateSchedule[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                scheduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateExperienceScheduleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "PackageStaffController_deleteSchedule[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                scheduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "PackageStaffController_listForPackage[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "PackageStaffController_requestAssignment[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateStaffAssignmentRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "PackageStaffController_revoke[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                assignmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13987,6 +19705,31 @@ export interface operations {
             };
         };
     };
+    FleetController_createUnitsBulk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkCreateUnitsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingUnit"][];
+                };
+            };
+        };
+    };
     FleetController_getMyUnits: {
         parameters: {
             query?: never;
@@ -14078,6 +19821,29 @@ export interface operations {
             };
             cookie?: never;
         };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordMaintenanceDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    FleetController_getMaintenanceRecords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                unitId: string;
+            };
+            cookie?: never;
+        };
         requestBody?: never;
         responses: {
             200: {
@@ -14085,7 +19851,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListingUnit"];
+                    "application/json": components["schemas"]["UnitMaintenanceRecord"][];
                 };
             };
         };
@@ -14324,6 +20090,111 @@ export interface operations {
             };
         };
     };
+    InsurancePolicyController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInsurancePolicyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InsurancePolicyController_findMine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    InsurancePolicyController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateInsurancePolicyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InsurancePolicyController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InsurancePolicyController_getDocumentUrl: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     LeadsController_create: {
         parameters: {
             query?: never;
@@ -14369,9 +20240,52 @@ export interface operations {
             query?: {
                 search?: string;
                 category?: string;
+                /**
+                 * @description SPLIT-1269 — Stays search: restrict browse to the 4 nightly-booking stay
+                 *     categories (STAY_CATEGORIES, listing-categories.ts). Only 'stays' is
+                 *     accepted today; an unrecognized value 400s rather than silently matching
+                 *     nothing (room to grow — e.g. a future 'experiences' group — without a
+                 *     breaking change to this field's shape).
+                 */
+                group?: string;
+                /**
+                 * @description SPLIT-1269 — Stays search: minimum guest capacity. Only meaningful
+                 *     against a nightly (stay) listing — ListingService pairs this with
+                 *     `bookingType = 'nightly'`, so a gear-listing browse that happens to pass
+                 *     `guests` simply matches nothing rather than erroring.
+                 */
+                guests?: number;
+                /**
+                 * @description SPLIT-1269 — Stays search: CSV of amenity keys (e.g. "wifi,hot_tub"),
+                 *     ALL of which must be real STAY_AMENITIES members — see
+                 *     {@link IsAmenitiesCsvConstraint}. Kept as a raw string (not an array) so
+                 *     the wire contract is a plain query param; ListingService re-splits it
+                 *     via {@link splitAmenitiesCsv} when building the SQL filter.
+                 */
+                amenities?: string;
                 location?: string;
                 minPrice?: number;
                 maxPrice?: number;
+                instantBook?: boolean;
+                /**
+                 * @description SPLIT-908 — renter browse filter: pass `false` to see only gear that will
+                 *     NOT demand ID verification before booking. Verification is a manual ~24h
+                 *     admin review, so plenty of renters would rather browse only what they can
+                 *     book today.
+                 *
+                 *     This keys off the SAME column the hard booking gate enforces
+                 *     (`listingHardRequiresIdVerification`, SPLIT-905), so "listings the filter
+                 *     shows me" and "listings that will not 403 me" are the same set by
+                 *     construction — a filter that disagreed with the gate would be worse than no
+                 *     filter at all.
+                 *
+                 *     `@StrictBoolean` is mandatory (see instantBook above): with the global
+                 *     `enableImplicitConversion`, `Boolean('false')` is `true`, which would invert
+                 *     this filter and show the renter exactly what they asked to avoid.
+                 */
+                requiresIdVerification?: boolean;
+                minRating?: number;
+                maxDeposit?: number;
                 startDate?: string;
                 endDate?: string;
                 status?: "draft" | "available" | "unavailable" | "rented" | "archived";
@@ -14390,7 +20304,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ListingBrowseResponseDto"];
+                };
             };
         };
     };
@@ -14481,9 +20397,52 @@ export interface operations {
             query?: {
                 search?: string;
                 category?: string;
+                /**
+                 * @description SPLIT-1269 — Stays search: restrict browse to the 4 nightly-booking stay
+                 *     categories (STAY_CATEGORIES, listing-categories.ts). Only 'stays' is
+                 *     accepted today; an unrecognized value 400s rather than silently matching
+                 *     nothing (room to grow — e.g. a future 'experiences' group — without a
+                 *     breaking change to this field's shape).
+                 */
+                group?: string;
+                /**
+                 * @description SPLIT-1269 — Stays search: minimum guest capacity. Only meaningful
+                 *     against a nightly (stay) listing — ListingService pairs this with
+                 *     `bookingType = 'nightly'`, so a gear-listing browse that happens to pass
+                 *     `guests` simply matches nothing rather than erroring.
+                 */
+                guests?: number;
+                /**
+                 * @description SPLIT-1269 — Stays search: CSV of amenity keys (e.g. "wifi,hot_tub"),
+                 *     ALL of which must be real STAY_AMENITIES members — see
+                 *     {@link IsAmenitiesCsvConstraint}. Kept as a raw string (not an array) so
+                 *     the wire contract is a plain query param; ListingService re-splits it
+                 *     via {@link splitAmenitiesCsv} when building the SQL filter.
+                 */
+                amenities?: string;
                 location?: string;
                 minPrice?: number;
                 maxPrice?: number;
+                instantBook?: boolean;
+                /**
+                 * @description SPLIT-908 — renter browse filter: pass `false` to see only gear that will
+                 *     NOT demand ID verification before booking. Verification is a manual ~24h
+                 *     admin review, so plenty of renters would rather browse only what they can
+                 *     book today.
+                 *
+                 *     This keys off the SAME column the hard booking gate enforces
+                 *     (`listingHardRequiresIdVerification`, SPLIT-905), so "listings the filter
+                 *     shows me" and "listings that will not 403 me" are the same set by
+                 *     construction — a filter that disagreed with the gate would be worse than no
+                 *     filter at all.
+                 *
+                 *     `@StrictBoolean` is mandatory (see instantBook above): with the global
+                 *     `enableImplicitConversion`, `Boolean('false')` is `true`, which would invert
+                 *     this filter and show the renter exactly what they asked to avoid.
+                 */
+                requiresIdVerification?: boolean;
+                minRating?: number;
+                maxDeposit?: number;
                 startDate?: string;
                 endDate?: string;
                 status?: "draft" | "available" | "unavailable" | "rented" | "archived";
@@ -14523,7 +20482,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Listing"][];
+                    "application/json": Record<string, never>[];
                 };
             };
         };
@@ -14544,7 +20503,53 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": components["schemas"]["ListingPricingStatsResponseDto"];
+                };
+            };
+        };
+    };
+    "ListingController_removeRateRule[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content?: never;
+            };
+        };
+    };
+    "ListingController_updateRateRule[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRateRuleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingRateRule"];
+                };
             };
         };
     };
@@ -14614,7 +20619,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ListingCollectionResponseDto"];
+                };
             };
         };
     };
@@ -14702,7 +20709,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ListingAvailabilityResponseDto"];
+                };
             };
         };
     };
@@ -14730,6 +20739,27 @@ export interface operations {
             };
         };
     };
+    "ListingController_regenerateCareGuide[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Listing"];
+                };
+            };
+        };
+    };
     "ListingController_duplicate[0]": {
         parameters: {
             query?: never;
@@ -14748,6 +20778,25 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Listing"];
                 };
+            };
+        };
+    };
+    "ListingRoutesController_getUpgrades[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14791,6 +20840,186 @@ export interface operations {
             };
         };
     };
+    "ListingController_getRateRules[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingRateRule"][];
+                };
+            };
+        };
+    };
+    "ListingController_createRateRule[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRateRuleDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingRateRule"];
+                };
+            };
+        };
+    };
+    "ListingController_applyStarterSeasons[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyStarterSeasonsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingRateRule"][];
+                };
+            };
+        };
+    };
+    "ListingRoutesController_getRoutes[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "ListingRoutesLinkController_setRoutes[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetRouteLinksDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "ListingRoutesController_createRoute[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateListingRouteDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "ListingRoutesController_updateRoute[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                routeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateListingRouteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "ListingRoutesController_removeRoute[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                routeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "ListingController_findSimilar[0]": {
         parameters: {
             query: {
@@ -14808,7 +21037,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ListingCollectionResponseDto"];
+                };
             };
         };
     };
@@ -14874,8 +21105,52 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MaintenanceBlock"];
+                    "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    "CalendarFeedController_list[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    "CalendarFeedController_create[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCalendarFeedDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -15177,6 +21452,25 @@ export interface operations {
             };
         };
     };
+    NotificationController_testPush: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
     NotificationController_getUnreadCount: {
         parameters: {
             query?: never;
@@ -15236,13 +21530,15 @@ export interface operations {
     };
     "ExperiencesController_findAll[1]": {
         parameters: {
-            query: {
-                location: string;
-                minPrice: string;
-                maxPrice: string;
-                date: string;
-                limit: string;
-                offset: string;
+            query?: {
+                offset?: number;
+                limit?: number;
+                maxDuration?: number;
+                groupSize?: number;
+                maxPrice?: number;
+                minPrice?: number;
+                location?: string;
+                category?: "tours" | "food" | "outdoor" | "arts" | "fitness" | "wellness" | "music" | "sports" | "workshop" | "photography" | "other";
             };
             header?: never;
             path?: never;
@@ -15317,6 +21613,25 @@ export interface operations {
             };
         };
     };
+    "ExperiencesController_getBookingDetail[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "ExperiencesController_cancelBooking[1]": {
         parameters: {
             query?: never;
@@ -15329,6 +21644,29 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "ExperiencesController_createBookingCheckoutSession[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateExperienceCheckoutSessionDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -15565,6 +21903,48 @@ export interface operations {
             };
         };
     };
+    "ExperienceGearController_getGear[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "ExperienceGearController_setGear[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetExperienceGearDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "ExperiencesController_publish[1]": {
         parameters: {
             query?: never;
@@ -15626,6 +22006,48 @@ export interface operations {
             };
         };
     };
+    "ExperienceRoutesLinkController_getRoutes[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "ExperienceRoutesLinkController_setRoutes[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetRouteLinksDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "ExperiencesController_getSchedules[1]": {
         parameters: {
             query: {
@@ -15670,6 +22092,174 @@ export interface operations {
             };
         };
     };
+    "PackageStaffController_generateWeeklySlots[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateWeeklySlotsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "PackageStaffController_updateSchedule[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                scheduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateExperienceScheduleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "PackageStaffController_deleteSchedule[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                scheduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "PackageStaffController_listForPackage[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "PackageStaffController_requestAssignment[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateStaffAssignmentRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "PackageStaffController_revoke[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                assignmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PaymentController_listDisputes: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PaymentController_getDisputeEvidence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                disputeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     PaymentController_getPlatformRevenue: {
         parameters: {
             query: {
@@ -15683,6 +22273,65 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PaymentController_closeDisputeSimulation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseDisputeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PaymentController_simulateDispute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulateDisputeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PaymentController_syncDisputeWebhookEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -15952,9 +22601,52 @@ export interface operations {
             query?: {
                 search?: string;
                 category?: string;
+                /**
+                 * @description SPLIT-1269 — Stays search: restrict browse to the 4 nightly-booking stay
+                 *     categories (STAY_CATEGORIES, listing-categories.ts). Only 'stays' is
+                 *     accepted today; an unrecognized value 400s rather than silently matching
+                 *     nothing (room to grow — e.g. a future 'experiences' group — without a
+                 *     breaking change to this field's shape).
+                 */
+                group?: string;
+                /**
+                 * @description SPLIT-1269 — Stays search: minimum guest capacity. Only meaningful
+                 *     against a nightly (stay) listing — ListingService pairs this with
+                 *     `bookingType = 'nightly'`, so a gear-listing browse that happens to pass
+                 *     `guests` simply matches nothing rather than erroring.
+                 */
+                guests?: number;
+                /**
+                 * @description SPLIT-1269 — Stays search: CSV of amenity keys (e.g. "wifi,hot_tub"),
+                 *     ALL of which must be real STAY_AMENITIES members — see
+                 *     {@link IsAmenitiesCsvConstraint}. Kept as a raw string (not an array) so
+                 *     the wire contract is a plain query param; ListingService re-splits it
+                 *     via {@link splitAmenitiesCsv} when building the SQL filter.
+                 */
+                amenities?: string;
                 location?: string;
                 minPrice?: number;
                 maxPrice?: number;
+                instantBook?: boolean;
+                /**
+                 * @description SPLIT-908 — renter browse filter: pass `false` to see only gear that will
+                 *     NOT demand ID verification before booking. Verification is a manual ~24h
+                 *     admin review, so plenty of renters would rather browse only what they can
+                 *     book today.
+                 *
+                 *     This keys off the SAME column the hard booking gate enforces
+                 *     (`listingHardRequiresIdVerification`, SPLIT-905), so "listings the filter
+                 *     shows me" and "listings that will not 403 me" are the same set by
+                 *     construction — a filter that disagreed with the gate would be worse than no
+                 *     filter at all.
+                 *
+                 *     `@StrictBoolean` is mandatory (see instantBook above): with the global
+                 *     `enableImplicitConversion`, `Boolean('false')` is `true`, which would invert
+                 *     this filter and show the renter exactly what they asked to avoid.
+                 */
+                requiresIdVerification?: boolean;
+                minRating?: number;
+                maxDeposit?: number;
                 startDate?: string;
                 endDate?: string;
                 status?: "draft" | "available" | "unavailable" | "rented" | "archived";
@@ -15973,7 +22665,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ListingBrowseResponseDto"];
+                };
             };
         };
     };
@@ -16064,9 +22758,52 @@ export interface operations {
             query?: {
                 search?: string;
                 category?: string;
+                /**
+                 * @description SPLIT-1269 — Stays search: restrict browse to the 4 nightly-booking stay
+                 *     categories (STAY_CATEGORIES, listing-categories.ts). Only 'stays' is
+                 *     accepted today; an unrecognized value 400s rather than silently matching
+                 *     nothing (room to grow — e.g. a future 'experiences' group — without a
+                 *     breaking change to this field's shape).
+                 */
+                group?: string;
+                /**
+                 * @description SPLIT-1269 — Stays search: minimum guest capacity. Only meaningful
+                 *     against a nightly (stay) listing — ListingService pairs this with
+                 *     `bookingType = 'nightly'`, so a gear-listing browse that happens to pass
+                 *     `guests` simply matches nothing rather than erroring.
+                 */
+                guests?: number;
+                /**
+                 * @description SPLIT-1269 — Stays search: CSV of amenity keys (e.g. "wifi,hot_tub"),
+                 *     ALL of which must be real STAY_AMENITIES members — see
+                 *     {@link IsAmenitiesCsvConstraint}. Kept as a raw string (not an array) so
+                 *     the wire contract is a plain query param; ListingService re-splits it
+                 *     via {@link splitAmenitiesCsv} when building the SQL filter.
+                 */
+                amenities?: string;
                 location?: string;
                 minPrice?: number;
                 maxPrice?: number;
+                instantBook?: boolean;
+                /**
+                 * @description SPLIT-908 — renter browse filter: pass `false` to see only gear that will
+                 *     NOT demand ID verification before booking. Verification is a manual ~24h
+                 *     admin review, so plenty of renters would rather browse only what they can
+                 *     book today.
+                 *
+                 *     This keys off the SAME column the hard booking gate enforces
+                 *     (`listingHardRequiresIdVerification`, SPLIT-905), so "listings the filter
+                 *     shows me" and "listings that will not 403 me" are the same set by
+                 *     construction — a filter that disagreed with the gate would be worse than no
+                 *     filter at all.
+                 *
+                 *     `@StrictBoolean` is mandatory (see instantBook above): with the global
+                 *     `enableImplicitConversion`, `Boolean('false')` is `true`, which would invert
+                 *     this filter and show the renter exactly what they asked to avoid.
+                 */
+                requiresIdVerification?: boolean;
+                minRating?: number;
+                maxDeposit?: number;
                 startDate?: string;
                 endDate?: string;
                 status?: "draft" | "available" | "unavailable" | "rented" | "archived";
@@ -16106,7 +22843,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Listing"][];
+                    "application/json": Record<string, never>[];
                 };
             };
         };
@@ -16127,7 +22864,53 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": components["schemas"]["ListingPricingStatsResponseDto"];
+                };
+            };
+        };
+    };
+    "ListingController_removeRateRule[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content?: never;
+            };
+        };
+    };
+    "ListingController_updateRateRule[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRateRuleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingRateRule"];
+                };
             };
         };
     };
@@ -16197,7 +22980,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ListingCollectionResponseDto"];
+                };
             };
         };
     };
@@ -16285,7 +23070,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ListingAvailabilityResponseDto"];
+                };
             };
         };
     };
@@ -16313,6 +23100,27 @@ export interface operations {
             };
         };
     };
+    "ListingController_regenerateCareGuide[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Listing"];
+                };
+            };
+        };
+    };
     "ListingController_duplicate[1]": {
         parameters: {
             query?: never;
@@ -16331,6 +23139,25 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Listing"];
                 };
+            };
+        };
+    };
+    "ListingRoutesController_getUpgrades[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16374,6 +23201,186 @@ export interface operations {
             };
         };
     };
+    "ListingController_getRateRules[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingRateRule"][];
+                };
+            };
+        };
+    };
+    "ListingController_createRateRule[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRateRuleDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingRateRule"];
+                };
+            };
+        };
+    };
+    "ListingController_applyStarterSeasons[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyStarterSeasonsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingRateRule"][];
+                };
+            };
+        };
+    };
+    "ListingRoutesController_getRoutes[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "ListingRoutesLinkController_setRoutes[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetRouteLinksDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "ListingRoutesController_createRoute[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateListingRouteDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "ListingRoutesController_updateRoute[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                routeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateListingRouteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "ListingRoutesController_removeRoute[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                routeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "ListingController_findSimilar[1]": {
         parameters: {
             query: {
@@ -16391,7 +23398,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ListingCollectionResponseDto"];
+                };
             };
         };
     };
@@ -16457,8 +23466,52 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MaintenanceBlock"];
+                    "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    "CalendarFeedController_list[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    "CalendarFeedController_create[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCalendarFeedDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16700,6 +23753,223 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    RoutesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRouteDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RoutesController_importGpx: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RoutesController_getMine: {
+        parameters: {
+            query?: {
+                /** @description Privileged-only on-behalf target — see `CreateRouteDto`'s doc comment. */
+                vendorId?: string;
+                includeArchived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RoutesPublicController_getBySlug: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shareSlug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RoutesPublicController_downloadGpx: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shareSlug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RoutesController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RoutesController_remove: {
+        parameters: {
+            query: {
+                hard: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RoutesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRouteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SavedTripsController_findAllForUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SavedTripsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSavedTripDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SavedTripsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -17092,6 +24362,143 @@ export interface operations {
             };
         };
     };
+    StaffPackagesController_listMyPackages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TripsController_emailPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailTripPlanDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TripsController_geocodeSuggest: {
+        parameters: {
+            query: {
+                /** @description Free-text place query (type-ahead) */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TripsController_ideas: {
+        parameters: {
+            query?: {
+                /** @description Booking start */
+                start?: string;
+                /** @description Booking end */
+                end?: string;
+            };
+            header?: never;
+            path: {
+                listingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TripsController_plan: {
+        parameters: {
+            query: {
+                destination: string;
+                /** @description ISO trip start */
+                start?: string;
+                /** @description ISO trip end */
+                end?: string;
+                days?: number;
+                /** @description Comma-separated listing categories (1–6) */
+                activities: string[];
+                people?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TripsController_pois: {
+        parameters: {
+            query: {
+                lat: number;
+                lng: number;
+                recipe: "trails-bike" | "trails-hike" | "food-drink" | "on-water" | "parks-views" | "camping";
+                radius?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     TrustController_assessBookingRisk: {
         parameters: {
             query?: never;
@@ -17180,6 +24587,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    UserController_acceptTerms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -17286,7 +24712,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -17346,6 +24774,27 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    UserController_requestDeletionCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestDeletionCodeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -17422,7 +24871,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["User"][];
+                    "application/json": Record<string, never>[];
                 };
             };
         };
@@ -17507,9 +24956,24 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["User"];
+                content?: never;
+            };
+        };
+    };
+    UserController_resendVerification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
                 };
+                content?: never;
             };
         };
     };
@@ -17527,6 +24991,46 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UserController_getTosStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    UserController_verifyEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyEmailDto"];
+            };
+        };
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -17728,6 +25232,23 @@ export interface operations {
             };
         };
     };
+    VendorOnboardingController_getWaiver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     VendorOnboardingController_signWaiver: {
         parameters: {
             query?: never;
@@ -17773,6 +25294,25 @@ export interface operations {
         };
     };
     VendorOnboardingController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    VendorOnboardingController_deleteApplication: {
         parameters: {
             query?: never;
             header?: never;
@@ -17884,6 +25424,63 @@ export interface operations {
                 "application/json": components["schemas"]["SetAutoApproveDto"];
             };
         };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    VendorCalendarController_getSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    VendorCalendarController_rotateSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    VendorCalendarController_getFeed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             200: {
                 headers: {
@@ -18331,23 +25928,6 @@ export interface operations {
             };
         };
     };
-    VerificationController_createBiometricSession: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     VerificationController_getBoaterLicenseStatus: {
         parameters: {
             query: {
@@ -18361,6 +25941,29 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    VerificationController_finalizeVerification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinalizeVerificationDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -18384,7 +25987,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserVerification"][];
+                    "application/json": Record<string, never>[];
                 };
             };
         };
@@ -18406,18 +26009,20 @@ export interface operations {
             };
         };
     };
-    VerificationController_getStripeSession: {
+    VerificationController_uploadVerification: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                sessionId: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["UploadVerificationDto"];
+            };
+        };
         responses: {
-            200: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -18427,7 +26032,7 @@ export interface operations {
             };
         };
     };
-    VerificationController_uploadVerification: {
+    VerificationController_createUploadToken: {
         parameters: {
             query?: never;
             header?: never;
@@ -18441,7 +26046,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserVerification"];
+                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -18464,6 +26069,25 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    VerificationController_getVerificationDocumentUrl: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18740,6 +26364,29 @@ export interface operations {
             };
         };
     };
+    EWaiversController_getWaiverVersions: {
+        parameters: {
+            query: {
+                type: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EWaiverVersion"][];
+                };
+            };
+        };
+    };
     WebAnalyticsController_getOverview: {
         parameters: {
             query: {
@@ -18751,6 +26398,68 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WebAnalyticsController_getTimeseries: {
+        parameters: {
+            query: {
+                startDate: string;
+                endDate: string;
+                granularity: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WebAnalyticsController_getVitalsOverview: {
+        parameters: {
+            query: {
+                startDate: string;
+                endDate: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WebAnalyticsController_trackConsent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrackConsentDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -18802,6 +26511,27 @@ export interface operations {
             };
         };
     };
+    WebAnalyticsController_trackScan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrackScanDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     WebAnalyticsController_trackSearch: {
         parameters: {
             query?: never;
@@ -18837,6 +26567,27 @@ export interface operations {
         };
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WebAnalyticsController_trackVital: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrackVitalDto"];
+            };
+        };
+        responses: {
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
