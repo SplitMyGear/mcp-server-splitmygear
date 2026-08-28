@@ -1,10 +1,15 @@
+# Primary deploy path: Vercel Git integration auto-deploys every push to `main`
+# for this project (prj_TDhBx521A191W9r43oVhwJrBCXxv) directly, with no Actions
+# involvement. This workflow is a manual fallback only, kept in case
+# VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID secrets are ever provisioned
+# in this repo. Made workflow_dispatch-only 2026-08-28 per the SPLIT-670
+# consolidation pattern (BE/FE/CRM deploy workflows) after this workflow failed
+# on every push since 2026-07-02 at the "Pull Vercel environment" step (those
+# secrets were never set here).
 name: Deploy to Vercel
 
 on:
-  push:
-    branches: [main]
-  release:
-    types: [published]
+  workflow_dispatch:
 
 jobs:
   deploy:
