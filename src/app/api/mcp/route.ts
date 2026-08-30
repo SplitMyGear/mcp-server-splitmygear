@@ -55,7 +55,7 @@ function buildServer(ctx: AuthContext): McpServer {
     checkIn: z.string().optional().describe('Check-in date (ISO format)'),
     checkOut: z.string().optional().describe('Check-out date (ISO format)'),
     guests: z.number().min(1).max(20).optional(),
-    category: z.string().optional().describe("Canonical listing category, Title-Case (e.g. 'Camping', 'Hiking', 'Water Sports', 'E-Bikes' — full list via the splitmygear://categories resource)"),
+    category: z.string().optional().describe("Canonical listing category, Title-Case (e.g. 'Camping', 'Hiking', 'Water Sports', 'E-Bikes': full list via the splitmygear://categories resource)"),
     minPrice: z.number().optional().describe('Minimum price per day'),
     maxPrice: z.number().optional().describe('Maximum price per day'),
     query: z.string().optional().describe('Natural language search query'),
