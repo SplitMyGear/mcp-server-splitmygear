@@ -3249,6 +3249,7 @@
           "cancellationPolicy": {
             "enum": [
               "flexible",
+              "flexible_72h",
               "moderate",
               "strict",
               "non_refundable"
@@ -5707,6 +5708,7 @@
           "cancellationPolicy": {
             "enum": [
               "flexible",
+              "flexible_72h",
               "moderate",
               "strict",
               "non_refundable"
@@ -10253,6 +10255,7 @@
           "cancellationPolicy": {
             "enum": [
               "flexible",
+              "flexible_72h",
               "moderate",
               "strict",
               "non_refundable"

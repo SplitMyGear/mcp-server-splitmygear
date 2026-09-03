@@ -10275,7 +10275,7 @@ export interface components {
             bookingType?: "daily" | "hourly" | "both" | "nightly";
             bufferDays?: number;
             /** @enum {string} */
-            cancellationPolicy?: "flexible" | "moderate" | "strict" | "non_refundable";
+            cancellationPolicy?: "flexible" | "flexible_72h" | "moderate" | "strict" | "non_refundable";
             careGuide?: components["schemas"]["CareGuideDto"];
             category?: string;
             checkInEndTime?: string;
@@ -11076,7 +11076,7 @@ export interface components {
             bookingType: "daily" | "hourly" | "both" | "nightly";
             bufferDays: number;
             /** @enum {string} */
-            cancellationPolicy: "flexible" | "moderate" | "strict" | "non_refundable";
+            cancellationPolicy: "flexible" | "flexible_72h" | "moderate" | "strict" | "non_refundable";
             /** @description SPLIT-914 — the gear's care & usage guide: { sections[{title,instructions[]}], safetyWarnings[], proTips[], returnChecklist[] }. Generated at listing creation, vendor-editable, public. */
             careGuide: {
                 [key: string]: unknown;
@@ -12694,7 +12694,7 @@ export interface components {
             bookingType?: "daily" | "hourly" | "both" | "nightly";
             bufferDays?: number;
             /** @enum {string} */
-            cancellationPolicy?: "flexible" | "moderate" | "strict" | "non_refundable";
+            cancellationPolicy?: "flexible" | "flexible_72h" | "moderate" | "strict" | "non_refundable";
             careGuide?: components["schemas"]["CareGuideDto"];
             category?: string;
             checkInEndTime?: string;
