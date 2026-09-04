@@ -138,3 +138,31 @@ describe('Auth Middleware', () => {
     expect(result.error).toBe('No authentication provided');
   });
 });
+
+describe('Auth Middleware: OAuth access envelopes', () => {
+  const KEY = 'unit-test-signing-key-with-at-least-32-bytes!!';
+  beforeEach(() => { process.env.MCP_API_KEY = 'test-operator-key'; process.env.MCP_OAUTH_SIGNING_KEY = KEY; });
+  afterEach(() => { delete process.env.MCP_API_KEY; delete process.env.MCP_OAUTH_SIGNING_KEY; });
+
+  it('accepts an MCP-issued access token and forwards the wrapped backend JWT', async () => {
+    const { issueTokens } = await import('../src/lib/oauth/tokens');
+    const backend = makeJwt({ sub: 'user-9', role: 'vendor_owner', email: 'v@x.test', exp: FUTURE });
+    const tokens = issueTokens({ clientId: 'c1', user: { id: 'user-9', role: 'vendor_owner', email: 'v@x.test' }, backendAccessToken: backend, backendRefreshToken: 'brt' })!;
+    const result = await authMiddleware({ headers: new Headers({ authorization: `Bearer ${tokens.access_token}` }), nextUrl: { pathname: '/api/mcp' } } as any);
+    expect(result).toMatchObject({ success: true, userId: 'user-9', role: 'vendor_owner', email: 'v@x.test', token: backend, kind: 'oauth' });
+  });
+
+  it('rejects a tampered/foreign envelope and flags it as invalid credentials', async () => {
+    const result = await authMiddleware({ headers: new Headers({ authorization: 'Bearer smg_at.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' }), nextUrl: { pathname: '/api/mcp' } } as any);
+    expect(result).toMatchObject({ success: false, invalidCredentials: true });
+  });
+
+  it('refuses to wrap a backend JWT it cannot read, and rejects an envelope whose inner JWT expired', async () => {
+    const { issueTokens, openAccessToken } = await import('../src/lib/oauth/tokens');
+    expect(issueTokens({ clientId: 'c1', user: { id: 'u', role: 'renter', email: 'e' }, backendAccessToken: 'not-a-jwt', backendRefreshToken: 'r' })).toBeNull();
+    const expiredInner = makeJwt({ sub: 'u', role: 'renter', exp: Math.floor(Date.now() / 1000) + 1 });
+    const tokens = issueTokens({ clientId: 'c1', user: { id: 'u', role: 'renter', email: 'e' }, backendAccessToken: expiredInner, backendRefreshToken: 'r' })!;
+    await new Promise((r) => setTimeout(r, 1100));
+    expect(openAccessToken(tokens.access_token)).toBeNull();
+  });
+});

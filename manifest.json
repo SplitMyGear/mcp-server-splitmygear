@@ -1,10 +1,10 @@
 {
   "dxt_version": "0.1",
   "name": "Splitt",
-  "display_name": "Splitt \u2014 Outdoor Gear Rental",
-  "version": "1.0.0",
-  "description": "Search, browse, and book outdoor gear rentals on Splitt. Supports natural language search, availability checks, pricing analysis, AI-generated listing descriptions, experiences, and more.",
-  "long_description": "The Splitt MCP server gives AI agents full access to the Splitt outdoor gear rental platform. Browse 19 gear categories (camping, hiking, water sports, snow sports, climbing, biking, fishing, photography, and more), search with natural language, check availability, view pricing, and book gear or outdoor experiences. Vendors can generate AI-powered listing descriptions and get competitive pricing insights. Authenticated users can manage bookings and conversations. All access requires an API key (no public tier).",
+  "display_name": "Splitt: Outdoor Gear Rental",
+  "version": "2.0.0",
+  "description": "Search, book and manage outdoor gear rentals and experiences on Splitt as a renter or vendor. Sign in with your Splitt account (OAuth) or use an operator key for public search.",
+  "long_description": "The Splitt MCP server lets an assistant act for you on the Splitt outdoor gear rental marketplace. Renters: search 19 gear categories with natural language, check availability, get exact price quotes, book (payment on a Stripe-hosted page), manage and cancel bookings, message vendors, leave reviews and keep favorites. Vendors: create and price listings with AI help, publish, block dates, handle incoming bookings, propose reschedules, respond to reviews, host experiences and schedules, and see earnings and payouts. Sign in with your Splitt account via OAuth (two-step verification supported); the tool list adapts to your role. An operator API key alternatively unlocks the public search tools only.",
   "author": {
     "name": "Splitt",
     "url": "https://go-splitt.com"
@@ -23,83 +23,307 @@
   "tools": [
     {
       "name": "search_listings",
-      "description": "Search for gear with filters or natural language"
+      "description": "Search gear rentals"
     },
     {
       "name": "get_listing_details",
-      "description": "Get full details for a specific listing"
+      "description": "Get listing details"
     },
     {
       "name": "check_availability",
-      "description": "Check if a listing is available for dates"
+      "description": "Check availability"
+    },
+    {
+      "name": "get_listing_calendar",
+      "description": "Get availability calendar"
     },
     {
       "name": "get_similar_listings",
-      "description": "Find similar gear using semantic similarity"
+      "description": "Find similar gear"
     },
     {
-      "name": "get_personalized_recommendations",
-      "description": "Get gear recommendations based on history"
+      "name": "get_listing_reviews",
+      "description": "Get listing reviews"
     },
     {
-      "name": "create_booking",
-      "description": "Create a gear rental booking"
-    },
-    {
-      "name": "cancel_booking",
-      "description": "Cancel a booking with optional refund"
-    },
-    {
-      "name": "get_booking_status",
-      "description": "Get the status of a booking"
+      "name": "get_booking_quote",
+      "description": "Get a price quote"
     },
     {
       "name": "suggest_listing_price",
-      "description": "Get AI-powered price suggestions for a gear category"
+      "description": "Suggest a listing price"
     },
     {
       "name": "analyze_competitor_pricing",
-      "description": "Compare a listing against local competitors"
-    },
-    {
-      "name": "generate_listing_description",
-      "description": "Generate an AI listing description from keywords"
-    },
-    {
-      "name": "improve_listing_title",
-      "description": "Optimize a listing title for SEO"
+      "description": "Analyze competitor pricing"
     },
     {
       "name": "search_experiences",
-      "description": "Browse outdoor adventures and tours"
+      "description": "Search experiences"
     },
     {
       "name": "get_experience_details",
-      "description": "Get full info and schedules for an experience"
+      "description": "Get experience details"
+    },
+    {
+      "name": "get_my_profile",
+      "description": "Who am I"
+    },
+    {
+      "name": "update_my_profile",
+      "description": "Update my profile"
+    },
+    {
+      "name": "get_vendor_onboarding_status",
+      "description": "Vendor onboarding status"
+    },
+    {
+      "name": "list_notifications",
+      "description": "List notifications"
+    },
+    {
+      "name": "mark_notifications_read",
+      "description": "Mark notifications read"
+    },
+    {
+      "name": "get_unread_counts",
+      "description": "Unread counts"
+    },
+    {
+      "name": "create_booking",
+      "description": "Book gear"
+    },
+    {
+      "name": "get_payment_link",
+      "description": "Get payment link"
+    },
+    {
+      "name": "set_booking_protection",
+      "description": "Set protection plan"
+    },
+    {
+      "name": "list_my_bookings",
+      "description": "List my bookings"
+    },
+    {
+      "name": "get_booking_status",
+      "description": "Get booking"
+    },
+    {
+      "name": "get_booking_history",
+      "description": "Booking timeline"
+    },
+    {
+      "name": "preview_cancellation",
+      "description": "Preview cancellation refund"
+    },
+    {
+      "name": "cancel_booking",
+      "description": "Cancel booking"
+    },
+    {
+      "name": "respond_to_reschedule_proposal",
+      "description": "Respond to reschedule proposal"
+    },
+    {
+      "name": "get_personalized_recommendations",
+      "description": "Recommendations for me"
     },
     {
       "name": "book_experience",
-      "description": "Book spots on an experience"
+      "description": "Book an experience"
     },
     {
-      "name": "send_message",
-      "description": "Send a message to a renter or vendor"
+      "name": "list_my_experience_bookings",
+      "description": "My experience bookings"
+    },
+    {
+      "name": "get_experience_booking",
+      "description": "Get experience booking"
+    },
+    {
+      "name": "cancel_experience_booking",
+      "description": "Cancel experience booking"
+    },
+    {
+      "name": "create_review",
+      "description": "Write a review"
+    },
+    {
+      "name": "list_my_reviews",
+      "description": "My reviews"
+    },
+    {
+      "name": "update_review",
+      "description": "Edit my review"
+    },
+    {
+      "name": "delete_review",
+      "description": "Delete my review"
+    },
+    {
+      "name": "list_favorites",
+      "description": "My favorites"
+    },
+    {
+      "name": "toggle_favorite",
+      "description": "Save / unsave listing"
     },
     {
       "name": "get_conversations",
-      "description": "List your active conversations"
+      "description": "List conversations"
+    },
+    {
+      "name": "get_conversation_messages",
+      "description": "Read a conversation"
+    },
+    {
+      "name": "send_message",
+      "description": "Send a message"
+    },
+    {
+      "name": "mark_conversation_read",
+      "description": "Mark conversation read"
     },
     {
       "name": "generate_ai_message_draft",
-      "description": "Draft a professional message using AI"
+      "description": "Draft a message"
+    },
+    {
+      "name": "generate_listing_description",
+      "description": "Generate listing description"
+    },
+    {
+      "name": "improve_listing_title",
+      "description": "Improve listing title"
+    },
+    {
+      "name": "list_my_listings",
+      "description": "My listings"
+    },
+    {
+      "name": "create_listing",
+      "description": "Create a listing"
+    },
+    {
+      "name": "update_listing",
+      "description": "Update a listing"
+    },
+    {
+      "name": "set_listing_published",
+      "description": "Publish / unpublish listing"
+    },
+    {
+      "name": "delete_listing",
+      "description": "Delete a listing"
+    },
+    {
+      "name": "duplicate_listing",
+      "description": "Duplicate a listing"
+    },
+    {
+      "name": "generate_listing_draft",
+      "description": "AI listing draft"
+    },
+    {
+      "name": "get_listing_performance",
+      "description": "Listing performance"
+    },
+    {
+      "name": "list_blackout_dates",
+      "description": "List blackout dates"
+    },
+    {
+      "name": "add_blackout_dates",
+      "description": "Block dates"
+    },
+    {
+      "name": "remove_blackout_date",
+      "description": "Unblock dates"
+    },
+    {
+      "name": "list_incoming_bookings",
+      "description": "Bookings on my listings"
+    },
+    {
+      "name": "set_booking_return_status",
+      "description": "Mark returned / overdue"
+    },
+    {
+      "name": "propose_booking_reschedule",
+      "description": "Propose new dates"
+    },
+    {
+      "name": "withdraw_reschedule_proposal",
+      "description": "Withdraw reschedule proposal"
+    },
+    {
+      "name": "set_booking_vendor_notes",
+      "description": "Private booking notes"
+    },
+    {
+      "name": "respond_to_review",
+      "description": "Respond to a review"
+    },
+    {
+      "name": "get_vendor_dashboard",
+      "description": "Vendor dashboard"
+    },
+    {
+      "name": "get_vendor_earnings",
+      "description": "Earnings"
+    },
+    {
+      "name": "get_vendor_payouts",
+      "description": "Payouts"
+    },
+    {
+      "name": "get_stripe_connect_status",
+      "description": "Stripe Connect status"
+    },
+    {
+      "name": "start_stripe_connect_onboarding",
+      "description": "Set up payouts (Stripe)"
+    },
+    {
+      "name": "list_my_experiences",
+      "description": "My experiences"
+    },
+    {
+      "name": "create_experience",
+      "description": "Create an experience"
+    },
+    {
+      "name": "update_experience",
+      "description": "Update an experience"
+    },
+    {
+      "name": "set_experience_status",
+      "description": "Publish / archive experience"
+    },
+    {
+      "name": "add_experience_schedule",
+      "description": "Add a schedule slot"
+    },
+    {
+      "name": "delete_experience_schedule",
+      "description": "Remove a schedule slot"
+    },
+    {
+      "name": "list_experience_host_bookings",
+      "description": "Bookings on my experiences"
+    },
+    {
+      "name": "update_experience_booking_status",
+      "description": "Confirm / complete / cancel experience booking"
     }
   ],
   "user_config": {
     "api_key": {
       "type": "string",
-      "title": "API Key (required)",
-      "description": "Your Splitt API key, sent as the x-api-key header. Required for all access — the server has no public tier and rejects unauthenticated requests.",
-      "required": true,
+      "title": "Operator API key (optional)",
+      "description": "Only for operator (server-to-server) access to the public tools. Leave empty to sign in with your Splitt account via OAuth, which unlocks the renter and vendor tools.",
+      "required": false,
       "secret": true
     }
   }

@@ -88,9 +88,13 @@ export const listingTools = {
     }
   },
 
-  async getListingDetails(listingId: string): Promise<ListingRecord | null> {
+  async getListingDetails(listingId: string, token?: string): Promise<ListingRecord | null> {
     try {
-      return await backendRequest<ListingRecord>('GET', `/rentals/${listingId}`);
+      // GET /rentals/:id is OptionalJwtAuthGuard-ed: forwarding the caller's
+      // token lets an owner see their private fields (tax address, iCal URL).
+      return token
+        ? await backendRequest<ListingRecord>('GET', `/rentals/${listingId}`, { token })
+        : await backendRequest<ListingRecord>('GET', `/rentals/${listingId}`);
     } catch (error) {
       // 404 → not found (matches the prior null contract); log only the unexpected.
       if (!(error instanceof BackendApiError)) console.error('Get listing error:', error);
@@ -119,6 +123,11 @@ export const listingTools = {
       // Fail safe: never report availability we could not actually confirm.
       return { available: false, message: toMessage(error, 'Unable to verify availability') };
     }
+  },
+
+  /** Day-by-day availability for a window (public). */
+  async getAvailabilityCalendar(listingId: string, from: string, to: string): Promise<unknown> {
+    return backendRequest('GET', `/rentals/${listingId}/availability/calendar${qs({ from, to })}`);
   },
 
   async getSimilarListings(listingId: string, limit = 5): Promise<ListingRecord[]> {

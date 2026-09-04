@@ -1,18 +1,9 @@
 {
   "framework": "nextjs",
   "functions": {
-    "src/app/api/mcp/route.ts": {
-      "maxDuration": 30
-    }
-  },
-  "headers": [
-    {
-      "source": "/api/mcp",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, x-api-key" }
-      ]
-    }
-  ]
+    "src/app/api/mcp/route.ts": { "maxDuration": 30 },
+    "src/app/oauth/authorize/route.ts": { "maxDuration": 30 },
+    "src/app/oauth/token/route.ts": { "maxDuration": 30 },
+    "src/app/oauth/revoke/route.ts": { "maxDuration": 30 }
+  }
 }

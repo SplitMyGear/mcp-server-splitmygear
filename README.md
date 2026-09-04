@@ -1,232 +1,140 @@
 # mcp-server-splitmygear
 
-MCP (Model Context Protocol) server for [SplitMyGear](https://go-splitt.com) — an outdoor gear rental marketplace. Lets AI agents (Claude, Cursor, Windsurf, etc.) search gear, check availability, manage bookings, browse experiences, and more.
+The official MCP (Model Context Protocol) server for [Splitt](https://go-splitt.com), the outdoor gear rental marketplace. It lets AI assistants (Claude, Cursor, Windsurf, custom agents) act for Splitt **renters** and **vendors**: search and book gear and experiences, manage bookings, message the other party, list and price gear, run a vendor's calendar and see payouts. Everything a person can do in the Splitt web app that makes sense for an agent, with the same permissions.
 
-**18 tools** across search, booking, pricing, content generation, experiences, and messaging.
+- **74 tools**, filtered by who is signed in (see [docs/mcp-tools.md](docs/mcp-tools.md))
+- **Sign in with your Splitt account** from any OAuth-capable MCP client (OAuth 2.1 + PKCE, email one-time-code 2FA supported)
+- **Thin, stateless client of the Splitt backend REST API**: no database or payment credentials live here ([ADR 0001](docs/adr/0001-mcp-is-a-backend-rest-client.md), [ADR 0002](docs/adr/0002-oauth-login-for-mcp-clients.md))
 
-> Independent project — not affiliated with any third party.
+Production endpoint: `https://mcp-server-splitmygear.vercel.app/api/mcp`
 
 ---
 
-## Quick Start
+## Connect
 
-### Claude Desktop
+### As a Splitt user (renter or vendor)
 
-> **Authentication is required.** Every request must present either an API key
-> (`x-api-key`) or a user JWT (`Authorization: Bearer …`). There is no public
-> tier — the server wields privileged credentials, so unauthenticated requests
-> are rejected with 401.
-
-Add to your `claude_desktop_config.json` (API key required):
+Add the server URL to any MCP client that supports OAuth (Claude.ai and Claude Desktop connectors, Cursor, Windsurf, the MCP Inspector). The client discovers the sign-in flow automatically, opens the hosted Splitt sign-in page, and from then on every tool acts as you.
 
 ```json
 {
   "mcpServers": {
-    "splitmygear": {
+    "splitt": { "url": "https://mcp-server-splitmygear.vercel.app/api/mcp" }
+  }
+}
+```
+
+What the sign-in page does: your email and password go straight to Splitt's own login API (this server never stores them); if two-step verification is on, you enter the emailed code; the client receives short-lived tokens that wrap your Splitt session. Signed up with Google or Apple? Set a password first from your Splitt profile.
+
+### As an operator (server-to-server, public tools only)
+
+```json
+{
+  "mcpServers": {
+    "splitt": {
       "url": "https://mcp-server-splitmygear.vercel.app/api/mcp",
-      "headers": {
-        "x-api-key": "your-splitmygear-api-key"
-      }
+      "headers": { "x-api-key": "your-operator-key" }
     }
   }
 }
 ```
 
-### Cursor / Windsurf / mcp.json
+The operator key unlocks the public tools (search, details, availability, calendar, quotes, reviews, market pricing, experiences). It cannot act as a user.
 
-```json
-{
-  "mcpServers": {
-    "splitmygear": {
-      "url": "https://mcp-server-splitmygear.vercel.app/api/mcp",
-      "headers": {
-        "x-api-key": "your-splitmygear-api-key"
-      }
-    }
-  }
-}
-```
+### With an existing Splitt session token
 
-### Claude Desktop Extension (DXT)
+A first-party integration that already holds a backend JWT (from `POST /api/v1/users/login`) may send it as `Authorization: Bearer <jwt>`; it is forwarded unchanged.
 
-Install `manifest.json` through Claude Desktop's Extension Manager (Claude Desktop v0.10.0+). The UI exposes the required API key field.
+### Claude Desktop Extension
 
-### HTTP (direct)
-
-```bash
-curl -X POST https://mcp-server-splitmygear.vercel.app/api/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "tools/call",
-    "params": {
-      "name": "search_listings",
-      "arguments": { "query": "tent for a family camping trip this weekend" }
-    }
-  }'
-```
+Install `manifest.json` through the Extension Manager. Leave the API key empty to sign in as a user, or fill it in for operator access.
 
 ---
 
-## Authentication
+## What you can do
 
-**All access requires authentication** — the server holds privileged platform
-credentials, so there is no public/anonymous tier. Present either:
+The tool list a client receives already reflects the signed-in account, so the model is never offered tools it cannot use.
 
-- an operator **API key** via the `x-api-key` header (unlocks read/search,
-  pricing, and content tools), or
-- a user **JWT** via `Authorization: Bearer <token>` (additionally unlocks
-  user-scoped tools — booking, messaging, personalized recommendations — which
-  act as the authenticated user; they never accept a caller-supplied user id).
+| Who | Tools | Highlights |
+|---|---|---|
+| Anyone (operator key or user) | 11 | `search_listings`, `get_listing_details`, `check_availability`, `get_listing_calendar`, `get_booking_quote`, `get_listing_reviews`, `suggest_listing_price`, `search_experiences` |
+| Signed-in user | +33 | profile, notifications, `list_my_bookings`, `cancel_booking` (with `preview_cancellation`), reschedule responses, reviews, favorites, conversations and messages, experience bookings, AI drafting helpers |
+| Renter | +2 | `create_booking` (server-priced draft plus a Stripe Checkout `paymentUrl`), `get_payment_link` |
+| Vendor seat (`vendor`, `vendor_owner`, `vendor_manager`, `vendor_staff`) | +24 | listings (create, update, publish, duplicate, delete, AI draft, performance), blackout dates, incoming bookings, overdue / return status, reschedule proposals, private notes, review responses, dashboard, experiences hosting (create, schedules, publish, host bookings) |
+| Vendor owner / manager | +3 | `get_vendor_earnings`, `get_vendor_payouts`, `get_stripe_connect_status` |
+| Vendor owner | +1 | `start_stripe_connect_onboarding` |
 
-Unauthenticated requests are rejected with `401`. The two tiers below mean
-"works with an API key" (**Auth**) vs "requires a user JWT" (**User**).
+Full reference with every argument: [docs/mcp-tools.md](docs/mcp-tools.md) (generated from the code by `npm run gen:docs`).
 
----
-
-## Available Tools (18)
-
-### Search & Listings
-
-| Tool | Auth | Description |
-|------|------|-------------|
-| `search_listings` | Auth | Search gear by filters or natural language |
-| `get_listing_details` | Auth | Full details for a listing |
-| `check_availability` | Auth | Check if a listing is available for dates |
-| `get_similar_listings` | Auth | Semantically similar gear |
-| `get_personalized_recommendations` | User | Recommendations based on booking history |
-
-### Bookings
-
-| Tool | Auth | Description |
-|------|------|-------------|
-| `create_booking` | User | Create a rental booking (Stripe payment) |
-| `cancel_booking` | User | Cancel a booking with optional refund |
-| `get_booking_status` | User | Status of YOUR booking (owner-checked) |
-
-### Pricing & Business Intelligence
-
-| Tool | Auth | Description |
-|------|------|-------------|
-| `suggest_listing_price` | Auth | AI-powered price suggestion for a gear category |
-| `analyze_competitor_pricing` | Auth | Compare a listing against local competitors |
-
-### Content Generation
-
-| Tool | Auth | Description |
-|------|------|-------------|
-| `generate_listing_description` | Auth | AI description from name + keywords |
-| `improve_listing_title` | Auth | SEO-optimized title suggestions |
-
-### Experiences
-
-| Tool | Auth | Description |
-|------|------|-------------|
-| `search_experiences` | Auth | Browse outdoor adventures and tours |
-| `get_experience_details` | Auth | Full info and available schedules |
-| `book_experience` | User | Book spots on a scheduled experience |
-
-### Messaging
-
-| Tool | Auth | Description |
-|------|------|-------------|
-| `send_message` | User | Send a message to a renter or vendor |
-| `get_conversations` | User | List your active conversations |
-| `generate_ai_message_draft` | Auth | AI-drafted professional message |
+Payments never happen inside the MCP: booking tools return a Stripe-hosted `paymentUrl` for the person to open. Money, availability, pricing, ownership and permissions are all decided by the Splitt backend on every call.
 
 ---
 
-## Natural Language Search
+## Security model
 
-The `search_listings` `query` parameter accepts plain English. The server parses it into structured filters automatically:
+- **Deny by default.** No credential, no service. A 401 carries `WWW-Authenticate` with the RFC 9728 resource-metadata URL so OAuth clients can start sign-in.
+- **The backend is the authority.** Every user-scoped call forwards the user's own Splitt JWT; the backend re-validates it and enforces role, ownership and lifecycle rules. This server never accepts a caller-supplied user id.
+- **Stateless OAuth.** Authorization codes, access tokens, refresh tokens, registered client ids and in-flight sign-in requests are AES-256-GCM envelopes sealed with `MCP_OAUTH_SIGNING_KEY` (purpose-bound keys, so a code can never be replayed as a token). PKCE S256 is mandatory; only `https` or loopback redirect URIs register; codes live 2 minutes and are single-use.
+- **Your password is never stored.** The hosted sign-in page relays it once to Splitt's login API, together with your real IP via the backend's trusted relay header (`MCP_BFF_RELAY_KEY`) so Splitt's brute-force throttling keys on you, not on this server.
+- **Hardened responses.** Strict CSP on the sign-in page (no scripts, no remote assets), `no-store` everywhere, `X-Frame-Options: DENY`, HSTS, constant-time secret comparison, sanitized error messages.
+- **Model safety.** Destructive tools carry MCP `destructiveHint`; results that contain other users' text are labelled as untrusted data; server instructions tell the model to confirm cancellations and never collect card numbers.
+- **Rate limiting** per principal (best effort per serverless instance; the backend has its own distributed limits).
 
-```
-"lightweight tent for solo backpacking next weekend under $40/day"
-"water sports gear for 3 people in Seattle"
-"climbing harness and helmet for a beginner"
-```
-
----
-
-## Resources
-
-| Resource URI | Description |
-|---|---|
-| `splitmygear://categories` | List of all 19 gear categories |
+Report security issues to security@go-splitt.com.
 
 ---
 
-## Running Locally
-
-### Prerequisites
-- Node.js 18+
-- An operator `MCP_API_KEY` (and, for user-scoped tools, a backend JWT)
-- Access to the SplitMyGear backend REST API (defaults to production; override with `BACKEND_API_URL`)
-- *(optional)* An AI provider key (OpenCode Zen / OpenRouter / OpenAI) for the two content tools and the AI message draft
-
-> This server holds **no** Supabase or Stripe credentials — every action goes
-> through the backend REST API, which is the single authority for auth, data,
-> pricing and payments (SPLIT-226).
-
-### Setup
+## Running locally
 
 ```bash
 git clone https://github.com/SplitMyGear/mcp-server-splitmygear
 cd mcp-server-splitmygear
 npm install
-cp .env.example .env.local
-# Fill in your env vars
-npm run dev
+cp .env.example .env.local   # fill in MCP_API_KEY and, for sign-in, MCP_OAUTH_SIGNING_KEY
+npm run dev                  # http://localhost:3000/api/mcp
 ```
 
-Your local server will be at `http://localhost:3000/api/mcp`.
+### Environment variables
 
-### Environment Variables
+| Variable | Required | Purpose |
+|---|---|---|
+| `MCP_API_KEY` | yes | Operator key (`x-api-key`). Without it every request is refused. |
+| `MCP_OAUTH_SIGNING_KEY` | for sign-in | 32+ random bytes; seals every OAuth artifact. Rotating it invalidates all issued tokens. |
+| `MCP_PUBLIC_URL` | production | Public origin of this server (the OAuth issuer), e.g. `https://mcp-server-splitmygear.vercel.app`. Falls back to Vercel's production URL. |
+| `MCP_BFF_RELAY_KEY` | recommended | The backend's `BFF_RELAY_KEY`; relays the end user's IP on login. |
+| `BACKEND_API_URL` | no | Backend base, default `https://splitmygear-backend.vercel.app/api/v1`. |
+| `MCP_BACKEND_JWT_SECRET` | no | Backend `JWT_SECRET`; verifies forwarded JWT signatures locally as defense in depth. |
+| `MCP_RATE_LIMIT_TIER` | no | `internal` (100/min), `beta` (50), `public` (20), default 10. |
 
-```env
-MCP_API_KEY=               # REQUIRED — operator key clients send via x-api-key
-BACKEND_API_URL=           # optional — defaults to the production backend /api/v1
-MCP_BACKEND_JWT_SECRET=    # optional — verify forwarded JWT signatures locally (defense in depth)
-# AI provider for the content/draft tools (first key present wins): OPENCODE → OPENROUTER → OPENAI
-OPENCODE_API_KEY=          # https://opencode.ai/zen — free tier
-OPENROUTER_API_KEY=        # https://openrouter.ai — free tier
-AI_CHAT_MODEL=             # optional override
-AI_EMBEDDING_MODEL=        # optional override
-MCP_RATE_LIMIT_TIER=public # internal | beta | public | default
-```
-
-> Without `MCP_API_KEY` the server fails closed (every request 401s). Without an
-> AI provider key the three AI content tools degrade gracefully (they return a
-> "disabled" notice); every other tool is unaffected.
-
-### Tests
+### Checks
 
 ```bash
-npm test
+npm run lint        # eslint
+npm run typecheck   # tsc --noEmit
+npm test            # jest (unit + route + full OAuth flow against a mocked backend)
+npm run build       # next build
+npm run verify      # all of the above
+npm run gen:docs    # regenerate docs/mcp-tools.md + manifest.json from the tool registry
+npm run gen:api     # regenerate backend API types from openapi/openapi.json
 ```
+
+CI (`.github/workflows/ci.yml`) runs the same on every push and pull request. Vercel's Git integration deploys `main`.
 
 ---
 
-## Deployment (Vercel)
+## Endpoints
 
-This server is optimized for Vercel Serverless Functions. Push to the connected GitHub repo to trigger a deploy:
+| Path | Purpose |
+|---|---|
+| `POST /api/mcp` | MCP Streamable HTTP (stateless, JSON responses) |
+| `GET /.well-known/oauth-protected-resource[/api/mcp]` | RFC 9728 protected-resource metadata |
+| `GET /.well-known/oauth-authorization-server` | RFC 8414 authorization-server metadata |
+| `POST /oauth/register` | RFC 7591 dynamic client registration (public clients) |
+| `GET/POST /oauth/authorize` | Hosted Splitt sign-in (authorization code + PKCE) |
+| `POST /oauth/token` | `authorization_code` and `refresh_token` grants |
+| `POST /oauth/revoke` | RFC 7009 revocation |
 
-```bash
-git push origin main
-```
-
----
-
-## Rate Limits
-
-| Tier | Requests/min | Tool calls/min |
-|------|-------------|----------------|
-| `public` | 20 | 200 |
-| `beta` | 50 | 500 |
-| `internal` | 100 | 1000 |
-
-Set `MCP_RATE_LIMIT_TIER` in your environment to control the limit.
+The server's own HTTP contract is described in [docs/openapi.json](docs/openapi.json); the backend contract it consumes is snapshotted in [openapi/openapi.json](openapi/openapi.json).
 
 ---
 

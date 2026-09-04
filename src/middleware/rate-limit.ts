@@ -41,11 +41,15 @@ export async function rateLimiter(
   request: NextRequest,
   userId?: string
 ): Promise<RateLimitResult> {
-  const clientId =
-    userId ||
+  // Key on the authenticated principal (user id) when there is one; otherwise
+  // (operator key) on the caller's network address. Namespaced so a user id
+  // can never collide with an IP string.
+  const ip =
+    request.headers.get('x-real-ip') ||
     (request as unknown as { ip?: string }).ip ||
-    request.headers.get('x-forwarded-for') ||
+    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
     'anonymous';
+  const clientId = userId ? `user:${userId}` : `ip:${ip}`;
 
   const tier = process.env.MCP_RATE_LIMIT_TIER || 'default';
   const limits = RATE_LIMITS[tier as keyof typeof RATE_LIMITS] || RATE_LIMITS.default;

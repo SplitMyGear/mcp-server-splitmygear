@@ -38,6 +38,12 @@ interface RequestOptions {
   /** The caller's backend JWT, forwarded as `Authorization: Bearer <token>`. */
   token?: string;
   body?: unknown;
+  /**
+   * Extra request headers (e.g. the trusted-relay client-IP headers the OAuth
+   * login bridge sends so the backend's per-IP login throttle keys on the END
+   * USER, not on this server's egress address). Never overrides Authorization.
+   */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -50,7 +56,7 @@ export async function backendRequest<T = unknown>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(options.headers ?? {}) };
   if (options.token) {
     headers['Authorization'] = `Bearer ${options.token}`;
   }

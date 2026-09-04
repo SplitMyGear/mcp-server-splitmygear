@@ -1,0 +1,66 @@
+export {};
+import crypto from 'crypto';
+import { verifyS256, s256Challenge, isValidCodeVerifier, isValidCodeChallenge } from '../../src/lib/oauth/pkce';
+import { registerClient, resolveClient, clientAllowsRedirect, isAllowedRedirectUri } from '../../src/lib/oauth/client';
+
+const KEY = 'unit-test-signing-key-with-at-least-32-bytes!!';
+
+describe('PKCE S256', () => {
+  it('accepts a matching verifier/challenge pair and rejects mismatches', () => {
+    const verifier = crypto.randomBytes(32).toString('base64url');
+    const challenge = s256Challenge(verifier);
+    expect(isValidCodeVerifier(verifier)).toBe(true);
+    expect(isValidCodeChallenge(challenge)).toBe(true);
+    expect(verifyS256(verifier, challenge)).toBe(true);
+    expect(verifyS256(verifier + 'x', challenge)).toBe(false);
+    expect(verifyS256('short', challenge)).toBe(false);
+    expect(verifyS256(verifier, 'plain-text-challenge')).toBe(false);
+  });
+});
+
+describe('stateless client registration', () => {
+  beforeEach(() => { process.env.MCP_OAUTH_SIGNING_KEY = KEY; });
+  afterEach(() => { delete process.env.MCP_OAUTH_SIGNING_KEY; });
+
+  it('accepts https and loopback redirect URIs only', () => {
+    expect(isAllowedRedirectUri('https://claude.ai/api/mcp/auth_callback')).toBe(true);
+    expect(isAllowedRedirectUri('http://localhost:8765/callback')).toBe(true);
+    expect(isAllowedRedirectUri('http://127.0.0.1:9/cb')).toBe(true);
+    expect(isAllowedRedirectUri('http://evil.example/cb')).toBe(false);
+    expect(isAllowedRedirectUri('https://ok.example/cb#frag')).toBe(false);
+    expect(isAllowedRedirectUri('javascript:alert(1)')).toBe(false);
+    expect(isAllowedRedirectUri('not a url')).toBe(false);
+  });
+
+  it('mints a signed client id that resolves to the registered record', () => {
+    const reg = registerClient({ client_name: 'Claude', redirect_uris: ['https://claude.ai/cb'], token_endpoint_auth_method: 'none' });
+    expect('error' in reg).toBe(false);
+    if ('error' in reg) return;
+    const resolved = resolveClient(reg.client_id);
+    expect(resolved?.client_name).toBe('Claude');
+    expect(resolved?.redirect_uris).toEqual(['https://claude.ai/cb']);
+    expect(clientAllowsRedirect(resolved!, 'https://claude.ai/cb')).toBe(true);
+    expect(clientAllowsRedirect(resolved!, 'https://claude.ai/cb2')).toBe(false);
+  });
+
+  it('rejects a tampered client id (redirect URI swap) and foreign ids', () => {
+    const reg = registerClient({ redirect_uris: ['https://claude.ai/cb'] });
+    if ('error' in reg) throw new Error('unexpected');
+    const [prefix, , sig] = reg.client_id.split('.');
+    const forgedBody = Buffer.from(JSON.stringify({ ru: ['https://attacker.example/cb'], iat: 1 })).toString('base64url');
+    expect(resolveClient(`${prefix}.${forgedBody}.${sig}`)).toBeNull();
+    expect(resolveClient('random-client-id')).toBeNull();
+    expect(resolveClient(undefined)).toBeNull();
+    process.env.MCP_OAUTH_SIGNING_KEY = 'another-secret-that-is-also-long-enough-000';
+    expect(resolveClient(reg.client_id)).toBeNull();
+  });
+
+  it('rejects confidential clients, bad grants and bad metadata', () => {
+    expect(registerClient(null)).toMatchObject({ error: 'invalid_client_metadata' });
+    expect(registerClient({ redirect_uris: [] })).toMatchObject({ error: 'invalid_redirect_uri' });
+    expect(registerClient({ redirect_uris: ['http://evil.example'] })).toMatchObject({ error: 'invalid_redirect_uri' });
+    expect(registerClient({ redirect_uris: ['https://a.example'], token_endpoint_auth_method: 'client_secret_basic' })).toMatchObject({ error: 'invalid_client_metadata' });
+    expect(registerClient({ redirect_uris: ['https://a.example'], grant_types: ['implicit'] })).toMatchObject({ error: 'invalid_client_metadata' });
+    expect(registerClient({ redirect_uris: ['https://a.example'], response_types: ['token'] })).toMatchObject({ error: 'invalid_client_metadata' });
+  });
+});
