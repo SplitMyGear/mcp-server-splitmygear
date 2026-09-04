@@ -16,7 +16,7 @@
  * desktop apps that run a local callback listener (RFC 8252 §7.3).
  */
 import crypto from 'crypto';
-import { deriveKey } from './config';
+import { allowedRedirectHosts, deriveKey, isAllowListedHost, isLoopbackHost } from './config';
 
 export const CLIENT_ID_PREFIX = 'smg_c';
 const MAX_REDIRECT_URIS = 10;
@@ -48,11 +48,22 @@ export function isAllowedRedirectUri(value: string): boolean {
     return false;
   }
   if (url.hash) return false;
-  if (url.protocol === 'https:') return true;
-  if (url.protocol === 'http:') {
-    return url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
+  if (url.protocol === 'http:') return isLoopbackHost(url.hostname);
+  if (url.protocol !== 'https:') return false;
+  // With an operator allow-list, only listed hosts may register (phishing
+  // guard: anyone can otherwise register a lookalike "Claude" client that
+  // sends the user to an attacker-controlled redirect).
+  return allowedRedirectHosts().length === 0 || isAllowListedHost(url.hostname);
+}
+
+/** A redirect URI is "verified" when it is loopback or on the operator allow-list. */
+export function isVerifiedRedirectUri(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return isLoopbackHost(url.hostname) || isAllowListedHost(url.hostname);
+  } catch {
+    return false;
   }
-  return false;
 }
 
 /** Validate RFC 7591 client metadata and mint a signed client id. */
@@ -67,7 +78,12 @@ export function registerClient(metadata: unknown): RegisteredClient | Registrati
   }
   for (const uri of redirectUris) {
     if (typeof uri !== 'string' || !isAllowedRedirectUri(uri)) {
-      return { error: 'invalid_redirect_uri', error_description: 'redirect_uris must be https:// URLs or http://localhost loopback URLs' };
+      return {
+        error: 'invalid_redirect_uri',
+        error_description: allowedRedirectHosts().length
+          ? 'redirect_uris must be http://localhost loopback URLs or https:// URLs on an allow-listed host'
+          : 'redirect_uris must be https:// URLs or http://localhost loopback URLs',
+      };
     }
   }
   if (m.token_endpoint_auth_method !== undefined && m.token_endpoint_auth_method !== 'none') {

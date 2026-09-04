@@ -54,11 +54,11 @@ function authorizationCodeGrant(p: Record<string, string>, request: Request): Re
 
 async function refreshTokenGrant(p: Record<string, string>, ctx: ClientContext): Promise<Response> {
   if (!p.refresh_token) return oauthError('invalid_request', 'refresh_token is required');
+  // OAuth 2.1 §4.3.1: public clients identify themselves on every token request.
+  if (!p.client_id) return oauthError('invalid_request', 'client_id is required');
   const rt = openRefreshToken(p.refresh_token);
   if (!rt) return oauthError('invalid_grant', 'Refresh token is invalid or expired');
-  if (p.client_id !== undefined && p.client_id !== rt.cid) {
-    return oauthError('invalid_grant', 'Refresh token was issued to a different client');
-  }
+  if (p.client_id !== rt.cid) return oauthError('invalid_grant', 'Refresh token was issued to a different client');
   try {
     const rotated = await backendRefresh(rt.brt, ctx);
     const tokens = issueTokens({
@@ -70,7 +70,10 @@ async function refreshTokenGrant(p: Record<string, string>, ctx: ClientContext):
     if (!tokens) return oauthError('server_error', 'Could not issue tokens for this session', 500);
     return json(tokens);
   } catch (error) {
-    if (error instanceof AuthBridgeError && (error.status === 401 || error.status === 403)) {
+    // 400 (rejected DTO / rotated token), 401 (revoked or expired), 403
+    // (suspended): the grant is dead either way, so tell the client to
+    // re-authenticate instead of retrying against a "temporary" failure.
+    if (error instanceof AuthBridgeError && (error.status === 400 || error.status === 401 || error.status === 403)) {
       return oauthError('invalid_grant', 'Refresh token has been revoked or expired; sign in again');
     }
     return oauthError('temporarily_unavailable', 'Splitt is temporarily unavailable; try again shortly', 503);

@@ -52,7 +52,10 @@ export const getListingDetails = defineTool({
   annotations: READ,
   handler: async ({ listingId }, ctx) => {
     const listing = await listingTools.getListingDetails(listingId, ctx.token);
-    return listing ? ok(listing) : fail(`Listing ${listingId} was not found (it may be unpublished).`);
+    if (!listing) return fail(`Listing ${listingId} was not found (it may be unpublished).`);
+    // An owner's iCal subscription URL is a bearer secret: keep it out of transcripts.
+    const { icalUrl, ...safe } = listing as Record<string, unknown> & { icalUrl?: unknown };
+    return ok(icalUrl ? { ...safe, icalUrl: '[redacted: manage calendar feeds in the Splitt dashboard]' } : safe);
   },
 });
 

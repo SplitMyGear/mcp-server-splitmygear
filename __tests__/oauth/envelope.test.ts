@@ -11,11 +11,20 @@ describe('OAuth config', () => {
     delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
   });
 
-  it('is disabled without a signing key, and with a short one', () => {
+  it('is disabled without a signing key, with a short one, and with a low-entropy one', () => {
     expect(oauthEnabled()).toBe(false);
     process.env.MCP_OAUTH_SIGNING_KEY = 'too-short';
     expect(oauthEnabled()).toBe(false);
+    process.env.MCP_OAUTH_SIGNING_KEY = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    expect(oauthEnabled()).toBe(false);
     expect(() => deriveKey('x')).toThrow(/not configured/);
+  });
+
+  it('binds derived keys to the deployment (MCP_PUBLIC_URL / VERCEL_URL)', () => {
+    process.env.MCP_OAUTH_SIGNING_KEY = KEY;
+    const local = deriveKey('a');
+    process.env.MCP_PUBLIC_URL = 'https://mcp.go-splitt.com';
+    expect(deriveKey('a').equals(local)).toBe(false);
   });
 
   it('derives distinct purpose-bound keys from one secret', () => {
@@ -26,14 +35,20 @@ describe('OAuth config', () => {
     expect(deriveKey('a').length).toBe(32);
   });
 
-  it('resolves the public base URL from env before the request origin', () => {
+  it('resolves the public base URL from env before the request origin, previews never advertise production', () => {
     const req = new Request('https://example-mcp.test/api/mcp');
     expect(publicBaseUrl(req)).toBe('https://example-mcp.test');
     process.env.VERCEL_PROJECT_PRODUCTION_URL = 'mcp.vercel.app';
+    process.env.VERCEL_URL = 'mcp-git-preview.vercel.app';
+    process.env.VERCEL_ENV = 'preview';
+    expect(publicBaseUrl(req)).toBe('https://mcp-git-preview.vercel.app');
+    process.env.VERCEL_ENV = 'production';
     expect(publicBaseUrl(req)).toBe('https://mcp.vercel.app');
     process.env.MCP_PUBLIC_URL = 'https://mcp.go-splitt.com/';
     expect(publicBaseUrl(req)).toBe('https://mcp.go-splitt.com');
     expect(resourceUrl(req)).toBe('https://mcp.go-splitt.com/api/mcp');
+    delete process.env.VERCEL_URL;
+    delete process.env.VERCEL_ENV;
   });
 });
 

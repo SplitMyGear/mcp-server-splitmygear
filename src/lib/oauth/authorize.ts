@@ -16,15 +16,15 @@
  * redirector); every other error is redirected to the registered redirect_uri
  * with `error` + `state`.
  */
-import { resolveClient, clientAllowsRedirect } from './client';
+import { resolveClient, clientAllowsRedirect, isVerifiedRedirectUri } from './client';
 import { isValidCodeChallenge } from './pkce';
 import { open, seal, nowSeconds } from './envelope';
 import { issueAuthorizationCode } from './tokens';
 import { resourceUrl, oauthEnabled } from './config';
 import { AuthBridgeError, backendLogin, backendSendOtp, backendVerifyOtp, type ClientContext } from './backend-auth';
 import { renderErrorPage, renderLoginPage, renderOtpPage, PAGE_HEADERS } from './pages';
-import { isThrottled, recordAttempt, clearAttempts } from './throttle';
-import { clientIp, readParams, type OAuthErrorCode } from './http';
+import { isThrottled, recordAttempt } from './throttle';
+import { clientIp, isSameOriginPost, readParams, type OAuthErrorCode } from './http';
 
 /** How long a rendered sign-in page stays submittable. */
 const REQUEST_TTL_S = 10 * 60;
@@ -63,15 +63,6 @@ function redirectError(ru: string, error: OAuthErrorCode, description: string, s
   return redirectTo(ru, { error, error_description: description, state });
 }
 
-function hostOf(uri: string): string {
-  try {
-    const u = new URL(uri);
-    return u.host || uri;
-  } catch {
-    return uri;
-  }
-}
-
 function sealRequest(rq: Omit<AuthorizeRequestPayload, 'exp' | 'iat'>): string {
   const iat = nowSeconds();
   return seal<AuthorizeRequestPayload>('req', { ...rq, iat, exp: iat + REQUEST_TTL_S });
@@ -82,7 +73,8 @@ function loginPage(rq: Omit<AuthorizeRequestPayload, 'exp' | 'iat'>, opts: { ema
     renderLoginPage({
       requestToken: sealRequest(rq),
       clientName: rq.cn,
-      redirectHost: hostOf(rq.ru),
+      redirectUri: rq.ru,
+      verified: isVerifiedRedirectUri(rq.ru),
       email: opts.email,
       error: opts.error,
     }),
@@ -155,11 +147,34 @@ export async function handleAuthorizeGet(request: Request): Promise<Response> {
   });
 }
 
+/**
+ * Throttle keys for a sign-in attempt: the caller's (trusted) IP and the
+ * targeted account. Only FAILURES are recorded, so a legitimate owner is never
+ * locked out by someone else's guesses (mirrors the backend's SPLIT-427 rule),
+ * and nothing is cleared on success (a valid login must not reset the budget
+ * for guesses at other accounts). Without a trusted IP the per-IP key is
+ * skipped: the backend's own per-IP throttle still applies to our address.
+ */
+function throttleKeys(ip: string | undefined, email: string | undefined): string[] {
+  const keys: string[] = [];
+  if (ip) keys.push(`ip:${ip}`);
+  if (email) keys.push(`email:${email.trim().toLowerCase()}`);
+  return keys;
+}
+function anyThrottled(keys: string[]): boolean {
+  return keys.some((k) => isThrottled(k));
+}
+function recordFailure(keys: string[]): void {
+  for (const k of keys) recordAttempt(k);
+}
+
 export async function handleAuthorizePost(request: Request): Promise<Response> {
   if (!oauthEnabled()) return html(renderErrorPage('Sign-in unavailable', 'OAuth sign-in is not enabled on this server.'), 404);
+  if (!isSameOriginPost(request)) {
+    return html(renderErrorPage('Blocked', 'This sign-in form can only be submitted from the Splitt sign-in page itself.'), 403);
+  }
   const params = await readParams(request);
   const ctx: ClientContext = { ip: clientIp(request), userAgent: request.headers.get('user-agent') ?? undefined };
-  const throttleKey = ctx.ip ?? 'unknown';
   const step = params.step;
 
   if (step === 'login' || step === 'cancel') {
@@ -170,11 +185,11 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
     const email = (params.email || '').trim();
     const password = params.password || '';
     if (!email || !password) return loginPage(rq, { email, error: 'Enter your email and password.' }, 400);
-    if (isThrottled(throttleKey)) return loginPage(rq, { email, error: THROTTLED_MESSAGE }, 429);
+    const keys = throttleKeys(ctx.ip, email);
+    if (anyThrottled(keys)) return loginPage(rq, { email, error: THROTTLED_MESSAGE }, 429);
 
     try {
       const outcome = await backendLogin(email, password, ctx);
-      clearAttempts(throttleKey);
       if (outcome.kind === 'session') return successRedirect(rq, outcome.session);
       // 2FA: trigger the email code (a cooldown error just means one is already in flight).
       let masked = outcome.challenge.maskedEmail;
@@ -186,7 +201,7 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
       }
       return otpPage(rq, outcome.challenge.challengeToken, masked);
     } catch (error) {
-      recordAttempt(throttleKey);
+      recordFailure(keys);
       return loginPage(rq, { email, error: bridgeErrorMessage(error, 'Sign-in failed. Please try again.') }, pageStatusFor(error));
     }
   }
@@ -194,7 +209,8 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
   if (step === 'otp' || step === 'otp_resend') {
     const chal = open<ChallengePayload>('chal', params.chal);
     if (!chal) return html(renderErrorPage('Verification expired', 'This verification step has expired. Go back to the application and connect again.'), 400);
-    if (isThrottled(throttleKey)) return otpPage(chal.rq, chal.ct, chal.me, THROTTLED_MESSAGE);
+    const keys = throttleKeys(ctx.ip, chal.me);
+    if (anyThrottled(keys)) return otpPage(chal.rq, chal.ct, chal.me, THROTTLED_MESSAGE);
 
     if (step === 'otp_resend') {
       try {
@@ -209,10 +225,9 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
     if (!code) return otpPage(chal.rq, chal.ct, chal.me, 'Enter the code from your email.');
     try {
       const session = await backendVerifyOtp(chal.ct, code, ctx);
-      clearAttempts(throttleKey);
       return successRedirect(chal.rq, session);
     } catch (error) {
-      recordAttempt(throttleKey);
+      recordFailure(keys);
       if (error instanceof AuthBridgeError && error.status === 401) {
         // Challenge consumed/expired → start over with the original request intact.
         return loginPage(chal.rq, { error: 'That verification session has expired. Please sign in again.' }, 401);

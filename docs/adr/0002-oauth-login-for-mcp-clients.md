@@ -58,6 +58,30 @@ authorization server** that fronts the backend's login:
 - **OAuth is opt-in.** Without `MCP_OAUTH_SIGNING_KEY` every OAuth endpoint fails
   closed and the header-based paths keep working unchanged.
 
+## Security review outcomes folded into the design (2026-09-04)
+
+- A raw backend JWT bearer is accepted only when it verifies against
+  `MCP_BACKEND_JWT_SECRET`; without the secret that path is closed. An
+  unverified JWT is a string anyone can type and must not unlock even the
+  public tools or its own rate-limit bucket. OAuth envelopes do not need the
+  secret: their authentication tag proves this server sealed them.
+- The sign-in form only accepts same-origin submissions (`Origin` /
+  `Sec-Fetch-Site`), so a hostile page cannot drive it with its visitors'
+  browsers to spread credential guessing across many IPs.
+- Proxy headers are trusted only on Vercel or with `MCP_TRUST_PROXY_HEADERS=1`,
+  values are validated as IP addresses before being relayed, and failures are
+  throttled per IP and per account without ever resetting on success.
+- Open registration is phishable by design (anyone can name a client
+  "Claude"). The page shows the exact redirect address and labels the app
+  "unverified" unless its host is on `MCP_OAUTH_ALLOWED_REDIRECT_HOSTS`, which
+  also restricts registration when set.
+- `client_id` is mandatory on refresh and revocation; a rejected refresh (400/
+  401/403) is `invalid_grant` so clients re-authenticate instead of retrying.
+- Derived keys are bound to the deployment (`MCP_PUBLIC_URL` / `VERCEL_URL`), so
+  a preview sharing the production secret cannot mint production tokens; the
+  issuer never advertises production endpoints from a preview.
+- `GET`/`DELETE /api/mcp` answer 405: there is no SSE stream or session to hold.
+
 ## Consequences
 
 - New routes: `/.well-known/oauth-protected-resource`,

@@ -12,6 +12,7 @@ export interface CallOptions {
   token?: string;
   body?: unknown;
   headers?: Record<string, string>;
+  timeoutMs?: number;
 }
 
 export async function call<T = unknown>(

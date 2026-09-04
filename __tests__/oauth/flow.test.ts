@@ -36,9 +36,16 @@ function backendJwt(payload: Record<string, unknown>): string {
 const FUTURE = Math.floor(Date.now() / 1000) + 900;
 let backendAccess = backendJwt({ sub: 'user-1', email: 'r@x.test', role: 'renter', exp: FUTURE });
 
-function form(body: Record<string, string>, url = `${BASE}/oauth/token`): Request {
-  return new Request(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-real-ip': '203.0.113.9', 'user-agent': 'TestClient/1' }, body: new URLSearchParams(body).toString() });
+function form(body: Record<string, string>, url = `${BASE}/oauth/token`, headers: Record<string, string> = {}): Request {
+  return new Request(url, {
+    method: 'POST',
+    // Browsers send Origin + Sec-Fetch-Site on form posts; the sign-in form requires same-origin.
+    headers: { 'content-type': 'application/x-www-form-urlencoded', origin: BASE, 'sec-fetch-site': 'same-origin', 'x-real-ip': '203.0.113.9', 'user-agent': 'TestClient/1', ...headers },
+    body: new URLSearchParams(body).toString(),
+  });
 }
+const NO_PARAMS = { params: Promise.resolve({ path: [] as string[] }) };
+const MCP_PARAMS = { params: Promise.resolve({ path: ['api', 'mcp'] }) };
 async function registerClient(): Promise<string> {
   const res = await register(new Request(`${BASE}/oauth/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_name: 'Test Client', redirect_uris: [REDIRECT] }) }));
   expect(res.status).toBe(201);
@@ -71,6 +78,7 @@ describe('OAuth 2.1 flow', () => {
     process.env.MCP_PUBLIC_URL = BASE;
     process.env.MCP_API_KEY = 'operator';
     process.env.MCP_BFF_RELAY_KEY = 'relay-secret';
+    process.env.MCP_TRUST_PROXY_HEADERS = '1';
     _resetThrottle();
     mockBackendRequest.mockReset();
   });
@@ -79,13 +87,16 @@ describe('OAuth 2.1 flow', () => {
     delete process.env.MCP_PUBLIC_URL;
     delete process.env.MCP_API_KEY;
     delete process.env.MCP_BFF_RELAY_KEY;
+    delete process.env.MCP_TRUST_PROXY_HEADERS;
   });
 
   it('serves discovery metadata (root and path-aware) and advertises it on 401', async () => {
-    const prm = await (await prmGet(new Request(`${BASE}/.well-known/oauth-protected-resource/api/mcp`))).json();
+    const prm = await (await prmGet(new Request(`${BASE}/.well-known/oauth-protected-resource/api/mcp`), MCP_PARAMS)).json();
     expect(prm.resource).toBe(`${BASE}/api/mcp`);
     expect(prm.authorization_servers).toEqual([BASE]);
-    const as = await (await asGet(new Request(`${BASE}/.well-known/oauth-authorization-server`))).json();
+    const as = await (await asGet(new Request(`${BASE}/.well-known/oauth-authorization-server`), NO_PARAMS)).json();
+    // Only the root and our resource path are answered (RFC 8414 path-aware discovery).
+    expect((await asGet(new Request(`${BASE}/.well-known/oauth-authorization-server/other`), { params: Promise.resolve({ path: ['other'] }) })).status).toBe(404);
     expect(as).toMatchObject({
       issuer: BASE,
       authorization_endpoint: `${BASE}/oauth/authorize`,
@@ -112,7 +123,8 @@ describe('OAuth 2.1 flow', () => {
     expect(page.headers.get('content-security-policy')).toContain("default-src 'none'");
     const html = await page.text();
     expect(html).toContain('Test Client');
-    expect(html).toContain('client.example');
+    expect(html).toContain('https://client.example/callback');
+    expect(html).toContain('unverified app'); // no allow-list configured in this test
     const req = hidden(html, 'req');
 
     // POST login → backend login → code redirect.
@@ -291,7 +303,7 @@ describe('OAuth 2.1 flow', () => {
 
   it('fails closed when OAuth is not configured', async () => {
     delete process.env.MCP_OAUTH_SIGNING_KEY;
-    expect((await prmGet(new Request(`${BASE}/.well-known/oauth-protected-resource`))).status).toBe(404);
+    expect((await prmGet(new Request(`${BASE}/.well-known/oauth-protected-resource`), NO_PARAMS)).status).toBe(404);
     expect((await register(new Request(`${BASE}/oauth/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }))).status).toBe(503);
     expect((await tokenPost(form({ grant_type: 'authorization_code' }))).status).toBe(503);
     expect((await authorizeGet(new Request(authorizeUrl({ client_id: 'x' })))).status).toBe(404);
@@ -305,7 +317,77 @@ describe('OAuth 2.1 flow', () => {
     expect((await (await tokenPost(form({}))).json()).error).toBe('invalid_request');
     expect((await (await tokenPost(form({ grant_type: 'password' }))).json()).error).toBe('unsupported_grant_type');
     expect((await (await tokenPost(form({ grant_type: 'authorization_code', code: 'x' }))).json()).error).toBe('invalid_request');
-    expect((await (await tokenPost(form({ grant_type: 'refresh_token', refresh_token: 'smg_rt.nope' }))).json()).error).toBe('invalid_grant');
+    expect((await (await tokenPost(form({ grant_type: 'refresh_token', refresh_token: 'smg_rt.nope' }))).json()).error).toBe('invalid_request'); // client_id required
+    expect((await (await tokenPost(form({ grant_type: 'refresh_token', refresh_token: 'smg_rt.nope', client_id: 'c' }))).json()).error).toBe('invalid_grant');
+    expect((await (await revokePost(form({ token: 'smg_rt.nope' }, `${BASE}/oauth/revoke`))).json()).error).toBe('invalid_request');
     expect((await (await tokenPost(form({ grant_type: 'authorization_code', code: 'smg_ac.nope', code_verifier: 'v'.repeat(43), redirect_uri: REDIRECT, client_id: 'c' }))).json()).error).toBe('invalid_grant');
+  });
+
+  it('blocks cross-site form submissions and ignores untrusted proxy headers', async () => {
+    const clientId = await registerClient();
+    const { challenge } = pkce();
+    const html = await (await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' })))).text();
+    const req = hidden(html, 'req');
+
+    const crossSite = await authorizePost(form({ step: 'login', req, email: 'r@x.test', password: 'pw' }, `${BASE}/oauth/authorize`, { origin: 'https://attacker.example', 'sec-fetch-site': 'cross-site' }));
+    expect(crossSite.status).toBe(403);
+    const wrongOriginOnly = await authorizePost(form({ step: 'login', req, email: 'r@x.test', password: 'pw' }, `${BASE}/oauth/authorize`, { origin: 'https://attacker.example', 'sec-fetch-site': 'same-origin' }));
+    expect(wrongOriginOnly.status).toBe(403);
+    expect(mockBackendRequest).not.toHaveBeenCalled();
+
+    // Off-Vercel without MCP_TRUST_PROXY_HEADERS: x-real-ip is attacker-controlled → not relayed.
+    delete process.env.MCP_TRUST_PROXY_HEADERS;
+    mockBackendRequest.mockImplementation(async (_m: string, path: string, opts: any) => {
+      if (path === '/users/login') {
+        expect(opts.headers['x-smg-client-ip']).toBeUndefined();
+        expect(opts.headers['x-smg-relay-key']).toBeUndefined();
+        expect(opts.headers['User-Agent']).toBe('TestClient/1 (via splitt-mcp)');
+        return { accessToken: backendAccess, refreshToken: 'brt-1', user: { id: 'user-1', email: 'r@x.test', role: 'renter' } };
+      }
+      throw new Error(`unexpected ${path}`);
+    });
+    const ok = await authorizePost(form({ step: 'login', req, email: 'r@x.test', password: 'pw' }, `${BASE}/oauth/authorize`, { 'x-real-ip': '198.51.100.7' }));
+    expect(ok.status).toBe(302);
+  });
+
+  it('does not reset the failure budget on a successful login (per-IP and per-account keys)', async () => {
+    const clientId = await registerClient();
+    const { challenge } = pkce();
+    const html = await (await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' })))).text();
+    const req = hidden(html, 'req');
+    const { BackendApiError } = jest.requireMock('../../src/lib/backend-client');
+    mockBackendRequest.mockImplementation(async (_m: string, _p: string, opts: any) => {
+      if (opts.body.email === 'victim@x.test') throw new BackendApiError(401, 'Invalid email or password');
+      return { accessToken: backendAccess, refreshToken: 'brt-1', user: { id: 'user-1', email: 'r@x.test', role: 'renter' } };
+    });
+    for (let i = 0; i < 9; i++) await authorizePost(form({ step: 'login', req, email: 'victim@x.test', password: 'guess' }, `${BASE}/oauth/authorize`));
+    // A successful login for another account from the same IP must not clear the budget.
+    expect((await authorizePost(form({ step: 'login', req, email: 'r@x.test', password: 'pw' }, `${BASE}/oauth/authorize`))).status).toBe(302);
+    await authorizePost(form({ step: 'login', req, email: 'victim@x.test', password: 'guess' }, `${BASE}/oauth/authorize`));
+    expect((await authorizePost(form({ step: 'login', req, email: 'victim@x.test', password: 'guess' }, `${BASE}/oauth/authorize`))).status).toBe(429);
+    // The per-account key also trips from a different IP (distributed spray on one account).
+    expect((await authorizePost(form({ step: 'login', req, email: 'victim@x.test', password: 'guess' }, `${BASE}/oauth/authorize`, { 'x-real-ip': '198.51.100.99' }))).status).toBe(429);
+    // …but a different account from that other IP is unaffected (no lockout of bystanders).
+    expect((await authorizePost(form({ step: 'login', req, email: 'other@x.test', password: 'pw' }, `${BASE}/oauth/authorize`, { 'x-real-ip': '198.51.100.99' }))).status).toBe(302);
+  });
+
+  it('maps a rejected refresh (400/401) to invalid_grant and answers 405 on GET/DELETE of /api/mcp', async () => {
+    const clientId = await registerClient();
+    const { verifier, challenge } = pkce();
+    const html = await (await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' })))).text();
+    const req = hidden(html, 'req');
+    mockBackendRequest.mockImplementation(async () => ({ accessToken: backendAccess, refreshToken: 'brt-1', user: { id: 'user-1', email: 'r@x.test', role: 'renter' } }));
+    const code = new URL((await authorizePost(form({ step: 'login', req, email: 'r@x.test', password: 'pw' }, `${BASE}/oauth/authorize`))).headers.get('location')!).searchParams.get('code')!;
+    const tokens = await (await tokenPost(form({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT, client_id: clientId }))).json();
+
+    const { BackendApiError } = jest.requireMock('../../src/lib/backend-client');
+    mockBackendRequest.mockImplementation(async () => { throw new BackendApiError(400, 'refreshToken must be a string'); });
+    const res = await tokenPost(form({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: clientId }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('invalid_grant');
+
+    const { GET: mcpGet, DELETE: mcpDelete } = await import('../../src/app/api/mcp/route');
+    expect((await mcpGet()).status).toBe(405);
+    expect((await mcpDelete()).status).toBe(405);
   });
 });

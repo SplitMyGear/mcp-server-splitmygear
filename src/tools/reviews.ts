@@ -1,5 +1,5 @@
 /** Reviews: public listing reviews, the caller's own reviews, and vendor responses. */
-import { call, compact, qs } from './_shared';
+import { call, compact } from './_shared';
 
 export const reviewTools = {
   async getListingReviews(listingId: string) {
@@ -9,10 +9,6 @@ export const reviewTools = {
     ]);
     if (!reviews.ok) return reviews;
     return { ok: true as const, data: { summary: summary.ok ? summary.data : null, reviews: reviews.data } };
-  },
-
-  checkEligibility(token: string, params: { listingId?: string; reviewedUserId?: string }) {
-    return call('GET', `/reviews/eligibility${qs(params)}`, { token });
   },
 
   createReview(

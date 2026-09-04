@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import crypto from 'crypto';
-import { readBackendJwtClaims } from '@/lib/jwt';
+import { verifyBackendJwtClaims } from '@/lib/jwt';
 import { looksLikeAccessEnvelope } from '@/lib/oauth/envelope';
 import { openAccessToken } from '@/lib/oauth/tokens';
 import { oauthEnabled } from '@/lib/oauth/config';
@@ -46,9 +46,12 @@ export interface AuthResult {
  *  2. An OAuth access token issued by THIS server (`smg_at.…`, see
  *     lib/oauth) → decrypted; the wrapped backend JWT is what tools forward.
  *  3. A raw Splitt backend JWT (`Authorization: Bearer …`, issued by
- *     POST /api/v1/users/login) → decoded (and signature-verified when
- *     MCP_BACKEND_JWT_SECRET is set); forwarded as-is. Kept for first-party
- *     integrations that already hold a backend session.
+ *     POST /api/v1/users/login) → accepted ONLY when its HS256 signature
+ *     verifies against MCP_BACKEND_JWT_SECRET; forwarded as-is. Kept for
+ *     first-party integrations that already hold a backend session. Without
+ *     the secret this path is closed: an unverified JWT is a base64 string
+ *     anyone can type, and it must never unlock even the public tools or a
+ *     rate-limit bucket of its own.
  * The backend re-validates every forwarded token; it is the single authority
  * for auth, RBAC and ownership. No Supabase client exists here (SPLIT-226).
  */
@@ -57,10 +60,10 @@ export async function authMiddleware(request: NextRequest): Promise<AuthResult> 
   const apiKey = request.headers.get('x-api-key');
 
   const operatorKey = process.env.MCP_API_KEY;
-  if (!operatorKey) {
+  if (!operatorKey && !oauthEnabled() && !process.env.MCP_BACKEND_JWT_SECRET) {
     return { success: false, error: 'Server auth not configured' };
   }
-  if (apiKey && timingSafeEqualStr(apiKey, operatorKey)) {
+  if (apiKey && operatorKey && timingSafeEqualStr(apiKey, operatorKey)) {
     return { success: true, role: 'admin', kind: 'operator' };
   }
 
@@ -74,9 +77,13 @@ export async function authMiddleware(request: NextRequest): Promise<AuthResult> 
       return { success: true, userId: at.sub, role: at.role || 'renter', email: at.email, token: at.bt, kind: 'oauth' };
     }
 
-    const claims = readBackendJwtClaims(bearer);
+    const claims = verifyBackendJwtClaims(bearer);
     if (!claims?.sub) {
-      return { success: false, error: 'Invalid token', invalidCredentials: true };
+      return {
+        success: false,
+        error: process.env.MCP_BACKEND_JWT_SECRET ? 'Invalid token' : 'Invalid token (raw backend JWTs are not accepted; sign in via OAuth)',
+        invalidCredentials: true,
+      };
     }
     return {
       success: true,

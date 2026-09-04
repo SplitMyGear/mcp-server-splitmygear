@@ -1,3 +1,5 @@
+import { trustProxyHeaders, validIp } from './config';
+
 /**
  * Small HTTP helpers shared by the OAuth route handlers: JSON + OAuth error
  * responses (RFC 6749 §5.2 shape), permissive CORS for the public discovery /
@@ -49,13 +51,20 @@ export function preflight(): Response {
 }
 
 /** Largest form/JSON body any OAuth endpoint accepts (tokens are < 2 KB). */
-const MAX_PARAMS_BYTES = 64 * 1024;
+export const MAX_PARAMS_BYTES = 64 * 1024;
+
+/** True when the declared Content-Length exceeds `limit` (unknown length passes). */
+export function exceedsContentLength(request: Request, limit: number): boolean {
+  const declared = Number(request.headers.get('content-length'));
+  return Number.isFinite(declared) && declared > limit;
+}
 
 /** Parse `application/x-www-form-urlencoded` (or JSON) into a flat string map. */
 export async function readParams(request: Request): Promise<Record<string, string>> {
   const contentType = request.headers.get('content-type') || '';
-  const text = await request.text();
   const out: Record<string, string> = {};
+  if (exceedsContentLength(request, MAX_PARAMS_BYTES)) return out;
+  const text = await request.text();
   if (text.length > MAX_PARAMS_BYTES) return out;
   if (contentType.includes('application/json')) {
     try {
@@ -76,11 +85,36 @@ export async function readParams(request: Request): Promise<Record<string, strin
   return out;
 }
 
-/** Spoof-resistant-as-possible client IP on Vercel (x-real-ip is set by the edge). */
+/**
+ * The end user's IP, only when the proxy headers can be trusted (Vercel, or an
+ * explicit operator opt-in) and the value is a real IP address. Undefined
+ * otherwise: callers must then neither relay an IP nor key throttles on it.
+ */
 export function clientIp(request: Request): string | undefined {
-  const real = request.headers.get('x-real-ip');
-  if (real) return real.trim();
-  const xff = request.headers.get('x-forwarded-for');
-  if (xff) return xff.split(',')[0].trim();
-  return undefined;
+  if (!trustProxyHeaders()) return undefined;
+  return validIp(request.headers.get('x-real-ip')) ?? validIp(request.headers.get('x-forwarded-for'));
+}
+
+/**
+ * Browser-submitted forms must come from THIS origin. Browsers always send
+ * `Origin` (and `Sec-Fetch-Site`) on cross-site POSTs and neither can be set
+ * by page script, so this blocks a hostile page from driving the sign-in form
+ * with its visitors' browsers (distributed credential guessing, login CSRF).
+ * Requests without either header (non-browser clients) are allowed through;
+ * they are covered by the throttles instead.
+ */
+export function isSameOriginPost(request: Request): boolean {
+  const fetchSite = request.headers.get('sec-fetch-site');
+  if (fetchSite && fetchSite !== 'same-origin' && fetchSite !== 'none') return false;
+  const origin = request.headers.get('origin');
+  if (origin) {
+    let requestOrigin: string;
+    try {
+      requestOrigin = new URL(request.url).origin;
+    } catch {
+      return false;
+    }
+    if (origin.toLowerCase() !== requestOrigin.toLowerCase()) return false;
+  }
+  return true;
 }

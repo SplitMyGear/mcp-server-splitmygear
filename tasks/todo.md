@@ -55,14 +55,14 @@ security as the first constraint. All work on `claude/splitmygear-mcp-production
       review responses, earnings, payouts, Stripe Connect status/onboard,
       dashboard, experiences (mine/create/update/publish/archive/schedules/
       host bookings/confirm-cancel-complete)
-- [ ] 7. Security pass: explicit OPTIONS/CORS incl. `mcp-*` headers, no-store
+- [x] 7. Security pass: explicit OPTIONS/CORS incl. `mcp-*` headers, no-store
       + security headers, login throttle, relay IP, sanitized errors, remove
-      stale supabase/stripe config, ADR 0002
+      stale supabase/stripe config, ADR 0002, independent review + fixes
 - [x] 8. Tests for every new module (unit) + route-level OAuth flow test
 - [x] 9. CI workflow (lint/typecheck/test/build) + ESLint config
 - [x] 10. Docs: README, docs/mcp-tools.md, manifest.json, smithery.yaml,
       .env.example, docs/openapi.json, TASKS.md
-- [ ] 11. Verify (tsc, jest, lint, build, tools/list probe, simulated OAuth
+- [x] 11. Verify (tsc, jest, lint, build, tools/list probe, simulated OAuth
       flow), commit, push
 
 ## Deferred (documented follow-ups, not in this pass)
@@ -99,6 +99,14 @@ backend/frontend/CRM changes were needed).**
 - Quality gates: ESLint config + CI (lint, typecheck, jest+coverage, build,
   prod dependency audit); 179 tests incl. a full OAuth flow against a mocked
   backend; docs and DXT manifest generated from the registry and diffed in CI.
+- Independent security review (subagent) found 0 critical/high, 4 medium,
+  8 low; all fixed: raw JWT path now requires signature verification,
+  same-origin gate on the sign-in form, proxy-header trust gated and validated,
+  redirect-host allow-list + "unverified app" labelling, client_id required on
+  refresh/revoke, no throttle reset on success, refresh 400 → invalid_grant,
+  deployment-bound key derivation, UA sanitising, 405 on GET/DELETE, metadata
+  suffix restriction, content-length prechecks, booking timeout budget, dead
+  eligibility call removed, iCal URL redacted from model output.
 - Verified: `npm run verify` green; built server smoke-tested (metadata, 401
   discovery headers, DCR, sign-in page rendered and screenshotted, cancel and
   outage paths, operator tools/list).

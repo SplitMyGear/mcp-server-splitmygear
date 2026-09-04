@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { readBackendJwtClaims } from '../src/lib/jwt';
+import { readBackendJwtClaims, verifyBackendJwtClaims, decodeBackendJwtClaims } from '../src/lib/jwt';
 
 function b64url(o: object): string {
   return Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -40,5 +40,28 @@ describe('readBackendJwtClaims', () => {
     expect(readBackendJwtClaims(makeToken({ sub: 'u1', exp: FUTURE }, 'shared-secret'))?.sub).toBe('u1');
     // A token signed with the wrong key (forged) is rejected.
     expect(readBackendJwtClaims(makeToken({ sub: 'attacker', exp: FUTURE }, 'wrong-secret'))).toBeNull();
+  });
+});
+
+describe('verifyBackendJwtClaims / decodeBackendJwtClaims', () => {
+  afterEach(() => { delete process.env.MCP_BACKEND_JWT_SECRET; });
+
+  it('verify returns null without a configured secret, even for a well-formed token', () => {
+    delete process.env.MCP_BACKEND_JWT_SECRET;
+    expect(verifyBackendJwtClaims(makeToken({ sub: 'u1', exp: FUTURE }, 'whatever'))).toBeNull();
+  });
+
+  it('verify rejects a non-HS256 header (alg confusion) and accepts a correctly signed token', () => {
+    process.env.MCP_BACKEND_JWT_SECRET = 'shared-secret';
+    const signingInput = `${b64url({ alg: 'none' })}.${b64url({ sub: 'u1', exp: FUTURE })}`;
+    const sig = crypto.createHmac('sha256', 'shared-secret').update(signingInput).digest('base64url');
+    expect(verifyBackendJwtClaims(`${signingInput}.${sig}`)).toBeNull();
+    expect(verifyBackendJwtClaims(makeToken({ sub: 'u1', role: 'renter', exp: FUTURE }, 'shared-secret'))?.role).toBe('renter');
+  });
+
+  it('decode rejects non-access token types and tokens without a string sub', () => {
+    expect(decodeBackendJwtClaims(makeToken({ sub: 'u1', typ: 'handoff', exp: FUTURE }))).toBeNull();
+    expect(decodeBackendJwtClaims(makeToken({ exp: FUTURE }))).toBeNull();
+    expect(decodeBackendJwtClaims(makeToken({ sub: 'u1', typ: 'access', exp: FUTURE }))?.sub).toBe('u1');
   });
 });

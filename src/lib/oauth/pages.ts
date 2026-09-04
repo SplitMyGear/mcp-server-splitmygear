@@ -38,6 +38,9 @@ const STYLES = `
   button { width: 100%; margin-top: 18px; padding: 11px; font-size: 15px; font-weight: 600; border: 0; border-radius: 8px; background: #1d7a4c; color: #fff; cursor: pointer; }
   button.secondary { background: transparent; color: #1d7a4c; margin-top: 8px; }
   .error { background: #fdecec; color: #8a1f1f; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 14px; }
+  .warn { background: #fff4de; color: #6b4a00; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; background: #fff4de; color: #6b4a00; border-radius: 4px; padding: 1px 6px; vertical-align: middle; }
+  code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
   .hint { font-size: 13px; color: #6b7a70; margin-top: 14px; }
   @media (prefers-color-scheme: dark) {
     body { background: #101512; color: #e8ede9; }
@@ -46,6 +49,7 @@ const STYLES = `
     .client { background: #1f2a22; } .client b { color: #e8ede9; }
     input { background: #0f1411; border-color: #3a463e; }
     .error { background: #3a1d1d; color: #f5b5b5; }
+    .warn, .tag { background: #3a2e12; color: #f2d48a; }
   }
 `;
 
@@ -70,7 +74,9 @@ ${body}
 export interface LoginPageProps {
   requestToken: string;
   clientName: string;
-  redirectHost: string;
+  redirectUri: string;
+  /** Loopback or operator allow-listed redirect host. */
+  verified: boolean;
   email?: string;
   error?: string;
 }
@@ -80,7 +86,8 @@ export function renderLoginPage(p: LoginPageProps): string {
     'Sign in',
     `<h1>Sign in to Splitt</h1>
 <p>Connect your Splitt account so this assistant can act as you.</p>
-<div class="client"><b>${escapeHtml(p.clientName)}</b> will be able to search gear, manage your bookings, listings and messages on your behalf. It will send you back to <b>${escapeHtml(p.redirectHost)}</b>.</div>
+<div class="client"><b>${escapeHtml(p.clientName)}</b>${p.verified ? '' : ' <span class="tag">unverified app</span>'} will be able to search gear, manage your bookings, listings and messages on your behalf.<br>After sign-in you will be sent to:<br><code>${escapeHtml(p.redirectUri)}</code></div>
+${p.verified ? '' : '<div class="warn">Splitt has not verified this app. Only continue if you started this sign-in yourself from an app you trust, and check the address above.</div>'}
 ${p.error ? `<div class="error" role="alert">${escapeHtml(p.error)}</div>` : ''}
 <form method="post" action="" autocomplete="on">
 <input type="hidden" name="step" value="login">

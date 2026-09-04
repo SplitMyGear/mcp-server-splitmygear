@@ -60,14 +60,24 @@ export class AuthBridgeError extends Error {
   }
 }
 
+const MAX_UA_LENGTH = 200;
+
+/** Printable ASCII only, bounded: the UA is stored by the backend against the session. */
+function sanitizeUserAgent(ua: string | undefined): string {
+  const clean = (ua ?? '').replace(/[^\x20-\x7e]/g, '').trim().slice(0, MAX_UA_LENGTH);
+  return clean ? `${clean} (via splitt-mcp)` : 'splitt-mcp';
+}
+
 function relayHeaders(ctx: ClientContext): Record<string, string> {
   const headers: Record<string, string> = {};
   const relayKey = process.env.MCP_BFF_RELAY_KEY;
+  // `ctx.ip` is only ever set from trusted proxy headers and validated as an
+  // IP (see http.clientIp); without one, the backend throttles on our address.
   if (relayKey && ctx.ip) {
     headers['x-smg-relay-key'] = relayKey;
     headers['x-smg-client-ip'] = ctx.ip;
   }
-  headers['User-Agent'] = ctx.userAgent ? `${ctx.userAgent} (via splitt-mcp)` : 'splitt-mcp';
+  headers['User-Agent'] = sanitizeUserAgent(ctx.userAgent);
   return headers;
 }
 

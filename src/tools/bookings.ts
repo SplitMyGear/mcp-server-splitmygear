@@ -89,6 +89,8 @@ export const bookingTools = {
     try {
       let totalPrice = 1;
       let quote: unknown;
+      // Three sequential backend calls must fit the function's 30 s budget:
+      // quote 8 s + create 12 s + checkout 8 s.
       const quoteResult = await this.getQuote({
         listingId: data.listingId,
         startDate: data.checkIn,
@@ -99,7 +101,7 @@ export const bookingTools = {
         selectedAddOns: data.selectedAddOns,
         deliveryRequested: data.deliveryRequested,
         bringingPets: data.bringingPets,
-      });
+      }, 8_000);
       if (quoteResult.ok) {
         quote = quoteResult.data;
         const total = Number((quoteResult.data as { total?: unknown })?.total);
@@ -108,6 +110,7 @@ export const bookingTools = {
 
       const booking = await backendRequest<CreatedBooking>('POST', '/bookings', {
         token: data.token,
+        timeoutMs: 12_000,
         body: compact({
           listingId: data.listingId,
           startDate: data.checkIn,
@@ -126,7 +129,7 @@ export const bookingTools = {
       if (!data.withPaymentLink) return { success: true, booking, quote };
       const bookingId = (booking as { id?: string })?.id;
       if (!bookingId) return { success: true, booking, quote, paymentError: 'Booking created but no id was returned; cannot open checkout.' };
-      const checkout = await this.createCheckoutSession(bookingId, data.token);
+      const checkout = await this.createCheckoutSession(bookingId, data.token, 8_000);
       return checkout.ok
         ? { success: true, booking, quote, paymentUrl: checkout.data.checkoutUrl }
         : { success: true, booking, quote, paymentError: checkout.error };
@@ -146,13 +149,13 @@ export const bookingTools = {
     selectedAddOns?: Array<{ name: string; quantity: number }>;
     deliveryRequested?: boolean;
     bringingPets?: boolean;
-  }): Promise<Result<unknown>> {
-    return call('POST', '/bookings/quote', { body: compact(input) });
+  }, timeoutMs?: number): Promise<Result<unknown>> {
+    return call('POST', '/bookings/quote', { body: compact(input), timeoutMs });
   },
 
   /** Stripe Checkout for a DRAFT booking; the backend picks its own return URLs. */
-  createCheckoutSession(bookingId: string, token: string): Promise<Result<{ checkoutUrl?: string; sessionId?: string }>> {
-    return call('POST', '/payments/checkout-session', { token, body: { bookingId } });
+  createCheckoutSession(bookingId: string, token: string, timeoutMs?: number): Promise<Result<{ checkoutUrl?: string; sessionId?: string }>> {
+    return call('POST', '/payments/checkout-session', { token, body: { bookingId }, timeoutMs });
   },
 
   setProtectionPlan(bookingId: string, plan: 'none' | 'basic' | 'standard' | 'premier', token: string) {

@@ -2,12 +2,17 @@ export {};
 
 import { authMiddleware } from '../src/middleware/auth';
 
-// Build a backend-style JWT (HS256, claims = { sub, role, exp }). No signature
-// verification happens unless MCP_BACKEND_JWT_SECRET is set, so the signature
-// segment is a placeholder for these decode-path tests.
-function makeJwt(payload: Record<string, unknown>): string {
+import crypto from 'crypto';
+
+// Build a backend-style JWT (HS256, claims = { sub, role, exp }). Raw bearer
+// JWTs are only accepted when they verify against MCP_BACKEND_JWT_SECRET, so
+// the tests sign with that secret; an unsigned placeholder must be rejected.
+const JWT_SECRET = 'backend-jwt-secret-for-tests';
+function makeJwt(payload: Record<string, unknown>, secret: string | null = JWT_SECRET): string {
   const seg = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
-  return `${seg({ alg: 'HS256', typ: 'JWT' })}.${seg(payload)}.sig`;
+  const signingInput = `${seg({ alg: 'HS256', typ: 'JWT' })}.${seg(payload)}`;
+  const sig = secret ? crypto.createHmac('sha256', secret).update(signingInput).digest('base64url') : 'sig';
+  return `${signingInput}.${sig}`;
 }
 const FUTURE = Math.floor(Date.now() / 1000) + 3600;
 
@@ -15,14 +20,17 @@ describe('Auth Middleware', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.MCP_API_KEY = 'test-operator-key';
+    process.env.MCP_BACKEND_JWT_SECRET = JWT_SECRET;
   });
 
   afterEach(() => {
     delete process.env.MCP_API_KEY;
+    delete process.env.MCP_BACKEND_JWT_SECRET;
   });
 
-  it('fails CLOSED when MCP_API_KEY is not configured (no public tier)', async () => {
+  it('fails CLOSED when nothing is configured (no public tier)', async () => {
     delete process.env.MCP_API_KEY;
+    delete process.env.MCP_BACKEND_JWT_SECRET;
     const mockRequest = {
       headers: new Headers({}),
       nextUrl: { pathname: '/api/mcp' },
@@ -124,6 +132,18 @@ describe('Auth Middleware', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Invalid token');
+  });
+
+  it('REJECTS an unsigned / unverifiable raw JWT (an unverified JWT is just a string anyone can type)', async () => {
+    const forged = makeJwt({ sub: 'attacker', role: 'admin', exp: FUTURE }, null);
+    const withSecret = await authMiddleware({ headers: new Headers({ authorization: `Bearer ${forged}` }), nextUrl: { pathname: '/api/mcp' } } as any);
+    expect(withSecret).toMatchObject({ success: false, invalidCredentials: true });
+    // And the whole raw-JWT path is closed when no verification secret is configured.
+    delete process.env.MCP_BACKEND_JWT_SECRET;
+    const genuineLooking = makeJwt({ sub: 'u1', role: 'renter', exp: FUTURE }, 'some-other-secret');
+    const noSecret = await authMiddleware({ headers: new Headers({ authorization: `Bearer ${genuineLooking}` }), nextUrl: { pathname: '/api/mcp' } } as any);
+    expect(noSecret.success).toBe(false);
+    expect(noSecret.error).toMatch(/sign in via OAuth/);
   });
 
   it('rejects a non-operator x-api-key with no bearer (api_keys path removed — no Supabase)', async () => {

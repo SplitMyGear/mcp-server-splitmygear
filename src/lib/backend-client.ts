@@ -44,6 +44,8 @@ interface RequestOptions {
    * USER, not on this server's egress address). Never overrides Authorization.
    */
   headers?: Record<string, string>;
+  /** Override the default per-request timeout (ms) for multi-step tool flows. */
+  timeoutMs?: number;
 }
 
 /**
@@ -69,7 +71,7 @@ export async function backendRequest<T = unknown>(
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       // AbortSignal.timeout (Node 18+/20) bounds every upstream call so a stalled
       // backend can't hang the serverless function to its maxDuration.
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(options.timeoutMs ?? REQUEST_TIMEOUT_MS),
     });
   } catch (err) {
     // A timeout abort, DNS failure, or connection reset reaches here as a raw

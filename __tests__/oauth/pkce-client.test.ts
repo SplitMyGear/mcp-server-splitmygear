@@ -1,7 +1,7 @@
 export {};
 import crypto from 'crypto';
 import { verifyS256, s256Challenge, isValidCodeVerifier, isValidCodeChallenge } from '../../src/lib/oauth/pkce';
-import { registerClient, resolveClient, clientAllowsRedirect, isAllowedRedirectUri } from '../../src/lib/oauth/client';
+import { registerClient, resolveClient, clientAllowsRedirect, isAllowedRedirectUri, isVerifiedRedirectUri } from '../../src/lib/oauth/client';
 
 const KEY = 'unit-test-signing-key-with-at-least-32-bytes!!';
 
@@ -53,6 +53,21 @@ describe('stateless client registration', () => {
     expect(resolveClient(undefined)).toBeNull();
     process.env.MCP_OAUTH_SIGNING_KEY = 'another-secret-that-is-also-long-enough-000';
     expect(resolveClient(reg.client_id)).toBeNull();
+  });
+
+  it('enforces the operator redirect-host allow-list and marks verified hosts', () => {
+    expect(isVerifiedRedirectUri('https://claude.ai/cb')).toBe(false);
+    expect(isVerifiedRedirectUri('http://localhost:1234/cb')).toBe(true);
+    process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS = 'claude.ai, .cursor.com';
+    expect(isAllowedRedirectUri('https://claude.ai/cb')).toBe(true);
+    expect(isAllowedRedirectUri('https://www.claude.ai/cb')).toBe(false);
+    expect(isAllowedRedirectUri('https://app.cursor.com/cb')).toBe(true);
+    expect(isAllowedRedirectUri('https://cursor.com/cb')).toBe(true);
+    expect(isAllowedRedirectUri('https://claude-login.example/cb')).toBe(false);
+    expect(isAllowedRedirectUri('http://127.0.0.1:9/cb')).toBe(true);
+    expect(isVerifiedRedirectUri('https://claude.ai/cb')).toBe(true);
+    expect(registerClient({ redirect_uris: ['https://evil.example/cb'] })).toMatchObject({ error: 'invalid_redirect_uri' });
+    delete process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS;
   });
 
   it('rejects confidential clients, bad grants and bad metadata', () => {

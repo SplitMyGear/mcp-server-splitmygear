@@ -274,24 +274,18 @@
         }
       },
       "get": {
-        "summary": "MCP SSE stream (not supported in stateless mode)",
+        "summary": "Not supported (stateless transport)",
         "responses": {
           "405": {
-            "description": "Method not allowed"
-          },
-          "401": {
-            "description": "Unauthorized"
+            "description": "Method not allowed; use POST"
           }
         }
       },
       "delete": {
-        "summary": "MCP session termination (no-op in stateless mode)",
+        "summary": "Not supported (stateless transport)",
         "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "401": {
-            "description": "Unauthorized"
+          "405": {
+            "description": "Method not allowed; use POST"
           }
         }
       },
@@ -511,6 +505,12 @@
           },
           "429": {
             "description": "Too many attempts"
+          },
+          "403": {
+            "description": "Cross-site form submission blocked"
+          },
+          "503": {
+            "description": "Splitt sign-in temporarily unavailable"
           }
         }
       }
@@ -525,7 +525,8 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "grant_type"
+                  "grant_type",
+                  "client_id"
                 ],
                 "properties": {
                   "grant_type": {
@@ -595,7 +596,8 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "token"
+                  "token",
+                  "client_id"
                 ],
                 "properties": {
                   "token": {

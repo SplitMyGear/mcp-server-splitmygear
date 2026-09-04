@@ -43,7 +43,7 @@ The operator key unlocks the public tools (search, details, availability, calend
 
 ### With an existing Splitt session token
 
-A first-party integration that already holds a backend JWT (from `POST /api/v1/users/login`) may send it as `Authorization: Bearer <jwt>`; it is forwarded unchanged.
+A first-party integration that already holds a backend JWT (from `POST /api/v1/users/login`) may send it as `Authorization: Bearer <jwt>`. This path is only open when the deployment has `MCP_BACKEND_JWT_SECRET` (the backend's `JWT_SECRET`) so the signature can be verified here; an unverified JWT never authenticates.
 
 ### Claude Desktop Extension
 
@@ -72,10 +72,11 @@ Payments never happen inside the MCP: booking tools return a Stripe-hosted `paym
 
 ## Security model
 
-- **Deny by default.** No credential, no service. A 401 carries `WWW-Authenticate` with the RFC 9728 resource-metadata URL so OAuth clients can start sign-in.
+- **Deny by default.** No credential, no service. A 401 carries `WWW-Authenticate` with the RFC 9728 resource-metadata URL so OAuth clients can start sign-in. Raw backend JWTs are accepted only when they verify against `MCP_BACKEND_JWT_SECRET`; OAuth tokens prove their own provenance. `GET`/`DELETE` on `/api/mcp` answer 405 (stateless transport).
 - **The backend is the authority.** Every user-scoped call forwards the user's own Splitt JWT; the backend re-validates it and enforces role, ownership and lifecycle rules. This server never accepts a caller-supplied user id.
 - **Stateless OAuth.** Authorization codes, access tokens, refresh tokens, registered client ids and in-flight sign-in requests are AES-256-GCM envelopes sealed with `MCP_OAUTH_SIGNING_KEY` (purpose-bound keys, so a code can never be replayed as a token). PKCE S256 is mandatory; only `https` or loopback redirect URIs register; codes live 2 minutes and are single-use.
-- **Your password is never stored.** The hosted sign-in page relays it once to Splitt's login API, together with your real IP via the backend's trusted relay header (`MCP_BFF_RELAY_KEY`) so Splitt's brute-force throttling keys on you, not on this server.
+- **Your password is never stored.** The hosted sign-in page relays it once to Splitt's login API, together with your real IP via the backend's trusted relay header (`MCP_BFF_RELAY_KEY`) so Splitt's brute-force throttling keys on you, not on this server. The form only accepts same-origin submissions (a hostile page cannot drive it with its visitors' browsers), failed attempts are throttled per IP and per account, and a successful login never resets the budget.
+- **Phishing resistance.** The sign-in page shows the app's name and the exact address it will send you to, and labels the app "unverified" unless its redirect host is on the operator allow-list (`MCP_OAUTH_ALLOWED_REDIRECT_HOSTS`, which also restricts who may register). Proxy headers are only trusted on Vercel or with `MCP_TRUST_PROXY_HEADERS=1`.
 - **Hardened responses.** Strict CSP on the sign-in page (no scripts, no remote assets), `no-store` everywhere, `X-Frame-Options: DENY`, HSTS, constant-time secret comparison, sanitized error messages.
 - **Model safety.** Destructive tools carry MCP `destructiveHint`; results that contain other users' text are labelled as untrusted data; server instructions tell the model to confirm cancellations and never collect card numbers.
 - **Rate limiting** per principal (best effort per serverless instance; the backend has its own distributed limits).
@@ -102,8 +103,10 @@ npm run dev                  # http://localhost:3000/api/mcp
 | `MCP_OAUTH_SIGNING_KEY` | for sign-in | 32+ random bytes; seals every OAuth artifact. Rotating it invalidates all issued tokens. |
 | `MCP_PUBLIC_URL` | production | Public origin of this server (the OAuth issuer), e.g. `https://mcp-server-splitmygear.vercel.app`. Falls back to Vercel's production URL. |
 | `MCP_BFF_RELAY_KEY` | recommended | The backend's `BFF_RELAY_KEY`; relays the end user's IP on login. |
+| `MCP_OAUTH_ALLOWED_REDIRECT_HOSTS` | recommended | Comma-separated redirect hosts allowed to register (leading dot = subdomains), e.g. `claude.ai,.claude.com,cursor.com`. Loopback is always allowed. Unset = any https host, shown as "unverified". |
+| `MCP_TRUST_PROXY_HEADERS` | off-Vercel only | `1` to trust `x-real-ip` / `x-forwarded-for` behind your own proxy. Automatic on Vercel. |
 | `BACKEND_API_URL` | no | Backend base, default `https://splitmygear-backend.vercel.app/api/v1`. |
-| `MCP_BACKEND_JWT_SECRET` | no | Backend `JWT_SECRET`; verifies forwarded JWT signatures locally as defense in depth. |
+| `MCP_BACKEND_JWT_SECRET` | for raw JWTs | Backend `JWT_SECRET`. Required to accept raw backend JWT bearers (they are signature-checked here); also verifies the JWTs inside OAuth tokens. |
 | `MCP_RATE_LIMIT_TIER` | no | `internal` (100/min), `beta` (50), `public` (20), default 10. |
 
 ### Checks

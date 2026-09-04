@@ -18,7 +18,7 @@ const SERVER_VERSION = '2.0.0';
  */
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key, mcp-session-id, mcp-protocol-version, last-event-id',
   'Access-Control-Expose-Headers': 'mcp-session-id, mcp-protocol-version, WWW-Authenticate, X-RateLimit-Remaining',
   'Access-Control-Max-Age': '86400',
@@ -66,16 +66,31 @@ export async function OPTIONS() {
   return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
-export async function GET(request: NextRequest) {
-  return handleRequest(request);
-}
-
 export async function POST(request: NextRequest) {
   return handleRequest(request);
 }
 
-export async function DELETE(request: NextRequest) {
-  return handleRequest(request);
+/**
+ * Stateless mode: there is no server-initiated SSE stream to open (GET) and no
+ * session to terminate (DELETE). Answer 405 up front instead of pinning a
+ * serverless invocation on an idle stream (the SDK would otherwise hold a GET
+ * open until the function's maxDuration).
+ */
+export async function GET() {
+  return methodNotAllowed();
+}
+
+export async function DELETE() {
+  return methodNotAllowed();
+}
+
+function methodNotAllowed(): Response {
+  return withHeaders(
+    new Response(JSON.stringify({ error: 'Method not allowed: this server is stateless; use POST' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json', Allow: 'POST, OPTIONS' },
+    }),
+  );
 }
 
 function withHeaders(response: Response, extra: Record<string, string> = {}): Response {
