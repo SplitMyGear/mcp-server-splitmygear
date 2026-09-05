@@ -1,9 +1,23 @@
 {
   "framework": "nextjs",
   "functions": {
-    "src/app/api/mcp/route.ts": { "maxDuration": 30 },
-    "src/app/oauth/authorize/route.ts": { "maxDuration": 30 },
-    "src/app/oauth/token/route.ts": { "maxDuration": 30 },
-    "src/app/oauth/revoke/route.ts": { "maxDuration": 30 }
+    "src/app/api/mcp/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/oauth/authorize/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/oauth/token/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/oauth/revoke/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/oauth/social/start/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/oauth/social/callback/route.ts": {
+      "maxDuration": 30
+    }
   }
 }
