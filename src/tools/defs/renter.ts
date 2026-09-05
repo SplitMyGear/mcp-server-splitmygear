@@ -251,9 +251,9 @@ export const respondToRescheduleProposal = defineTool({
 export const getPersonalizedRecommendations = defineTool({
   name: 'get_personalized_recommendations',
   title: 'Recommendations for me',
-  description: 'Gear recommendations based on the signed-in user\'s booking history and interests.',
+  description: 'Gear recommendations based on the signed-in user\'s booking history and interests (uses your account data, so it needs the profile scope).',
   access: 'user',
-  scope: 'read',
+  scope: 'profile',
   inputSchema: { limit: z.number().int().min(1).max(50).optional().default(5) },
   annotations: READ,
   handler: async ({ limit }, ctx) => ok(await listingTools.getPersonalizedRecommendations(token(ctx), limit)),

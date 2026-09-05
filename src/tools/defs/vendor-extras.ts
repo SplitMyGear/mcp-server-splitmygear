@@ -11,7 +11,7 @@ import { defineTool, fail, fromResult } from '../registry';
 import { vendorExtrasApi, REPORT_FREQUENCIES, REPORT_TYPES, SPONSOR_TIERS } from '../vendor-extras';
 import { uuid, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, token } from './common';
 
-const STAFF_NOTE = 'Account-level setting: vendor_staff seats get a 403.';
+const STAFF_NOTE = 'Account-level setting shared by every seat of the vendor account (owner, manager and staff seats may all change it).';
 
 // ── Vendor settings ──────────────────────────────────────────────────────────
 
@@ -94,7 +94,7 @@ export const getPayoutDetails = defineTool({
   description:
     'One payout of the signed-in vendor (ids come from get_vendor_payouts): amount, fee, net amount, status (pending, processing, completed, failed, cancelled), ' +
     'description, failure reason and dates. By default also returns the itemized statement: the bookings this payout settled with per-booking gross, platform fee ' +
-    'and net plus totals (statement.derived=true means a best-effort attribution for older payouts). Owner/manager seats only.',
+    'and net plus totals (statement.derived=true means a best-effort attribution for older payouts). Vendor owner seat only: the backend requires the payouts permission, which manager seats do not have.',
   access: 'vendor_finance',
   scope: 'finance',
   inputSchema: {

@@ -46,7 +46,9 @@ export type LegacyRouteStatus = (typeof LEGACY_ROUTE_STATUSES)[number];
 export const MAX_LINKED_ROUTES_PER_LISTING = 5;
 /** `POST /routes/import/gpx` multer limit and `RouteImportService` cap. */
 export const MAX_GPX_BYTES = 2 * 1024 * 1024;
-const UPLOAD_TIMEOUT_MS = 20_000;
+// GPX import may be followed by a route create in the same tool call; both must fit the function's 30 s budget.
+const UPLOAD_TIMEOUT_MS = 14_000;
+const IMPORT_CREATE_TIMEOUT_MS = 10_000;
 
 // ── Input shapes (mirror routes/dto/route.dto.ts and listing/dto/listing-route.dto.ts) ──
 
@@ -240,8 +242,8 @@ function getOne(token: string, routeId: string) {
   return call('GET', `/routes/${routeId}`, { token });
 }
 
-function create(token: string, input: RouteInput) {
-  return call<{ success?: boolean; route?: unknown }>('POST', '/routes', { token, body: compact(input) });
+function create(token: string, input: RouteInput, timeoutMs?: number) {
+  return call<{ success?: boolean; route?: unknown }>('POST', '/routes', { token, timeoutMs, body: compact(input) });
 }
 
 function update(token: string, routeId: string, input: RouteUpdateInput) {
@@ -303,7 +305,9 @@ async function importGpxAsRoute(token: string, gpxXml: string, overrides: GpxImp
     return { ok: false as const, error: 'Splitt could not find a usable track in that GPX file.', status: 400 };
   }
   const { activityType, name, ...rest } = overrides;
-  const created = await create(token, {
+  const created = await create(
+    token,
+    {
     name: (name ?? draft.name ?? 'Imported route').slice(0, 140),
     activityType,
     geometry: draft.geometry,
@@ -318,7 +322,9 @@ async function importGpxAsRoute(token: string, gpxXml: string, overrides: GpxImp
     seasonality: rest.seasonality,
     source: 'gpx',
     sourceRef: draft.sourceRef ?? undefined,
-  });
+    },
+    IMPORT_CREATE_TIMEOUT_MS,
+  );
   if (!created.ok) return created;
   return { ok: true as const, data: { ...created.data, import: { pointCount: draft.geometry.length, preview: draft.preview } } };
 }

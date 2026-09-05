@@ -13,7 +13,7 @@ const kindField = z
 const triggerField = z
   .enum(MESSAGE_TEMPLATE_TRIGGERS)
   .describe(
-    'Booking event that sends a LIFECYCLE template: BOOKING_CONFIRMED (when the vendor accepts a booking), PICKUP_REMINDER_24H (the day before pickup), ' +
+    'Booking event that sends a LIFECYCLE template: BOOKING_CONFIRMED (when a booking becomes confirmed: instant-book payment or vendor acceptance), PICKUP_REMINDER_24H (the day before pickup), ' +
       'RETURN_REMINDER_24H (the day before return), POST_RETURN (when the booking is completed; good for a thank-you and review request). Ignored for QUICK_REPLY.',
   );
 

@@ -8,7 +8,7 @@
  * stays in the Splitt web UI on purpose and is not exposed here.
  */
 import { z } from 'zod';
-import { defineTool, fail, fromResult } from '../registry';
+import { defineTool, fail, fromResult, TOOL_SCOPES } from '../registry';
 import { accountSecurityTools as backend, NOTIFICATION_CATEGORIES } from '../account-security';
 import { READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, token } from './common';
 
@@ -73,7 +73,15 @@ export const exportMyData = defineTool({
       .describe('Top-level sections to include, e.g. ["profile","bookings","consent"]. Omit for everything. Section names come from summaryOnly.availableSections.'),
   },
   annotations: READ,
-  handler: async ({ summaryOnly, sections }, ctx) => fromResult(await backend.exportMyData(token(ctx), { summaryOnly, sections })),
+  handler: async ({ summaryOnly, sections }, ctx) => {
+    // The export spans every other scope's data (bookings, messages, payouts,
+    // analytics), so a connection granted only `profile` must not get it:
+    // require a full-access grant (no scopes recorded, or every scope).
+    if (ctx.scopes && TOOL_SCOPES.some((s) => !ctx.scopes!.includes(s))) {
+      return fail('export_my_data needs a full-access connection because the export contains data from every scope. Reconnect without restricting scopes to use it.');
+    }
+    return fromResult(await backend.exportMyData(token(ctx), { summaryOnly, sections }));
+  },
 });
 
 // ── Preference centres ───────────────────────────────────────────────────────

@@ -21,7 +21,9 @@ describe('roles', () => {
     expect(canBookRentals('vendor')).toBe(false);
     expect(canBookRentals('renter')).toBe(true);
     expect(canViewVendorFinance('vendor')).toBe(false);
-    expect(canViewVendorFinance('vendor_manager')).toBe(true);
+    // Managers pass the backend's role gate but lack the ACCESS_PAYOUTS seat permission, so finance reads are owner-only.
+    expect(canViewVendorFinance('vendor_manager')).toBe(false);
+    expect(canViewVendorFinance('vendor_owner')).toBe(true);
     expect(canManageVendorPayouts('vendor_manager')).toBe(false);
     expect(canManageVendorPayouts('vendor_owner')).toBe(true);
   });
@@ -37,7 +39,8 @@ describe('tool visibility', () => {
     expect(isToolVisible('vendor', renter)).toBe(false);
     expect(isToolVisible('vendor', staff)).toBe(true);
     expect(isToolVisible('vendor_finance', staff)).toBe(false);
-    expect(isToolVisible('vendor_finance', manager)).toBe(true);
+    expect(isToolVisible('vendor_finance', manager)).toBe(false);
+    expect(isToolVisible('vendor_finance', owner)).toBe(true);
     expect(isToolVisible('vendor_owner', manager)).toBe(false);
     expect(isToolVisible('vendor_owner', owner)).toBe(true);
     expect(isToolVisible('vendor_owner', admin)).toBe(true);

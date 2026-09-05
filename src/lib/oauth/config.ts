@@ -102,7 +102,11 @@ export function trustProxyHeaders(): boolean {
 
 /** A syntactically valid IPv4/IPv6 address, or undefined. */
 export function validIp(value: string | null | undefined): string | undefined {
-  const v = value?.split(',')[0].trim();
+  // `x-forwarded-for` grows by appending: a trusted proxy adds the address it
+  // saw at the END, while anything the client sent arrives at the front. The
+  // rightmost entry is therefore the only one the proxy vouches for.
+  const parts = (value ?? '').split(',').map((p) => p.trim()).filter(Boolean);
+  const v = parts[parts.length - 1];
   return v && net.isIP(v) ? v : undefined;
 }
 

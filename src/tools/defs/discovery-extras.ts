@@ -78,7 +78,7 @@ const hasCriteria = (a: { searchQuery?: string; category?: string; location?: st
 /** `CreateSearchAlertDto` criteria fields (all optional). */
 const alertCriteria = {
   searchQuery: z.string().max(200).optional().describe('Free-text keywords to match against new listings, e.g. "tandem kayak".'),
-  category: z.enum(CATEGORY_NAMES).optional().describe('Canonical listing category to watch.'),
+  category: z.string().min(1).max(60).optional().describe('Listing category to watch, exactly as returned by list_categories (canonical names such as "Camping", or a live category from the catalogue).'),
   minPrice: z.number().min(0).max(100000).optional().describe('Minimum price per day (USD).'),
   maxPrice: z.number().min(0).max(100000).optional().describe('Maximum price per day (USD).'),
   location: z.string().max(200).optional().describe('City or area text, e.g. "Austin, TX".'),
@@ -302,18 +302,21 @@ export const planTrip = defineTool({
     destination: z.string().min(2).max(120).describe('Where the trip is, e.g. "Yosemite National Park, CA" or a label from suggest_locations.'),
     activities: z.array(z.enum(CATEGORY_NAMES)).min(1).max(6).describe('1 to 6 listing categories the trip is about, e.g. ["Kayaking", "Camping"].'),
     start: z.string().max(10).optional().describe('Trip start day, YYYY-MM-DD.'),
-    end: z.string().max(10).optional().describe('Trip end day, YYYY-MM-DD (requires start; at most 30 days after it).'),
+    end: z.string().max(10).optional().describe('Trip end day, YYYY-MM-DD (requires start; at most 30 days after it). Alternatively pass start with days.'),
     days: z.number().int().min(1).max(MAX_TRIP_DAYS).optional().describe('Trip length in days when no dates are fixed (1 to 30).'),
     people: z.number().int().min(1).max(20).optional().describe('Group size (1 to 20).'),
   },
   annotations: READ,
   handler: async ({ destination, activities, start, end, days, people }) => {
     if (start !== undefined && end === undefined) {
+      // The backend accepts a start day plus a day count as well as a start/end pair.
       const err = dayError('start', start);
       if (err) return fail(err);
+      if (days === undefined) return fail('With start alone, also pass days (1 to 30), or pass an end date instead.');
+    } else {
+      const err = tripDatesError(start, end, ['start', 'end'], true);
+      if (err) return fail(err);
     }
-    const err = tripDatesError(start, end, ['start', 'end'], true);
-    if (err) return fail(err);
     return fromResult(await extras.planTrip({ destination: destination.trim(), activities, start, end, days, people }), (plan) => {
       const p = plan as { available?: boolean; reason?: string } | null;
       if (p && p.available === false) {

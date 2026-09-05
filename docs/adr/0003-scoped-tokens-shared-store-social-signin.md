@@ -52,7 +52,8 @@ of the first cut, which makes least-privilege connections more valuable.
 ### Social sign-in on the hosted page
 
 - The backend gained an allow-listed `return_to` on `GET /auth/google` and
-  `GET /auth/apple` (`SOCIAL_AUTH_RETURN_ORIGINS`), persisted on the CSRF
+  `GET /auth/apple` (`SOCIAL_AUTH_RETURN_ORIGINS`, matched by origin plus an
+  optional path prefix and capped at 4096 characters), persisted on the CSRF
   state row and honoured by the callbacks, which append `code` or `error` to
   it with proper URL handling.
 - The hosted page offers "Continue with Google / Apple" only when the backend
@@ -77,8 +78,19 @@ of the first cut, which makes least-privilege connections more valuable.
 
 - New env vars: `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` (or
   `KV_REST_API_*`) on this server; `SOCIAL_AUTH_RETURN_ORIGINS` on the backend
-  must include this server's origin.
+  must include this server's callback, path pinned
+  (`https://<this host>/oauth/social/callback`).
 - Existing connections keep working: tokens issued before scopes carried no
-  scope claim and are treated as full access until they refresh.
+  scope claim and are treated as full access; a refresh re-seals that full
+  access unless the client narrows it with `scope`. They age out with the
+  refresh token's 30-day lifetime.
+- The `bookings` scope covers booking operations the user is a party to as
+  renter OR vendor (pickup/return verification, waivers, service bookings);
+  `vendor_bookings` is vendor-only booking administration. `export_my_data`
+  additionally requires a full-access grant because the export spans every
+  scope.
+- Finance reads (earnings, payouts, Stripe status) are owner-seat only: the
+  backend's seat matrix grants the payouts permission to owners alone, so a
+  manager seat would pass the role gate and be refused.
 - Adding a tool now requires choosing its scope; the registry test enforces
   that every tool has one from the taxonomy.

@@ -1,7 +1,7 @@
 export {};
 import crypto from 'crypto';
 import { seal, open, ENVELOPE_PREFIX, looksLikeAccessEnvelope, nowSeconds } from '../../src/lib/oauth/envelope';
-import { oauthEnabled, deriveKey, publicBaseUrl, resourceUrl } from '../../src/lib/oauth/config';
+import { oauthEnabled, deriveKey, publicBaseUrl, resourceUrl, validIp } from '../../src/lib/oauth/config';
 import { SCOPE_DESCRIPTIONS, TOOL_SCOPES, parseScopeParam, formatScope, isSubset, coerceScopes } from '../../src/lib/oauth/scopes';
 import { issueAuthorizationCode, openAuthorizationCode, issueTokens, openAccessToken, openRefreshToken } from '../../src/lib/oauth/tokens';
 import { authorizationServerMetadata, protectedResourceMetadata } from '../../src/lib/oauth/metadata';
@@ -37,6 +37,18 @@ describe('OAuth config', () => {
     expect(deriveKey('a').equals(deriveKey('a'))).toBe(true);
     expect(deriveKey('a').equals(deriveKey('b'))).toBe(false);
     expect(deriveKey('a').length).toBe(32);
+  });
+
+  it('believes only the rightmost x-forwarded-for entry (the one the proxy appended) and only when it is an IP', () => {
+    expect(validIp('203.0.113.9')).toBe('203.0.113.9');
+    expect(validIp(' 10.0.0.1, 198.51.100.7 , 203.0.113.9 ')).toBe('203.0.113.9');
+    expect(validIp('2001:db8::1')).toBe('2001:db8::1');
+    // A client-supplied prefix cannot smuggle an address past the proxy's own entry.
+    expect(validIp('198.51.100.7, not-an-ip')).toBeUndefined();
+    expect(validIp('198.51.100.7,')).toBe('198.51.100.7');
+    expect(validIp('')).toBeUndefined();
+    expect(validIp(null)).toBeUndefined();
+    expect(validIp(undefined)).toBeUndefined();
   });
 
   it('resolves the public base URL from env before the request origin, previews never advertise production', () => {

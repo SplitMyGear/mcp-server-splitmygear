@@ -30,6 +30,7 @@ const rateRuleFields = {
     .number()
     .min(0)
     .max(1_000_000)
+    .multipleOf(0.01)
     .nullable()
     .optional()
     .describe('Absolute per-night rate in USD (up to 2 decimals). Mutually exclusive with ratePct; null (update only) clears it.'),

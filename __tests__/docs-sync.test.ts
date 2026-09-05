@@ -20,7 +20,7 @@ const ACCESS_LABEL: Record<ToolAccess, string> = {
   user: 'Signed-in user',
   renter: 'Renter',
   vendor: 'Vendor',
-  vendor_finance: 'Vendor owner/manager',
+  vendor_finance: 'Vendor owner (payouts permission)',
   vendor_owner: 'Vendor owner',
 };
 

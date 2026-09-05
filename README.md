@@ -62,8 +62,7 @@ The tool list a client receives already reflects the signed-in account and the g
 | Signed-in user | +89 | profile and security settings, notifications, bookings (list, cancel with refund preview, reschedule responses, protection plan), pickup/return photos and inspection checklists, reviews, favorites, saved searches and trips, conversations and messages, experience and service bookings, waivers, disputes, damage-claim responses, incidental charges, evidence uploads, trust score, vendor onboarding, AI drafting helpers |
 | Renter | +2 | `create_booking` (server-priced draft plus a Stripe Checkout `paymentUrl`), `get_payment_link` |
 | Vendor seat (`vendor`, `vendor_owner`, `vendor_manager`, `vendor_staff`) | +98 | listings (create, update, publish, duplicate, delete, AI draft, performance), blackout dates, seasonal rate rules and dynamic pricing, fleet units, calendar feeds and iCal, routes and GPX import, insurance and waivers, message templates, incoming bookings, overdue / return status, reschedule proposals, private notes, damage claims and incidental charges, review responses, dashboard, experiences hosting, services, promotions, auto-approve, report subscriptions, tax summary |
-| Vendor owner / manager | +4 | `get_vendor_earnings`, `get_vendor_payouts`, `get_payout_details`, `get_stripe_connect_status` |
-| Vendor owner | +2 | `start_stripe_connect_onboarding`, `request_payout` |
+| Vendor owner | +6 | `get_vendor_earnings`, `get_vendor_payouts`, `get_payout_details`, `get_stripe_connect_status`, `start_stripe_connect_onboarding`, `request_payout` (the backend grants the payouts permission to the owner seat only) |
 
 Full reference with every argument: [docs/mcp-tools.md](docs/mcp-tools.md) (generated from the code by `npm run gen:docs`).
 
@@ -78,7 +77,7 @@ Payments never happen inside the MCP: booking tools return a Stripe-hosted `paym
 - **Scopes.** Every tool belongs to one OAuth scope (see the Scopes table in docs/mcp-tools.md). Clients request scopes with the standard space-separated `scope` parameter on `/oauth/authorize`; a client that sends none is granted all scopes and the consent page says so in plain words. The `scope` member of the token response echoes the grant. A `refresh_token` request may pass `scope` to narrow the grant (never widen it), and the narrowed set persists in the new refresh token. The operator API key has `read` only; a verified raw backend JWT has every scope. Scopes never override the backend role model: granting `listings` to a renter account unlocks nothing, and the backend re-checks every forwarded call.
 - **Stateless OAuth.** Authorization codes, access tokens, refresh tokens, registered client ids and in-flight sign-in requests are AES-256-GCM envelopes sealed with `MCP_OAUTH_SIGNING_KEY` (purpose-bound keys, so a code can never be replayed as a token). PKCE S256 is mandatory; only `https` or loopback redirect URIs register; codes live 2 minutes and are single-use.
 - **Your password is never stored.** The hosted sign-in page relays it once to Splitt's login API, together with your real IP via the backend's trusted relay header (`MCP_BFF_RELAY_KEY`) so Splitt's brute-force throttling keys on you, not on this server. The form only accepts same-origin submissions (a hostile page cannot drive it with its visitors' browsers), failed attempts are throttled per IP and per account, and a successful login never resets the budget.
-- **Social sign-in cannot skip the consent card.** Continue with Google / Apple can only be started by a click on the sign-in page itself (the start route requires a same-origin navigation), and the browser that clicked is tied to the return trip by a nonce carried in the sealed request and in a short-lived HttpOnly cookie; the callback refuses anything else. The one-time exchange code the backend hands back is swapped once and expires after a minute. The backend must list this server's origin in `SOCIAL_AUTH_RETURN_ORIGINS` or it will not send the browser back here.
+- **Social sign-in cannot skip the consent card.** Continue with Google / Apple can only be started by a click on the sign-in page itself (the start route requires a same-origin navigation), and the browser that clicked is tied to the return trip by a nonce carried in the sealed request and in a short-lived HttpOnly cookie; the callback refuses anything else. The one-time exchange code the backend hands back is swapped once and expires after a minute. The backend must list this server's callback in `SOCIAL_AUTH_RETURN_ORIGINS` (pin the path: `https://<this host>/oauth/social/callback`) or it will not send the browser back here.
 - **Phishing resistance.** The sign-in page shows the app's name and the exact address it will send you to, and labels the app "unverified" unless its redirect host is on the operator allow-list (`MCP_OAUTH_ALLOWED_REDIRECT_HOSTS`, which also restricts who may register). Proxy headers are only trusted on Vercel or with `MCP_TRUST_PROXY_HEADERS=1`.
 - **Hardened responses.** Strict CSP on the sign-in page (no scripts, no remote assets), `no-store` everywhere, `X-Frame-Options: DENY`, HSTS, constant-time secret comparison, sanitized error messages.
 - **Model safety.** Destructive tools carry MCP `destructiveHint`; results that contain other users' text are labelled as untrusted data; server instructions tell the model to confirm cancellations and never collect card numbers.
@@ -94,7 +93,7 @@ Report security issues to security@go-splitt.com.
 git clone https://github.com/SplitMyGear/mcp-server-splitmygear
 cd mcp-server-splitmygear
 npm install
-cp .env.example .env.local   # fill in MCP_API_KEY and, for sign-in, MCP_OAUTH_SIGNING_KEY
+cp .env.example .env.local   # set MCP_OAUTH_SIGNING_KEY for sign-in and/or MCP_API_KEY for operator access
 npm run dev                  # http://localhost:3000/api/mcp
 ```
 
@@ -102,7 +101,7 @@ npm run dev                  # http://localhost:3000/api/mcp
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `MCP_API_KEY` | yes | Operator key (`x-api-key`). Without it every request is refused. |
+| `MCP_API_KEY` | for operator access | Operator key (`x-api-key`) for the public tools. Auth fails closed only when none of `MCP_API_KEY`, `MCP_OAUTH_SIGNING_KEY` and `MCP_BACKEND_JWT_SECRET` is configured. |
 | `MCP_OAUTH_SIGNING_KEY` | for sign-in | 32+ random bytes; seals every OAuth artifact. Rotating it invalidates all issued tokens. |
 | `MCP_PUBLIC_URL` | production | Public origin of this server (the OAuth issuer), e.g. `https://mcp-server-splitmygear.vercel.app`. Falls back to Vercel's production URL. |
 | `MCP_BFF_RELAY_KEY` | recommended | The backend's `BFF_RELAY_KEY`; relays the end user's IP on login. |
@@ -133,7 +132,7 @@ Create a Redis database at console.upstash.com (the free tier is enough), open i
 
 ### Social sign-in
 
-The backend must list this server's exact public origin in `SOCIAL_AUTH_RETURN_ORIGINS` (see the backend's `.env.example`) and have Google or Apple configured; the buttons appear automatically when `GET /api/v1/auth/providers` reports a provider.
+The backend must list this server's callback in `SOCIAL_AUTH_RETURN_ORIGINS` (see the backend's `.env.example`; use the full path `https://<this host>/oauth/social/callback` so the backend only ever returns to that route, not to an arbitrary page on this origin) and have Google or Apple configured; the buttons appear automatically when `GET /api/v1/auth/providers` reports a provider.
 
 ---
 

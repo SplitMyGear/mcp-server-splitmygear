@@ -21,6 +21,8 @@ export const UPLOAD_FOLDERS = [
   'incidental-charges',
   'inspections',
   'listings',
+  'experiences',
+  'services',
   'insurance',
   'profile-photos',
   'general',
@@ -29,10 +31,10 @@ export type UploadFolder = (typeof UPLOAD_FOLDERS)[number];
 
 /**
  * Content types the backend accepts by MAGIC BYTES (`sniffFileType`: JPEG, PNG,
- * GIF, WebP, PDF). HEIC is deliberately absent: the backend has no signature
+ * WebP, PDF). HEIC is deliberately absent: the backend has no signature
  * for it and rejects the bytes with a 400, so offering it would only mislead.
  */
-export const UPLOAD_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'] as const;
+export const UPLOAD_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] as const;
 export type UploadContentType = (typeof UPLOAD_CONTENT_TYPES)[number];
 
 /** Decoded size cap (the backend allows 10 MB; MCP payloads are kept smaller). */
@@ -46,7 +48,6 @@ const EXTENSIONS: Record<UploadContentType, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
-  'image/gif': 'gif',
   'application/pdf': 'pdf',
 };
 
@@ -76,7 +77,6 @@ export function sniffContentType(bytes: Uint8Array): UploadContentType | null {
   if (bytes.length < 4) return null;
   if (startsWith(bytes, [0xff, 0xd8, 0xff])) return 'image/jpeg';
   if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'image/png';
-  if (startsWith(bytes, [0x47, 0x49, 0x46, 0x38])) return 'image/gif';
   if (startsWith(bytes, [0x52, 0x49, 0x46, 0x46]) && startsWith(bytes, [0x57, 0x45, 0x42, 0x50], 8)) return 'image/webp';
   if (startsWith(bytes, [0x25, 0x50, 0x44, 0x46])) return 'application/pdf';
   return null;
@@ -144,7 +144,7 @@ export const filesApi = {
         ok: false,
         error: sniffed
           ? `The file content is ${sniffed}, not ${input.contentType}. Pass the matching contentType.`
-          : 'The file content is not a recognised JPEG, PNG, WebP, GIF or PDF.',
+          : 'The file content is not a recognised JPEG, PNG, WebP or PDF.',
       };
     }
 

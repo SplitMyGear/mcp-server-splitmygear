@@ -86,7 +86,8 @@ function startRequest(path: string, headers: Record<string, string> = {}): Reque
 }
 function cookieOf(res: Response): { header: string; value: string } {
   const header = res.headers.get('set-cookie') || '';
-  const m = header.match(/^smg_social=([^;]*)/);
+  // Over https the cookie carries the __Host- prefix (and therefore Path=/).
+  const m = header.match(/^(?:__Host-)?smg_social=([^;]*)/);
   if (!m) throw new Error(`no smg_social cookie in ${header}`);
   return { header, value: m[1] };
 }
@@ -102,7 +103,7 @@ async function start(req: string, provider = 'google') {
 function callbackRequest(returnTo: string, params: Record<string, string>, cookie?: string, headers: Record<string, string> = {}): Request {
   const url = new URL(returnTo);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  return new Request(url.toString(), { headers: { 'sec-fetch-site': 'cross-site', 'x-real-ip': IP, 'user-agent': 'TestBrowser/1', ...(cookie !== undefined ? { cookie: `smg_social=${cookie}` } : {}), ...headers } });
+  return new Request(url.toString(), { headers: { 'sec-fetch-site': 'cross-site', 'x-real-ip': IP, 'user-agent': 'TestBrowser/1', ...(cookie !== undefined ? { cookie: `__Host-smg_social=${cookie}` } : {}), ...headers } });
 }
 function form(body: Record<string, string>, url: string): Request {
   return new Request(url, {
@@ -153,7 +154,11 @@ describe('social sign-in on the hosted page', () => {
 
       const { header } = cookieOf(res);
       expect(cookie).toMatch(/^[A-Za-z0-9_-]{20,}$/);
-      expect(header).toContain('Path=/oauth/social/callback');
+      // __Host- prefix: Secure, Path=/, no Domain (browsers refuse it from any other host).
+      expect(header).toMatch(/^__Host-smg_social=/);
+      expect(header).toContain('Path=/');
+      expect(header).toContain('Secure');
+      expect(header).not.toContain('Domain=');
       expect(header).toContain('HttpOnly');
       expect(header).toContain('SameSite=Lax');
       expect(header).toContain('Secure');
@@ -199,6 +204,32 @@ describe('social sign-in on the hosted page', () => {
       expect(noHeader.status).toBe(403);
     });
 
+    it('refuses to start when return_to would exceed what the backend stores (a very long redirect URI plus maximal state)', async () => {
+      // The sealed request carries the client id (which embeds the redirect URIs), the redirect URI again and the state.
+      const longRedirect = `https://client.example/${'p'.repeat(700)}`;
+      const reg = await register(new Request(`${BASE}/oauth/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_name: 'Long', redirect_uris: [longRedirect] }) }));
+      expect(reg.status).toBe(201);
+      const clientId = (await reg.json()).client_id;
+      mockBackendRequest.mockImplementation(async (method: string, path: string) => {
+        if (method === 'GET' && path === '/auth/providers') return { google: true, apple: true };
+        throw new Error(`unexpected ${method} ${path}`);
+      });
+      const u = new URL(`${BASE}/oauth/authorize`);
+      for (const [k, v] of Object.entries({ response_type: 'code', client_id: clientId, redirect_uri: longRedirect, state: 's'.repeat(512), code_challenge: pkce().challenge, code_challenge_method: 'S256' })) u.searchParams.set(k, v);
+      const page = await authorizeGet(new Request(u.toString()));
+      expect(page.status).toBe(200); // password sign-in still works for such a client
+      const req = hidden(await page.text(), 'req');
+      mockBackendRequest.mockClear();
+
+      const res = await socialStart(startRequest(`/oauth/social/start?provider=google&req=${encodeURIComponent(req)}`));
+      expect(res.status).toBe(400);
+      const html = await res.text();
+      expect(html).toContain('Sign-in request too large');
+      expect(html).toContain('email and password');
+      expect(res.headers.get('set-cookie')).toBeNull();
+      expect(mockBackendRequest).not.toHaveBeenCalled();
+    });
+
     it('fails closed when OAuth is not configured', async () => {
       const { req } = await signInPage();
       delete process.env.MCP_OAUTH_SIGNING_KEY;
@@ -229,7 +260,7 @@ describe('social sign-in on the hosted page', () => {
       const code = location.searchParams.get('code')!;
       expect(code.startsWith('smg_ac.')).toBe(true);
       // The single-use cookie is dropped on the way out.
-      expect(res.headers.get('set-cookie')).toMatch(/^smg_social=;.*Max-Age=0/);
+      expect(res.headers.get('set-cookie')).toMatch(/^__Host-smg_social=;.*Max-Age=0/);
 
       // The code is bound to the client, the PKCE challenge and the scopes the page was rendered for.
       const tokenRes = await tokenPost(form({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT, client_id: clientId }, `${BASE}/oauth/token`));

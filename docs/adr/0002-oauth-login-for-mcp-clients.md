@@ -46,8 +46,9 @@ authorization server** that fronts the backend's login:
   IP is relayed through the backend's trusted `x-smg-relay-key` header so its
   brute-force throttle keys on the user, not on this server's egress address.
 - **Public clients only, PKCE S256 mandatory, exact redirect-URI match,
-  `https` or loopback redirects only, 2-minute single-use codes** (per-instance
-  replay cache; PKCE plus client/redirect binding make a replayed code useless
+  `https` or loopback redirects only, 2-minute single-use codes** (replay
+  cache in the shared store when one is configured, per-instance otherwise; see
+  ADR 0003. PKCE plus client/redirect binding make a replayed code useless
   without the verifier). Dynamic registration (RFC 7591) is open, as the MCP
   ecosystem expects; the user sees the client's name and redirect host on the
   sign-in page.
@@ -107,5 +108,6 @@ authorization server** that fronts the backend's login:
   backend gained an allow-listed `return_to`).
 - Discovery documents list `scopes_supported`; token responses include `scope`.
   docs/mcp-tools.md gains a Scopes section and a Scope column (generated).
-- The per-instance code replay cache and login throttle are best-effort; the
-  backend's own distributed throttles are the real control.
+- Without a shared store (ADR 0003) the code replay cache and login throttle
+  are per-instance and best-effort; the backend's own distributed throttles are
+  the real control either way.

@@ -49,6 +49,12 @@ import { isThrottled, recordAttempt } from './throttle';
 import { clientIp, isSameOriginPost, readParams, type OAuthErrorCode } from './http';
 
 /** How long a rendered sign-in page stays submittable. */
+/** RFC 6749 leaves `state` unbounded; cap it so the sealed request (and the social return_to built from it) stays a sane size. */
+const MAX_STATE_LENGTH = 512;
+/** RFC 5321 mailbox limit; also bounds the throttle keys built from the address. */
+const MAX_EMAIL_LENGTH = 254;
+/** The backend's `oauth_exchange_code.returnTo` column width. */
+const SOCIAL_RETURN_TO_MAX_LENGTH = 2048;
 const REQUEST_TTL_S = 10 * 60;
 const THROTTLED_MESSAGE = 'Too many sign-in attempts from your network. Please wait a few minutes and try again.';
 const EXPIRED_MESSAGE = 'This sign-in page has expired. Go back to the application and connect again.';
@@ -78,6 +84,8 @@ type AuthorizeRequest = Omit<AuthorizeRequestPayload, 'exp' | 'iat'>;
 interface ChallengePayload {
   ct: string;
   me: string;
+  /** Lowercased account email, sealed (never rendered): the per-account throttle key. */
+  em?: string;
   rq: AuthorizeRequest;
   exp: number;
   iat: number;
@@ -123,9 +131,9 @@ function loginPage(rq: AuthorizeRequest, opts: { email?: string; error?: string 
   );
 }
 
-function otpPage(rq: AuthorizeRequest, challengeToken: string, maskedEmail: string, error?: string): Response {
+function otpPage(rq: AuthorizeRequest, challengeToken: string, maskedEmail: string, error?: string, email?: string): Response {
   const iat = nowSeconds();
-  const chal = seal<ChallengePayload>('chal', { ct: challengeToken, me: maskedEmail, rq, iat, exp: iat + REQUEST_TTL_S });
+  const chal = seal<ChallengePayload>('chal', { ct: challengeToken, me: maskedEmail, em: email, rq, iat, exp: iat + REQUEST_TTL_S });
   return html(renderOtpPage({ challengeToken: chal, maskedEmail, error }));
 }
 
@@ -148,7 +156,7 @@ function successRedirect(rq: AuthorizeRequest, session: BackendSession): Respons
  * redirect; a 2FA challenge triggers the email code (a cooldown error just
  * means one is already in flight) and renders the OTP step.
  */
-async function completeLogin(rq: AuthorizeRequest, outcome: LoginOutcome, ctx: ClientContext): Promise<Response> {
+async function completeLogin(rq: AuthorizeRequest, outcome: LoginOutcome, ctx: ClientContext, email?: string): Promise<Response> {
   if (outcome.kind === 'session') return successRedirect(rq, outcome.session);
   let masked = outcome.challenge.maskedEmail;
   try {
@@ -157,7 +165,7 @@ async function completeLogin(rq: AuthorizeRequest, outcome: LoginOutcome, ctx: C
   } catch {
     /* keep going: the user can press "Resend code" */
   }
-  return otpPage(rq, outcome.challenge.challengeToken, masked);
+  return otpPage(rq, outcome.challenge.challengeToken, masked, undefined, email);
 }
 
 /** HTTP status for a re-rendered sign-in page: 401 bad credentials, 429 throttled, 503 backend trouble. */
@@ -191,6 +199,10 @@ export async function handleAuthorizeGet(request: Request): Promise<Response> {
     return html(renderErrorPage('Invalid redirect', 'The application supplied a redirect address it did not register.'), 400);
   }
   const state = q('state');
+  if (state !== undefined && state.length > MAX_STATE_LENGTH) {
+    // Not echoed back: the whole point is that it is too long to carry around.
+    return redirectError(redirectUri, 'invalid_request', `state must be at most ${MAX_STATE_LENGTH} characters`);
+  }
   if (q('response_type') !== 'code') return redirectError(redirectUri, 'unsupported_response_type', 'response_type must be "code"', state);
   const codeChallenge = q('code_challenge');
   if (!isValidCodeChallenge(codeChallenge)) return redirectError(redirectUri, 'invalid_request', 'A PKCE code_challenge is required', state);
@@ -260,12 +272,13 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
     const email = (params.email || '').trim();
     const password = params.password || '';
     if (!email || !password) return loginPage(rq, { email, error: 'Enter your email and password.' }, 400);
+    if (email.length > MAX_EMAIL_LENGTH) return loginPage(rq, { email: '', error: 'Enter a valid email address.' }, 400);
     const keys = throttleKeys(ctx.ip, email);
     if (await anyThrottled(keys)) return loginPage(rq, { email, error: THROTTLED_MESSAGE }, 429);
 
     try {
       const outcome = await backendLogin(email, password, ctx);
-      return await completeLogin(rq, outcome, ctx);
+      return await completeLogin(rq, outcome, ctx, email.toLowerCase());
     } catch (error) {
       await recordFailure(keys);
       return loginPage(rq, { email, error: bridgeErrorMessage(error, 'Sign-in failed. Please try again.') }, pageStatusFor(error));
@@ -275,20 +288,20 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
   if (step === 'otp' || step === 'otp_resend') {
     const chal = open<ChallengePayload>('chal', params.chal);
     if (!chal) return html(renderErrorPage('Verification expired', 'This verification step has expired. Go back to the application and connect again.'), 400);
-    const keys = throttleKeys(ctx.ip, chal.me);
-    if (await anyThrottled(keys)) return otpPage(chal.rq, chal.ct, chal.me, THROTTLED_MESSAGE);
+    const keys = throttleKeys(ctx.ip, chal.em ?? chal.me);
+    if (await anyThrottled(keys)) return otpPage(chal.rq, chal.ct, chal.me, THROTTLED_MESSAGE, chal.em);
 
     if (step === 'otp_resend') {
       try {
         const sent = await backendSendOtp(chal.ct, ctx);
-        return otpPage(chal.rq, chal.ct, sent.maskedEmail || chal.me, 'A new code is on its way.');
+        return otpPage(chal.rq, chal.ct, sent.maskedEmail || chal.me, 'A new code is on its way.', chal.em);
       } catch (error) {
-        return otpPage(chal.rq, chal.ct, chal.me, bridgeErrorMessage(error, 'Could not resend the code.'));
+        return otpPage(chal.rq, chal.ct, chal.me, bridgeErrorMessage(error, 'Could not resend the code.'), chal.em);
       }
     }
 
     const code = (params.code || '').trim();
-    if (!code) return otpPage(chal.rq, chal.ct, chal.me, 'Enter the code from your email.');
+    if (!code) return otpPage(chal.rq, chal.ct, chal.me, 'Enter the code from your email.', chal.em);
     try {
       const session = await backendVerifyOtp(chal.ct, code, ctx);
       return successRedirect(chal.rq, session);
@@ -298,7 +311,7 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
         // Challenge consumed/expired → start over with the original request intact.
         return loginPage(chal.rq, { error: 'That verification session has expired. Please sign in again.' }, 401);
       }
-      return otpPage(chal.rq, chal.ct, chal.me, bridgeErrorMessage(error, 'Verification failed.'));
+      return otpPage(chal.rq, chal.ct, chal.me, bridgeErrorMessage(error, 'Verification failed.'), chal.em);
     }
   }
 
@@ -356,9 +369,23 @@ const SOCIAL_ERROR_MESSAGES: Record<string, { message: string; status: number }>
 };
 const SOCIAL_ERROR_FALLBACK = { message: 'Social sign-in did not complete. Please try again, or sign in with your email and password.', status: 400 };
 
+/**
+ * Over https the cookie carries the `__Host-` prefix: browsers then refuse to
+ * accept it from any other host (no sibling-subdomain "cookie tossing"), which
+ * requires `Secure`, `Path=/` and no `Domain`. Plain http (local dev) cannot
+ * use the prefix, so it falls back to the bare name scoped to the callback path.
+ */
+function isSecureOrigin(request: Request): boolean {
+  return publicBaseUrl(request).startsWith('https://');
+}
+function socialCookieName(request: Request): string {
+  return isSecureOrigin(request) ? `__Host-${SOCIAL_COOKIE}` : SOCIAL_COOKIE;
+}
 function socialCookie(value: string, maxAge: number, request: Request): string {
-  const secure = publicBaseUrl(request).startsWith('https://') ? '; Secure' : '';
-  return `${SOCIAL_COOKIE}=${value}; Path=${SOCIAL_COOKIE_PATH}; Max-Age=${maxAge}; HttpOnly; SameSite=Lax${secure}`;
+  if (isSecureOrigin(request)) {
+    return `${socialCookieName(request)}=${value}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax; Secure`;
+  }
+  return `${SOCIAL_COOKIE}=${value}; Path=${SOCIAL_COOKIE_PATH}; Max-Age=${maxAge}; HttpOnly; SameSite=Lax`;
 }
 
 function cookieValue(request: Request, name: string): string | undefined {
@@ -416,6 +443,17 @@ export async function handleSocialStartGet(request: Request): Promise<Response> 
   const nonce = crypto.randomBytes(16).toString('base64url');
   const bound = sealRequest({ ...unbound(rq), sn: nonce });
   const returnTo = `${publicBaseUrl(request)}/oauth/social/callback?req=${encodeURIComponent(bound)}`;
+  if (returnTo.length > SOCIAL_RETURN_TO_MAX_LENGTH) {
+    // The backend caps return_to at the width of its state column and would
+    // bounce the user to the Splitt web login instead of back here.
+    return html(
+      renderErrorPage(
+        'Sign-in request too large',
+        'This app\'s sign-in request is too long for social sign-in (its redirect address or state is unusually large). Sign in with your email and password instead, or ask the app to shorten its request.',
+      ),
+      400,
+    );
+  }
   const location = `${backendBaseUrl()}/auth/${provider}?return_to=${encodeURIComponent(returnTo)}`;
   return new Response(null, {
     status: 302,
@@ -435,7 +473,7 @@ export async function handleSocialCallbackGet(request: Request): Promise<Respons
 
   const bound = open<AuthorizeRequestPayload>('req', q('req'));
   if (!bound) return done(html(renderErrorPage('Sign-in expired', EXPIRED_MESSAGE), 400));
-  if (!nonceMatches(cookieValue(request, SOCIAL_COOKIE), bound.sn)) {
+  if (!nonceMatches(cookieValue(request, socialCookieName(request)), bound.sn)) {
     return done(
       html(
         renderErrorPage(

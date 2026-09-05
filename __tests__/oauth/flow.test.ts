@@ -352,6 +352,121 @@ describe('OAuth 2.1 flow', () => {
     expect(tokenRes.status).toBe(200);
   });
 
+  /** Sign in as r@x.test up to the OTP step; the backend mock answers verify with `verifyError`. */
+  async function otpStep(loginEmail = 'r@x.test') {
+    const clientId = await registerClient();
+    const { challenge } = pkce();
+    const html = await (await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' })))).text();
+    const req = hidden(html, 'req');
+    const { BackendApiError } = jest.requireMock('../../src/lib/backend-client');
+    const state = { sent: [] as string[], verifyError: new BackendApiError(400, 'Invalid verification code') as Error };
+    mockBackendRequest.mockImplementation(async (method: string, path: string) => {
+      state.sent.push(path);
+      if (path === '/users/login') return { twoFactorRequired: true, challengeToken: 'c'.repeat(64), methods: ['email_otp'], defaultMethod: 'email_otp', maskedEmail: 'r***@x.test', expiresAt: new Date(Date.now() + 600_000).toISOString() };
+      if (path === '/auth/2fa/otp/send') return { success: true, maskedEmail: 'r***@x.test', resendAvailableAt: new Date().toISOString() };
+      if (path === '/auth/2fa/otp/verify') throw state.verifyError;
+      throw new Error(`unexpected ${method} ${path}`);
+    });
+    const otpHtml = await (await authorizePost(form({ step: 'login', req, email: loginEmail, password: 'pw' }, `${BASE}/oauth/authorize`))).text();
+    const chal = hidden(otpHtml, 'chal');
+    state.sent.length = 0;
+    return { chal, req, state, BackendApiError };
+  }
+
+  it('OTP step: an empty code re-prompts, a wrong code stays on the OTP page, resend sends again, an expired challenge returns to sign-in', async () => {
+    const { chal, state, BackendApiError } = await otpStep();
+
+    const empty = await authorizePost(form({ step: 'otp', chal, code: '   ' }, `${BASE}/oauth/authorize`));
+    expect(empty.status).toBe(200);
+    expect(await empty.text()).toContain('Enter the code from your email.');
+    expect(state.sent).toEqual([]); // nothing guessed, nothing sent
+
+    const wrong = await authorizePost(form({ step: 'otp', chal, code: '000000' }, `${BASE}/oauth/authorize`));
+    expect(wrong.status).toBe(200);
+    const wrongHtml = await wrong.text();
+    expect(wrongHtml).toContain('Invalid verification code');
+    expect(wrongHtml).toContain('name="chal"'); // same challenge, try again
+    expect(state.sent).toEqual(['/auth/2fa/otp/verify']);
+
+    state.sent.length = 0;
+    const resend = await authorizePost(form({ step: 'otp_resend', chal }, `${BASE}/oauth/authorize`));
+    expect(resend.status).toBe(200);
+    expect(await resend.text()).toContain('A new code is on its way.');
+    expect(state.sent).toEqual(['/auth/2fa/otp/send']);
+
+    // The backend says the challenge is gone (consumed or expired): back to the
+    // sign-in form with the original OAuth request intact, never a dead end.
+    state.verifyError = new BackendApiError(401, 'Challenge expired');
+    const expired = await authorizePost(form({ step: 'otp', chal, code: '123456' }, `${BASE}/oauth/authorize`));
+    expect(expired.status).toBe(401);
+    const expiredHtml = await expired.text();
+    expect(expiredHtml).toContain('That verification session has expired. Please sign in again.');
+    expect(expiredHtml).toContain('name="req"');
+
+    const bogus = await authorizePost(form({ step: 'otp', chal: 'smg_ch.bogus', code: '123456' }, `${BASE}/oauth/authorize`));
+    expect(bogus.status).toBe(400);
+    expect(await bogus.text()).toContain('Verification expired');
+
+    const unknownStep = await authorizePost(form({ step: 'magic', chal }, `${BASE}/oauth/authorize`));
+    expect(unknownStep.status).toBe(400);
+  });
+
+  it('counts failed OTP guesses against the real account email (not the masked one), so they throttle the password form too', async () => {
+    // Sign in with odd casing: the throttle key is the lower-cased real address.
+    const { chal, state } = await otpStep('R@X.test');
+    for (let i = 0; i < 10; i++) {
+      const res = await authorizePost(form({ step: 'otp', chal, code: '000000' }, `${BASE}/oauth/authorize`));
+      expect(res.status).toBe(200);
+    }
+    expect(state.sent.filter((p) => p === '/auth/2fa/otp/verify')).toHaveLength(10);
+
+    // Guess eleven: throttled before any backend call.
+    const throttled = await authorizePost(form({ step: 'otp', chal, code: '000000' }, `${BASE}/oauth/authorize`));
+    expect(throttled.status).toBe(200);
+    expect(await throttled.text()).toContain('Too many sign-in attempts');
+    expect(state.sent.filter((p) => p === '/auth/2fa/otp/verify')).toHaveLength(10);
+
+    // The same account from ANOTHER network is throttled on the password form
+    // (per-email key), while a different account from that network is not.
+    const clientId = await registerClient();
+    const { challenge } = pkce();
+    const html = await (await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' })))).text();
+    const req = hidden(html, 'req');
+    const otherNet = { 'x-real-ip': '198.51.100.7' };
+    const sameAccount = await authorizePost(form({ step: 'login', req, email: 'r@x.test', password: 'pw' }, `${BASE}/oauth/authorize`, otherNet));
+    expect(sameAccount.status).toBe(429);
+    expect(state.sent).not.toContain('/users/login');
+    mockBackendRequest.mockImplementation(async () => ({ accessToken: backendAccess, refreshToken: 'brt-2', user: { id: 'user-2', email: 'other@x.test', role: 'renter' } }));
+    const otherAccount = await authorizePost(form({ step: 'login', req, email: 'other@x.test', password: 'pw' }, `${BASE}/oauth/authorize`, otherNet));
+    expect(otherAccount.status).toBe(302);
+  });
+
+  it('caps state at 512 characters (redirected as invalid_request without echoing it) and the sign-in email at 254', async () => {
+    const clientId = await registerClient();
+    const { challenge } = pkce();
+    const base = { response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' };
+
+    const tooLong = await authorizeGet(new Request(authorizeUrl({ ...base, state: 'x'.repeat(513) })));
+    expect(tooLong.status).toBe(302);
+    const loc = new URL(tooLong.headers.get('location')!);
+    expect(loc.origin + loc.pathname).toBe(REDIRECT);
+    expect(loc.searchParams.get('error')).toBe('invalid_request');
+    expect(loc.searchParams.get('error_description')).toContain('512');
+    expect(loc.searchParams.has('state')).toBe(false);
+
+    const atCap = await authorizeGet(new Request(authorizeUrl({ ...base, state: 'x'.repeat(512) })));
+    expect(atCap.status).toBe(200);
+    const req = hidden(await atCap.text(), 'req');
+
+    const longEmail = `${'a'.repeat(250)}@x.test`;
+    const res = await authorizePost(form({ step: 'login', req, email: longEmail, password: 'pw' }, `${BASE}/oauth/authorize`));
+    expect(res.status).toBe(400);
+    const html = await res.text();
+    expect(html).toContain('Enter a valid email address.');
+    expect(html).not.toContain(longEmail); // not echoed back into the form
+    expect(mockBackendRequest.mock.calls.some((c) => c[1] === '/users/login')).toBe(false);
+  });
+
   it('never redirects on an unknown client or unregistered redirect_uri, and redirects other errors', async () => {
     const clientId = await registerClient();
     const unknown = await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: 'smg_c.forged.sig', redirect_uri: REDIRECT, code_challenge: 'x'.repeat(43), code_challenge_method: 'S256' })));

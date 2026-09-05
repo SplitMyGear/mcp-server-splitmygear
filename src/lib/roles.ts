@@ -23,9 +23,15 @@ export function canActAsVendor(role?: string): boolean {
   return isVendorFamily(role) || isAdmin(role);
 }
 
-/** May read vendor earnings/payouts/Stripe status (owner or manager seat, or admin). */
+/**
+ * May read vendor earnings/payouts/Stripe status. The backend gates these
+ * routes with `@Roles(VENDOR_OWNER, VENDOR_MANAGER)` AND
+ * `@VendorPermissions(ACCESS_PAYOUTS)`, and its seat matrix grants
+ * ACCESS_PAYOUTS to the owner seat only, so a manager passes the role gate and
+ * is then denied. In practice: owner seat or admin.
+ */
 export function canViewVendorFinance(role?: string): boolean {
-  return role === 'vendor_owner' || role === 'vendor_manager' || isAdmin(role);
+  return role === 'vendor_owner' || isAdmin(role);
 }
 
 /** May start Stripe Connect onboarding / request payouts (owner seat or admin). */

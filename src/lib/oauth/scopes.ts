@@ -20,15 +20,15 @@ export type { ToolScope };
 /** One plain sentence per scope: what the connected app will be able to do. */
 export const SCOPE_DESCRIPTIONS: Record<ToolScope, string> = {
   read: 'Search and read public listings, experiences, availability, prices and reviews.',
-  profile: 'See and update your account profile, settings and notifications.',
-  bookings: 'See, create, change and cancel your gear and experience bookings, and pay for them through Stripe links.',
+  profile: 'See and update your account profile, settings, notifications, trust score and personalised recommendations.',
+  bookings: 'See, create, change and cancel bookings you are part of as renter or as the gear owner (rentals, experiences, services), pay through Stripe links, sign waivers and complete pickup and return checks.',
   favorites: 'See and manage your saved listings, searches and trips.',
   messaging: 'Read your conversations and send messages on your behalf.',
-  reviews: 'Write, edit and delete your reviews.',
+  reviews: 'Write, edit and delete your reviews and, for vendors, respond to reviews of your listings.',
   listings: 'Create and manage your listings, pricing, availability and vendor catalogue.',
-  vendor_bookings: 'Handle bookings on your listings: accept, decline, reschedule and update them.',
+  vendor_bookings: 'Vendor-only booking operations on your listings: incoming bookings, overdue and return status, reschedule proposals, private notes, auto-approve and booking risk.',
   experiences: 'Create and manage the experiences and schedules you host.',
-  finance: 'See your earnings, payouts, promotions, tax and financial reports.',
+  finance: 'See your payment and transaction history and, for vendors, earnings, payouts, promotions, tax and financial reports.',
   claims: 'File and manage claims, disputes and incidental charges.',
   files: 'Upload photos and documents for you.',
 };

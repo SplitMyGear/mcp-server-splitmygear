@@ -86,29 +86,27 @@ integration + adversarial review pass by the main loop.
       vendor onboarding, vendor extras (payout details, promotions, tax,
       trust), booking verification, account security, services
 - [x] Integrate (defs index, docs regen, README/ADR/env), verify, commit, push
-- [ ] Adversarial review workflow over the diff; fix; push; backend PR;
+- [x] Adversarial review workflow over the diff; fix; push; backend PR (#734);
       update PR #34 body
 
 ## Deferred (documented follow-ups, not in this pass)
 
-- Distributed rate limiting (needs a shared store such as Upstash)
-- Seasonal rate rules, dynamic pricing config, fleet units, iCal feeds,
-  message templates, insurance, waivers, claims/disputes/incidental charges
-  (evidence uploads need file transfer), search alerts, saved trips, routes
-- Scoped OAuth tokens (per-capability scopes) — authorization today is the
-  backend's role model, re-checked on every forwarded call
-- Social (Google/Apple) sign-in on the hosted login page (users set a
-  password first)
+- Account deletion, password change and 2FA enrol/disable as tools (they
+  need passwords/codes typed by the user; keep them in the web UI)
+- KYC document upload (browser Blob flow)
+- SHA-pinning GitHub Actions (needs verified tag SHAs)
+- Per-link update endpoint for listing routes (backend), so attach/detach
+  need not read-modify-write the whole link set
 
 ## Review
 
-**Shipped on `claude/splitmygear-mcp-production-0rr5t7` (MCP repo only; no
-backend/frontend/CRM changes were needed).**
+**Shipped on `claude/splitmygear-mcp-production-0rr5t7` (MCP PR #34 plus the
+backend `return_to` change in PR #734; no frontend/CRM changes).**
 
-- 74 role-aware tools (was 18, none of which had a description): 11 public,
-  33 signed-in-user, 2 renter-only, 24 vendor, 3 owner/manager finance,
-  1 owner. `tools/list` is filtered per principal; handlers re-gate; the
-  backend enforces everything again.
+- 219 role- and scope-aware tools (was 18, none of which had a description):
+  24 public, 89 signed-in-user, 2 renter-only, 98 vendor, 6 vendor-owner.
+  `tools/list` is filtered per principal and per granted scope; handlers
+  re-gate; the backend enforces everything again.
 - OAuth 2.1 sign-in for MCP clients: RFC 9728/8414 discovery, RFC 7591 DCR
   (signed stateless client ids), hosted Splitt sign-in page with email-OTP 2FA,
   PKCE-S256-only codes, wrapped access/refresh tokens, RFC 7009 revocation,
@@ -121,8 +119,8 @@ backend/frontend/CRM changes were needed).**
   per-IP login throttle, body-size caps, sanitized errors, stale supabase/stripe
   config removed, secrets never logged.
 - Quality gates: ESLint config + CI (lint, typecheck, jest+coverage, build,
-  prod dependency audit); 179 tests incl. a full OAuth flow against a mocked
-  backend; docs and DXT manifest generated from the registry and diffed in CI.
+  prod dependency audit); 490+ tests incl. full OAuth, scope and social flows
+  against a mocked backend; docs and DXT manifest generated from the registry and diffed in CI.
 - Independent security review (subagent) found 0 critical/high, 4 medium,
   8 low; all fixed: raw JWT path now requires signature verification,
   same-origin gate on the sign-in form, proxy-header trust gated and validated,

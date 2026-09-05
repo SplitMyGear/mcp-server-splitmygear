@@ -269,7 +269,7 @@ export const attachRouteToListing = defineTool({
   title: 'Attach route to listing',
   description:
     'Show one of the vendor\'s library routes on one of their listings (appended after the routes already attached; at most ' + MAX_LINKED_ROUTES_PER_LISTING +
-    ' per listing). Already attached is a no-op. Both the route and the listing must belong to the signed-in vendor. Use set_listing_routes to reorder or replace the whole set.',
+    ' per listing). Already attached is a no-op. Both the route and the listing must belong to the signed-in vendor. Use set_listing_routes to reorder or replace the whole set. Caution: the listing\'s current link set is read back and re-saved in full, and routes hidden by moderation or archived are not visible in that read, so their links can be dropped; use set_listing_routes when you know the exact set you want.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: { listingId: uuid('listing'), routeId: uuid('library route') },
@@ -301,7 +301,7 @@ export const detachRouteFromListing = defineTool({
   title: 'Detach route from listing',
   description:
     'Stop showing a library route on a listing. The route itself stays in the vendor\'s library and on any other listing. Returns wasAttached:false if it was not attached. ' +
-    'For a legacy per-listing route card use delete_listing_route instead. Confirm with the user first.',
+    'For a legacy per-listing route card use delete_listing_route instead. Confirm with the user first. Caution: the listing\'s current link set is read back and re-saved in full, and routes hidden by moderation or archived are not visible in that read, so their links can be dropped; use set_listing_routes when you know the exact set you want.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: { listingId: uuid('listing'), routeId: uuid('library route') },

@@ -17,7 +17,7 @@ export const MAINTENANCE_KINDS = ['service', 'repair', 'inspection'] as const;
 
 /** `CreateUnitDto` fields (all optional). */
 const unitFields = {
-  label: z.string().min(1).max(120).optional().describe('Human-readable name staff use, e.g. "Unit #3" or "Blue Trek".'),
+  label: z.string().min(1).max(64).optional().describe('Human-readable name staff use, e.g. "Unit #3" or "Blue Trek" (max 64 chars).'),
   serialNumber: z.string().min(1).max(120).optional().describe('Serial number or asset tag.'),
   notes: z.string().max(2000).optional().describe('Private notes: damage history, quirks. Renters never see these.'),
   maintenanceIntervalHours: z.number().min(1).max(100000).optional().describe('Rental hours between services; the unit is flagged when its accumulated rental hours reach this.'),
@@ -97,7 +97,7 @@ export const addFleetUnits = defineTool({
     'Add physical units to one of the vendor\'s listings. New units start as available and increase the listing\'s bookable capacity. ' +
     'count=1 (default) creates one unit with any of the identity fields (label, serialNumber, VIN/HIN, make, model, year, acquisitionValue, notes, maintenanceIntervalHours). ' +
     'count>1 creates that many identical stubs labeled "<label> 1", "<label> 2"... (label defaults to "Unit"); identity fields are not allowed in bulk mode, set them afterwards with update_fleet_unit. ' +
-    'A listing is capped at 200 units. Returns the created unit(s).',
+    'Bulk creation is capped at 200 units per call. Returns the created unit(s).',
   access: 'vendor',
   scope: 'listings',
   inputSchema: {

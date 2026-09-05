@@ -123,6 +123,20 @@ describe('accountSecurityTools (backend module)', () => {
       expect(res.data).not.toHaveProperty('pageViews');
     });
 
+    it('export_my_data refuses a scoped connection (the export spans every scope) and serves a full grant', async () => {
+      const partial = await exportMyData.handler({ summaryOnly: true }, { ...ctx, scopes: ['profile', 'bookings'] });
+      expect(partial.isError).toBe(true);
+      expect(text(partial)).toContain('full-access connection');
+      expect(mockBackendRequest).not.toHaveBeenCalled();
+
+      mockBackendRequest.mockResolvedValue(payload);
+      const everyScope = await exportMyData.handler({ summaryOnly: true }, { ...ctx, scopes: [...TOOL_SCOPES] });
+      expect(everyScope.isError).toBeUndefined();
+      const unrestricted = await exportMyData.handler({ summaryOnly: true }, ctx);
+      expect(unrestricted.isError).toBeUndefined();
+      expect(mockBackendRequest).toHaveBeenCalledTimes(2);
+    });
+
     it('propagates backend errors (e.g. the 3/min throttle)', async () => {
       mockBackendRequest.mockRejectedValue(new BackendApiError(429, 'ThrottlerException: Too Many Requests'));
       expect(await accountSecurityTools.exportMyData(T)).toEqual({ ok: false, error: 'ThrottlerException: Too Many Requests', status: 429 });

@@ -32,7 +32,8 @@ describe('helpers', () => {
   it('sniffs the supported content types and rejects others', () => {
     expect(sniffContentType(PNG)).toBe('image/png');
     expect(sniffContentType(JPEG)).toBe('image/jpeg');
-    expect(sniffContentType(GIF)).toBe('image/gif');
+    // GIF is deliberately unsupported: the backend stores it as application/octet-stream.
+    expect(sniffContentType(GIF)).toBeNull();
     expect(sniffContentType(WEBP)).toBe('image/webp');
     expect(sniffContentType(PDF)).toBe('application/pdf');
     expect(sniffContentType(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'))).toBeNull();
@@ -88,7 +89,7 @@ describe('filesApi.uploadFile', () => {
   });
 
   it('accepts every declared folder and content type', async () => {
-    const samples: Record<(typeof UPLOAD_CONTENT_TYPES)[number], Buffer> = { 'image/jpeg': JPEG, 'image/png': PNG, 'image/webp': WEBP, 'image/gif': GIF, 'application/pdf': PDF };
+    const samples: Record<(typeof UPLOAD_CONTENT_TYPES)[number], Buffer> = { 'image/jpeg': JPEG, 'image/png': PNG, 'image/webp': WEBP, 'application/pdf': PDF };
     for (const folder of UPLOAD_FOLDERS) {
       for (const contentType of UPLOAD_CONTENT_TYPES) {
         const result = await filesApi.uploadFile(T, { folder, contentType, base64: samples[contentType].toString('base64') });
@@ -107,7 +108,7 @@ describe('filesApi.uploadFile', () => {
     });
     expect(await filesApi.uploadFile(T, { folder: 'claims', contentType: 'image/png', base64: Buffer.from('<html>hi</html>').toString('base64') })).toEqual({
       ok: false,
-      error: 'The file content is not a recognised JPEG, PNG, WebP, GIF or PDF.',
+      error: 'The file content is not a recognised JPEG, PNG, WebP or PDF.',
     });
     expect(await filesApi.uploadFile(T, { folder: 'claims', contentType: 'image/png', base64: '***' })).toEqual({ ok: false, error: 'base64 content is malformed.' });
     expect(await filesApi.uploadFile(T, { folder: 'nope' as never, contentType: 'image/png', base64: PNG64 })).toEqual({ ok: false, error: 'Unknown upload folder.' });

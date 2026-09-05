@@ -10,6 +10,8 @@ const FOLDER_NEXT_STEP: Record<(typeof UPLOAD_FOLDERS)[number], string> = {
   'incidental-charges': 'Pass this url as an evidence item url in file_incidental_charge.',
   inspections: 'Pass this url to the booking inspection / verification tool.',
   listings: 'Pass this url in create_listing or update_listing imageUrls.',
+  experiences: 'Pass this url in create_experience or update_experience imageUrls.',
+  services: 'Pass this url in create_service or update_service imageUrls.',
   insurance: 'Pass this url as the documentUrl of the vendor insurance policy tool.',
   'profile-photos': 'Pass this url as profileImageUrl in update_my_profile.',
   general: 'Reference this url from the tool that needs it.',
@@ -23,7 +25,7 @@ export const uploadFile = defineTool({
     'incidental charge, or to add listing / profile photos, then pass the returned url to the relevant tool. ' +
     'The folder must match where the file will be used: dispute evidence goes to "disputes", damage-claim evidence to "claims", incidental-charge evidence to ' +
     '"incidental-charges" (these are stored privately and are only accepted by that process); listing photos to "listings", profile photos to "profile-photos". ' +
-    `Accepts JPEG, PNG, WebP, GIF or PDF up to ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB, sent as base64. Only upload files the user has provided and asked to attach; never fabricate evidence.`,
+    `Accepts JPEG, PNG, WebP or PDF up to ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB, sent as base64. Only upload files the user has provided and asked to attach; never fabricate evidence.`,
   access: 'user',
   scope: 'files',
   inputSchema: {

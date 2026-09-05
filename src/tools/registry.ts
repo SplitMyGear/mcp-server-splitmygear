@@ -122,7 +122,7 @@ const ACCESS_DENIED: Record<Exclude<ToolAccess, 'public'>, string> = {
   user: 'This tool acts as a signed-in Splitt user. Connect with your Splitt account (OAuth) or a user Bearer token; the operator key cannot use it.',
   renter: 'Only renter accounts can create rental bookings on Splitt. Sign in with a renter account.',
   vendor: 'This tool is for Splitt vendors. Sign in with a vendor account (or apply to become a vendor at https://go-splitt.com/partners).',
-  vendor_finance: 'Earnings and payout data are available to vendor owner/manager seats only.',
+  vendor_finance: 'Earnings and payout data are available to the vendor owner seat only (the backend requires the payouts permission).',
   vendor_owner: 'Only the vendor owner seat can manage Stripe Connect and payouts.',
 };
 
