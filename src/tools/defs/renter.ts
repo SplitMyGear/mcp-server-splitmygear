@@ -55,7 +55,9 @@ export const updateMyProfile = defineTool({
 export const getVendorOnboardingStatus = defineTool({
   name: 'get_vendor_onboarding_status',
   title: 'Vendor onboarding status',
-  description: 'Where the signed-in user is in the become-a-vendor pipeline (not_started → applied → profile → Stripe → waiver → admin review → active) and what to do next at https://go-splitt.com/vendor/onboarding.',
+  description:
+    'Where the signed-in user is in the become-a-vendor pipeline (not_started, applied, profile_pending, stripe_pending, waiver_pending, admin_review, active) and what to do next. ' +
+    'The steps can be completed with apply_to_become_vendor, start_vendor_onboarding, complete_vendor_business_profile, start_vendor_stripe_onboarding, confirm_vendor_stripe and sign_vendor_agreement, or in the web app at https://go-splitt.com/vendor/onboarding.',
   access: 'user',
   scope: 'profile',
   inputSchema: {},
