@@ -20,6 +20,7 @@ export const searchListings = defineTool({
     'Follow up with get_listing_details for full info and check_availability / get_booking_quote before booking. ' +
     UNTRUSTED_NOTE,
   access: 'public',
+  scope: 'read',
   inputSchema: {
     query: z.string().max(500).optional().describe('Natural-language search (semantic). Optional.'),
     location: z.string().max(200).optional().describe('City, neighbourhood or area to search in.'),
@@ -48,6 +49,7 @@ export const getListingDetails = defineTool({
     'Full details for one listing: description, pricing (per day/hour, deposit, delivery, discounts), cancellation policy, ' +
     'location, images, add-ons, owner and rating. Signed-in owners also see their private fields. ' + UNTRUSTED_NOTE,
   access: 'public',
+  scope: 'read',
   inputSchema: { listingId: uuid('listing') },
   annotations: READ,
   handler: async ({ listingId }, ctx) => {
@@ -64,6 +66,7 @@ export const checkAvailability = defineTool({
   title: 'Check availability',
   description: 'Check whether a listing is free for a date range. Returns available:true/false with a short reason. Use before creating a booking.',
   access: 'public',
+  scope: 'read',
   inputSchema: {
     listingId: uuid('listing'),
     checkIn: isoDate('Rental start date'),
@@ -83,6 +86,7 @@ export const getListingCalendar = defineTool({
   title: 'Get availability calendar',
   description: 'Day-by-day availability for a listing over a window (max 92 days); use it to suggest alternative dates when the requested ones are taken.',
   access: 'public',
+  scope: 'read',
   inputSchema: { listingId: uuid('listing'), from: isoDate('Window start'), to: isoDate('Window end') },
   annotations: READ,
   handler: async ({ listingId, from, to }) => {
@@ -101,6 +105,7 @@ export const getSimilarListings = defineTool({
   title: 'Find similar gear',
   description: 'Semantically similar listings to a given one (same kind of gear, nearby price/location). Good for alternatives when something is unavailable.',
   access: 'public',
+  scope: 'read',
   inputSchema: { listingId: uuid('listing'), limit: z.number().int().min(1).max(20).optional().default(5) },
   annotations: READ,
   handler: async ({ listingId, limit }) => ok(await listingTools.getSimilarListings(listingId, limit)),
@@ -111,6 +116,7 @@ export const getListingReviews = defineTool({
   title: 'Get listing reviews',
   description: 'Rating summary and individual reviews for a listing, including any vendor responses. ' + UNTRUSTED_NOTE,
   access: 'public',
+  scope: 'read',
   inputSchema: { listingId: uuid('listing') },
   annotations: READ,
   handler: async ({ listingId }) => fromResult(await reviewTools.getListingReviews(listingId)),
@@ -123,6 +129,7 @@ export const getBookingQuote = defineTool({
     'Server-authoritative price breakdown for a rental BEFORE booking: nightly rates, discounts, protection premium, add-ons, delivery, fees, deposit and total. ' +
     'No booking is created. Use it to show the renter what they will pay; create_booking uses the same pricing.',
   access: 'public',
+  scope: 'read',
   inputSchema: {
     listingId: uuid('listing'),
     startDate: isoDate('Rental start date'),
@@ -147,6 +154,7 @@ export const suggestListingPrice = defineTool({
   title: 'Suggest a listing price',
   description: 'Market-based daily price suggestion for a gear category (optionally in a location): suggested price, market average/median/min/max, competitor count and confidence.',
   access: 'public',
+  scope: 'read',
   inputSchema: {
     category: z.enum(LISTING_CATEGORIES).describe('Gear category.'),
     location: z.string().max(200).optional().describe('City/area for a local market read.'),
@@ -160,6 +168,7 @@ export const analyzeCompetitorPricing = defineTool({
   title: 'Analyze competitor pricing',
   description: "Compare a listing's current price with the local market for its category (average, median, range, suggested price).",
   access: 'public',
+  scope: 'read',
   inputSchema: { listingId: uuid('listing') },
   annotations: READ,
   handler: async ({ listingId }) => {
@@ -176,6 +185,7 @@ export const searchExperiences = defineTool({
   title: 'Search experiences',
   description: 'Browse guided outdoor experiences, tours, workshops and classes on Splitt (optionally by location and category). ' + UNTRUSTED_NOTE,
   access: 'public',
+  scope: 'read',
   inputSchema: {
     location: z.string().max(200).optional(),
     category: z.enum(['tours', 'food', 'outdoor', 'arts', 'fitness', 'wellness', 'music', 'sports', 'workshop', 'photography', 'other']).optional(),
@@ -192,6 +202,7 @@ export const getExperienceDetails = defineTool({
   title: 'Get experience details',
   description: 'Full details for an experience plus its upcoming schedule slots (scheduleId, date, start time, spots left, price). ' + UNTRUSTED_NOTE,
   access: 'public',
+  scope: 'read',
   inputSchema: { experienceId: uuid('experience') },
   annotations: READ,
   handler: async ({ experienceId }) => {

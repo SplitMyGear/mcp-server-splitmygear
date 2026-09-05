@@ -25,6 +25,27 @@ import { canActAsVendor, canBookRentals, canManageVendorPayouts, canViewVendorFi
 
 export type ToolAccess = 'public' | 'user' | 'renter' | 'vendor' | 'vendor_finance' | 'vendor_owner';
 
+/**
+ * OAuth scope a tool belongs to. A connection may be granted a subset of
+ * scopes at sign-in; tools outside the granted set are neither listed nor
+ * callable on that connection. Role/access checks still apply on top.
+ */
+export const TOOL_SCOPES = [
+  'read',
+  'profile',
+  'bookings',
+  'favorites',
+  'messaging',
+  'reviews',
+  'listings',
+  'vendor_bookings',
+  'experiences',
+  'finance',
+  'claims',
+  'files',
+] as const;
+export type ToolScope = (typeof TOOL_SCOPES)[number];
+
 export interface ToolContext {
   userId?: string;
   role?: string;
@@ -39,6 +60,7 @@ export interface ToolDef<Shape extends ZodRawShape = ZodRawShape> {
   title: string;
   description: string;
   access: ToolAccess;
+  scope: ToolScope;
   inputSchema: Shape;
   annotations: ToolAnnotations;
   handler: (args: objectOutputType<Shape, ZodTypeAny>, ctx: ToolContext) => Promise<CallToolResult>;

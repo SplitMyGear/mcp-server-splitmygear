@@ -1,7 +1,7 @@
 export {};
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { defineTool, isToolVisible, registerTools, ok, fail, fromResult, type ToolContext } from '../src/tools/registry';
+import { defineTool, isToolVisible, registerTools, ok, fail, fromResult, TOOL_SCOPES, type ToolContext } from '../src/tools/registry';
 import { ALL_TOOLS } from '../src/tools/defs';
 import { canActAsVendor, canBookRentals, canManageVendorPayouts, canViewVendorFinance, isVendorFamily } from '../src/lib/roles';
 
@@ -55,6 +55,7 @@ describe('tool visibility', () => {
     expect(names(owner)).toContain('start_stripe_connect_onboarding');
     expect(names(admin).length).toBe(ALL_TOOLS.length);
     for (const t of ALL_TOOLS) {
+      expect(TOOL_SCOPES).toContain(t.scope);
       expect(t.title.length).toBeGreaterThan(2);
       expect(t.description.length).toBeGreaterThan(30);
       expect(t.description).not.toMatch(/—/);
@@ -67,7 +68,7 @@ describe('tool visibility', () => {
     const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
     const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js');
     const boom = defineTool({
-      name: 'boom', title: 'Boom', description: 'throws for the test, long enough description here', access: 'user',
+      name: 'boom', title: 'Boom', description: 'throws for the test, long enough description here', access: 'user', scope: 'profile',
       inputSchema: { x: z.string() }, annotations: { readOnlyHint: true },
       handler: async () => { throw new Error('kaboom'); },
     });
