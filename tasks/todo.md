@@ -70,22 +70,22 @@ security as the first constraint. All work on `claude/splitmygear-mcp-production
 Orchestrated as one parallel workflow (15 agents on disjoint files) plus an
 integration + adversarial review pass by the main loop.
 
-- [ ] Scoped OAuth tokens: scope taxonomy declared on every tool (done);
+- [x] Scoped OAuth tokens: scope taxonomy declared on every tool (done);
       enforcement in envelopes, authorize/consent page, token/refresh
       narrowing, middleware, registry visibility, metadata, generated docs
-- [ ] Distributed rate limiting: Upstash Redis REST shared store (no deps),
+- [x] Distributed rate limiting: Upstash Redis REST shared store (no deps),
       fixed-window MCP limiter with in-memory fail-open fallback; login
       throttle and code replay cache wired to the same store
-- [ ] Social sign-in on the hosted page: backend `return_to` (allow-listed
+- [x] Social sign-in on the hosted page: backend `return_to` (allow-listed
       origins, persisted on the CSRF state row, migration) + MCP
       /oauth/social/start and /oauth/social/callback using the one-time
       exchange code
-- [ ] New tool domains: uploads + disputes/claims/incidental charges, rate
+- [x] New tool domains: uploads + disputes/claims/incidental charges, rate
       rules + dynamic pricing, fleet, calendar feeds, message templates,
       insurance + waivers, saved searches/trips + trip planning, routes,
       vendor onboarding, vendor extras (payout details, promotions, tax,
       trust), booking verification, account security, services
-- [ ] Integrate (defs index, docs regen, README/ADR/env), verify, commit, push
+- [x] Integrate (defs index, docs regen, README/ADR/env), verify, commit, push
 - [ ] Adversarial review workflow over the diff; fix; push; backend PR;
       update PR #34 body
 

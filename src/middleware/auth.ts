@@ -4,6 +4,7 @@ import { verifyBackendJwtClaims } from '@/lib/jwt';
 import { looksLikeAccessEnvelope } from '@/lib/oauth/envelope';
 import { openAccessToken } from '@/lib/oauth/tokens';
 import { oauthEnabled } from '@/lib/oauth/config';
+import { TOOL_SCOPES, type ToolScope } from '@/tools/registry';
 
 /**
  * SPLIT-335: constant-time secret comparison. A plain `a === b` short-circuits
@@ -31,6 +32,12 @@ export interface AuthResult {
    */
   token?: string;
   kind?: PrincipalKind;
+  /**
+   * OAuth scopes this principal may use (see `lib/oauth/scopes`): the granted
+   * set for an OAuth token, `read` only for the operator key, every scope for
+   * a verified raw backend JWT (a first-party session is not scope-limited).
+   */
+  scopes?: ToolScope[];
   error?: string;
   /**
    * Distinguishes "no credentials" from "credentials presented but rejected"
@@ -64,7 +71,7 @@ export async function authMiddleware(request: NextRequest): Promise<AuthResult> 
     return { success: false, error: 'Server auth not configured' };
   }
   if (apiKey && operatorKey && timingSafeEqualStr(apiKey, operatorKey)) {
-    return { success: true, role: 'admin', kind: 'operator' };
+    return { success: true, role: 'admin', kind: 'operator', scopes: ['read'] };
   }
 
   if (authHeader?.startsWith('Bearer ')) {
@@ -74,7 +81,7 @@ export async function authMiddleware(request: NextRequest): Promise<AuthResult> 
       if (!oauthEnabled()) return { success: false, error: 'Invalid token', invalidCredentials: true };
       const at = openAccessToken(bearer);
       if (!at) return { success: false, error: 'Invalid or expired token', invalidCredentials: true };
-      return { success: true, userId: at.sub, role: at.role || 'renter', email: at.email, token: at.bt, kind: 'oauth' };
+      return { success: true, userId: at.sub, role: at.role || 'renter', email: at.email, token: at.bt, kind: 'oauth', scopes: at.scp };
     }
 
     const claims = verifyBackendJwtClaims(bearer);
@@ -92,6 +99,7 @@ export async function authMiddleware(request: NextRequest): Promise<AuthResult> 
       email: claims.email,
       token: bearer,
       kind: 'jwt',
+      scopes: [...TOOL_SCOPES],
     };
   }
 

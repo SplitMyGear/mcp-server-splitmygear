@@ -2,8 +2,14 @@
  * The hosted sign-in pages for the OAuth authorization endpoint. Server-rendered
  * HTML strings with inline CSS only (strict CSP: no scripts, no remote assets),
  * every dynamic value HTML-escaped. Deliberately minimal: email + password,
- * then an email one-time-code step when the account has 2FA on.
+ * then an email one-time-code step when the account has 2FA on. The sign-in
+ * page doubles as the consent screen: it lists what the app will be able to
+ * do, one line per requested scope. Below the form, "Continue with Google /
+ * Apple" are plain links (no script) to `/oauth/social/start`, one per
+ * provider the backend reports configured.
  */
+import { SCOPE_DESCRIPTIONS, type ToolScope } from './scopes';
+import type { SocialProvider } from './backend-auth';
 
 export function escapeHtml(value: string): string {
   return value
@@ -32,6 +38,9 @@ const STYLES = `
   p { margin: 0 0 16px; color: #4b5a50; }
   .client { background: #eef5ef; border-radius: 8px; padding: 10px 12px; margin-bottom: 18px; font-size: 14px; }
   .client b { color: #17211b; }
+  .client ul { margin: 6px 0 10px; padding-left: 18px; }
+  .client li { margin: 2px 0; }
+  .full { display: block; font-weight: 600; margin-bottom: 4px; }
   label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 6px; }
   input { width: 100%; padding: 10px 12px; font-size: 15px; border: 1px solid #b9c4bc; border-radius: 8px; background: #fff; color: inherit; }
   input:focus { outline: 2px solid #1d7a4c; outline-offset: 1px; }
@@ -42,12 +51,19 @@ const STYLES = `
   .tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; background: #fff4de; color: #6b4a00; border-radius: 4px; padding: 1px 6px; vertical-align: middle; }
   code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
   .hint { font-size: 13px; color: #6b7a70; margin-top: 14px; }
+  .or { display: flex; align-items: center; gap: 10px; margin: 18px 0 4px; font-size: 12px; color: #6b7a70; text-transform: uppercase; letter-spacing: .04em; }
+  .or::before, .or::after { content: ""; flex: 1; border-top: 1px solid #dfe5e0; }
+  .social { display: block; width: 100%; margin-top: 8px; padding: 10px; font-size: 15px; font-weight: 600; text-align: center; text-decoration: none; border: 1px solid #b9c4bc; border-radius: 8px; background: #fff; color: #17211b; }
+  .social:hover { background: #f4f6f4; }
   @media (prefers-color-scheme: dark) {
     body { background: #101512; color: #e8ede9; }
     main { background: #171d19; border-color: #2a332d; }
-    p, .hint { color: #a8b3ab; }
+    p, .hint, .or { color: #a8b3ab; }
+    .or::before, .or::after { border-color: #2a332d; }
     .client { background: #1f2a22; } .client b { color: #e8ede9; }
     input { background: #0f1411; border-color: #3a463e; }
+    .social { background: #0f1411; border-color: #3a463e; color: #e8ede9; }
+    .social:hover { background: #1f2a22; }
     .error { background: #3a1d1d; color: #f5b5b5; }
     .warn, .tag { background: #3a2e12; color: #f2d48a; }
   }
@@ -77,8 +93,42 @@ export interface LoginPageProps {
   redirectUri: string;
   /** Loopback or operator allow-listed redirect host. */
   verified: boolean;
+  /** Scopes the app will be granted (listed one per line on the consent card). */
+  scopes: readonly ToolScope[];
+  /** false when the app sent no `scope` at all, i.e. it is asking for full access. */
+  scopesRequested: boolean;
+  /** Social providers the backend can serve; one "Continue with ..." link each. */
+  providers: readonly SocialProvider[];
   email?: string;
   error?: string;
+}
+
+const PROVIDER_LABEL: Record<SocialProvider, string> = { google: 'Google', apple: 'Apple' };
+
+/** Where "Continue with <provider>" sends the browser (same origin; the request rides along sealed). */
+export function socialStartPath(provider: SocialProvider, requestToken: string): string {
+  return `/oauth/social/start?provider=${provider}&req=${encodeURIComponent(requestToken)}`;
+}
+
+function renderSocialLinks(p: Pick<LoginPageProps, 'providers' | 'requestToken'>): string {
+  if (p.providers.length === 0) {
+    return '<p class="hint">Signed up with Google or Apple? Set a password first from your Splitt profile, then sign in here.</p>';
+  }
+  const links = p.providers
+    .map((provider) => `<a class="social" href="${escapeHtml(socialStartPath(provider, p.requestToken))}">Continue with ${PROVIDER_LABEL[provider]}</a>`)
+    .join('\n');
+  return `<div class="or">or</div>\n${links}`;
+}
+
+/** The consent card body: what the app asked for, in the user's words. */
+export function renderConsent(p: Pick<LoginPageProps, 'clientName' | 'verified' | 'scopes' | 'scopesRequested'>): string {
+  const app = `<b>${escapeHtml(p.clientName)}</b>${p.verified ? '' : ' <span class="tag">unverified app</span>'}`;
+  const items = p.scopes.map((s) => `<li>${escapeHtml(SCOPE_DESCRIPTIONS[s])}</li>`).join('');
+  if (!p.scopesRequested) {
+    return `<span class="full">${app} is asking for full access to your Splitt account.</span>It did not limit its request, so it will be able to do everything you can:<ul>${items}</ul>`;
+  }
+  if (p.scopes.length === 0) return `${app} will not be able to do anything with your account (it requested no usable permissions).`;
+  return `${app} will be able to:<ul>${items}</ul>`;
 }
 
 export function renderLoginPage(p: LoginPageProps): string {
@@ -86,7 +136,7 @@ export function renderLoginPage(p: LoginPageProps): string {
     'Sign in',
     `<h1>Sign in to Splitt</h1>
 <p>Connect your Splitt account so this assistant can act as you.</p>
-<div class="client"><b>${escapeHtml(p.clientName)}</b>${p.verified ? '' : ' <span class="tag">unverified app</span>'} will be able to search gear, manage your bookings, listings and messages on your behalf.<br>After sign-in you will be sent to:<br><code>${escapeHtml(p.redirectUri)}</code></div>
+<div class="client">${renderConsent(p)}After sign-in you will be sent to:<br><code>${escapeHtml(p.redirectUri)}</code></div>
 ${p.verified ? '' : '<div class="warn">Splitt has not verified this app. Only continue if you started this sign-in yourself from an app you trust, and check the address above.</div>'}
 ${p.error ? `<div class="error" role="alert">${escapeHtml(p.error)}</div>` : ''}
 <form method="post" action="" autocomplete="on">
@@ -99,7 +149,7 @@ ${p.error ? `<div class="error" role="alert">${escapeHtml(p.error)}</div>` : ''}
 <button type="submit">Continue</button>
 <button type="submit" class="secondary" name="step" value="cancel" formnovalidate>Cancel</button>
 </form>
-<p class="hint">Signed up with Google or Apple? Set a password first from your Splitt profile, then sign in here.</p>`,
+${renderSocialLinks(p)}`,
   );
 }
 

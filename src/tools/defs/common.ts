@@ -13,9 +13,11 @@ export const WRITE = { readOnlyHint: false, destructiveHint: false, idempotentHi
 export const WRITE_IDEMPOTENT = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true } as const;
 export const DESTRUCTIVE = { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true } as const;
 
+/** Mirrors the backend's canonical taxonomy (apps/api/src/listing/listing-categories.ts). */
 export const LISTING_CATEGORIES = [
   'E-Bikes', 'Biking', 'Camping', 'RV', 'Hiking', 'Water Sports', 'Winter Sports', 'Snow Sports', 'Climbing',
-  'Surfing', 'Fishing', 'Golf', 'Kayaking', 'Skiing', 'Tennis', 'Boating', 'Photography', 'Electronics', 'Other',
+  'Surfing', 'Fishing', 'Golf', 'Kayaking', 'Skiing', 'Tennis', 'Boating', 'ATVs', 'Photography', 'Electronics',
+  'Cabins', 'Campsites', 'RV Sites', 'Glamping', 'Other',
 ] as const;
 
 export const PROTECTION_PLANS = ['none', 'basic', 'standard', 'premier'] as const;

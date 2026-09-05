@@ -51,10 +51,20 @@ authorization server** that fronts the backend's login:
   without the verifier). Dynamic registration (RFC 7591) is open, as the MCP
   ecosystem expects; the user sees the client's name and redirect host on the
   sign-in page.
-- **Authorization is the backend's role model.** No OAuth scopes are issued in
-  this iteration: the tool list is filtered by the user's backend role, handlers
-  re-check it, and the backend enforces it again. Scopes can be layered on later
-  by adding a claim to the envelope.
+- **Authorization is the backend's role model, narrowed by OAuth scopes.**
+  Every tool declares one of 12 scopes (`read`, `profile`, `bookings`,
+  `favorites`, `messaging`, `reviews`, `listings`, `vendor_bookings`,
+  `experiences`, `finance`, `claims`, `files`). The authorization code carries
+  the granted scopes (`sc`) and both tokens carry them as `scp`; the middleware
+  hands them to the registry, which lists and runs only tools in the granted
+  set (call-time gate included). A client that requests no `scope` is granted
+  everything and the consent page states that it asked for full access;
+  unknown scopes are redirected as `invalid_scope`; a refresh may only narrow
+  the grant (RFC 6749 §6). The operator key is `read`-only and a verified raw
+  backend JWT is unrestricted. Scopes are a client-side least-privilege control
+  layered on top of the role checks; the backend remains the authority.
+  Envelopes sealed before scopes existed are honoured as full-access grants
+  until they expire. (See ADR 0003.)
 - **OAuth is opt-in.** Without `MCP_OAUTH_SIGNING_KEY` every OAuth endpoint fails
   closed and the header-based paths keep working unchanged.
 
@@ -93,8 +103,9 @@ authorization server** that fronts the backend's login:
 - Access tokens expire with the backend JWT (about 15 minutes); clients refresh
   transparently. A user's role change (e.g. renter becomes vendor) shows up on
   the next refresh, when the backend re-reads the user row.
-- Social (Google/Apple) sign-in is not offered on the hosted page: it would
-  require the backend's OAuth callback to redirect back here. Users set a
-  password first. Tracked as a follow-up.
+- Social (Google/Apple) sign-in on the hosted page landed with ADR 0003 (the
+  backend gained an allow-listed `return_to`).
+- Discovery documents list `scopes_supported`; token responses include `scope`.
+  docs/mcp-tools.md gains a Scopes section and a Scope column (generated).
 - The per-instance code replay cache and login throttle are best-effort; the
   backend's own distributed throttles are the real control.

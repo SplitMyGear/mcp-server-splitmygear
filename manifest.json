@@ -66,6 +66,78 @@
       "description": "Get experience details"
     },
     {
+      "name": "list_search_alerts",
+      "description": "My saved searches"
+    },
+    {
+      "name": "create_search_alert",
+      "description": "Save a search"
+    },
+    {
+      "name": "update_search_alert",
+      "description": "Edit a saved search"
+    },
+    {
+      "name": "toggle_search_alert",
+      "description": "Pause / resume alert"
+    },
+    {
+      "name": "delete_search_alert",
+      "description": "Delete saved search"
+    },
+    {
+      "name": "list_saved_trips",
+      "description": "My saved trips"
+    },
+    {
+      "name": "save_trip",
+      "description": "Save a trip"
+    },
+    {
+      "name": "delete_saved_trip",
+      "description": "Delete saved trip"
+    },
+    {
+      "name": "email_trip_plan",
+      "description": "Email me this trip"
+    },
+    {
+      "name": "plan_trip",
+      "description": "Plan a trip"
+    },
+    {
+      "name": "get_trip_pois",
+      "description": "Points of interest"
+    },
+    {
+      "name": "get_trip_ideas_for_listing",
+      "description": "Make a day of it"
+    },
+    {
+      "name": "suggest_locations",
+      "description": "Suggest locations"
+    },
+    {
+      "name": "generate_ai_trip_plan",
+      "description": "AI gear plan"
+    },
+    {
+      "name": "list_destinations",
+      "description": "List destinations"
+    },
+    {
+      "name": "get_destination",
+      "description": "Destination details"
+    },
+    {
+      "name": "list_categories",
+      "description": "List categories"
+    },
+    {
+      "name": "get_category",
+      "description": "Category details"
+    },
+    {
       "name": "get_my_profile",
       "description": "Who am I"
     },
@@ -198,6 +270,214 @@
       "description": "Improve listing title"
     },
     {
+      "name": "get_booking_verification",
+      "description": "Booking verification records"
+    },
+    {
+      "name": "get_inspection_checklist_template",
+      "description": "Inspection checklist template"
+    },
+    {
+      "name": "get_inspection_completion",
+      "description": "Inspection completion status"
+    },
+    {
+      "name": "submit_inspection_checklist",
+      "description": "Submit inspection checklist"
+    },
+    {
+      "name": "upload_handoff_photos",
+      "description": "Upload condition photos"
+    },
+    {
+      "name": "create_handoff_token",
+      "description": "Create handoff token"
+    },
+    {
+      "name": "verify_handoff_token",
+      "description": "Verify handoff token"
+    },
+    {
+      "name": "get_security_status",
+      "description": "Security status"
+    },
+    {
+      "name": "sign_out_all_sessions",
+      "description": "Sign out everywhere"
+    },
+    {
+      "name": "export_my_data",
+      "description": "Export my data"
+    },
+    {
+      "name": "get_notification_preferences",
+      "description": "Notification preferences"
+    },
+    {
+      "name": "set_notification_preference",
+      "description": "Set notification preference"
+    },
+    {
+      "name": "get_email_preferences",
+      "description": "Email preferences"
+    },
+    {
+      "name": "set_email_preferences",
+      "description": "Set email preferences"
+    },
+    {
+      "name": "get_terms_status",
+      "description": "Terms of Service status"
+    },
+    {
+      "name": "accept_terms",
+      "description": "Accept Terms of Service"
+    },
+    {
+      "name": "resend_verification_email",
+      "description": "Resend verification email"
+    },
+    {
+      "name": "get_identity_verification_status",
+      "description": "Identity verification status"
+    },
+    {
+      "name": "apply_to_become_vendor",
+      "description": "Apply as vendor"
+    },
+    {
+      "name": "start_vendor_onboarding",
+      "description": "Start vendor onboarding"
+    },
+    {
+      "name": "complete_vendor_business_profile",
+      "description": "Vendor business profile"
+    },
+    {
+      "name": "start_vendor_stripe_onboarding",
+      "description": "Set up vendor payouts"
+    },
+    {
+      "name": "check_vendor_stripe_status",
+      "description": "Check Stripe status"
+    },
+    {
+      "name": "confirm_vendor_stripe",
+      "description": "Confirm Stripe step"
+    },
+    {
+      "name": "get_vendor_agreement",
+      "description": "Vendor agreement"
+    },
+    {
+      "name": "sign_vendor_agreement",
+      "description": "Sign vendor agreement"
+    },
+    {
+      "name": "upload_file",
+      "description": "Upload a file"
+    },
+    {
+      "name": "list_disputes",
+      "description": "My disputes"
+    },
+    {
+      "name": "get_dispute",
+      "description": "Get a dispute"
+    },
+    {
+      "name": "open_dispute",
+      "description": "Open a dispute"
+    },
+    {
+      "name": "list_claims",
+      "description": "My damage claims"
+    },
+    {
+      "name": "get_claim",
+      "description": "Get a damage claim"
+    },
+    {
+      "name": "file_damage_claim",
+      "description": "File a damage claim"
+    },
+    {
+      "name": "respond_to_claim",
+      "description": "Respond to a damage claim"
+    },
+    {
+      "name": "add_claim_evidence",
+      "description": "Add claim evidence"
+    },
+    {
+      "name": "list_incidental_charges",
+      "description": "My incidental charges"
+    },
+    {
+      "name": "get_incidental_charge",
+      "description": "Get an incidental charge"
+    },
+    {
+      "name": "file_incidental_charge",
+      "description": "File an incidental charge"
+    },
+    {
+      "name": "respond_to_incidental_charge",
+      "description": "Respond to an incidental charge"
+    },
+    {
+      "name": "cancel_incidental_charge",
+      "description": "Withdraw an incidental charge"
+    },
+    {
+      "name": "search_services",
+      "description": "Search services"
+    },
+    {
+      "name": "get_service_details",
+      "description": "Get service details"
+    },
+    {
+      "name": "book_service",
+      "description": "Book a service"
+    },
+    {
+      "name": "list_my_service_bookings",
+      "description": "My service bookings"
+    },
+    {
+      "name": "get_service_booking",
+      "description": "Get service booking"
+    },
+    {
+      "name": "cancel_service_booking",
+      "description": "Cancel service booking"
+    },
+    {
+      "name": "review_service",
+      "description": "Review a service"
+    },
+    {
+      "name": "update_service_booking_status",
+      "description": "Confirm / complete service booking"
+    },
+    {
+      "name": "list_my_services",
+      "description": "My services"
+    },
+    {
+      "name": "create_service",
+      "description": "Create a service"
+    },
+    {
+      "name": "update_service",
+      "description": "Update a service"
+    },
+    {
+      "name": "delete_service",
+      "description": "Delete a service"
+    },
+    {
       "name": "list_my_listings",
       "description": "My listings"
     },
@@ -316,6 +596,306 @@
     {
       "name": "update_experience_booking_status",
       "description": "Confirm / complete / cancel experience booking"
+    },
+    {
+      "name": "list_rate_rules",
+      "description": "List seasonal rate rules"
+    },
+    {
+      "name": "create_rate_rule",
+      "description": "Create a rate rule"
+    },
+    {
+      "name": "update_rate_rule",
+      "description": "Update a rate rule"
+    },
+    {
+      "name": "delete_rate_rule",
+      "description": "Delete a rate rule"
+    },
+    {
+      "name": "apply_starter_seasons",
+      "description": "Apply starter seasons"
+    },
+    {
+      "name": "get_dynamic_pricing_config",
+      "description": "Dynamic pricing config"
+    },
+    {
+      "name": "set_dynamic_pricing_config",
+      "description": "Configure dynamic pricing"
+    },
+    {
+      "name": "preview_dynamic_price",
+      "description": "Preview dynamic price"
+    },
+    {
+      "name": "get_dynamic_pricing_recommendations",
+      "description": "Pricing recommendations"
+    },
+    {
+      "name": "generate_dynamic_pricing_recommendations",
+      "description": "Generate recommendations"
+    },
+    {
+      "name": "apply_dynamic_pricing",
+      "description": "Apply dynamic price"
+    },
+    {
+      "name": "get_suggested_initial_price",
+      "description": "Suggested starting price"
+    },
+    {
+      "name": "get_market_insights",
+      "description": "Market insights"
+    },
+    {
+      "name": "get_fleet_summary",
+      "description": "Fleet summary"
+    },
+    {
+      "name": "list_fleet_units",
+      "description": "List fleet units"
+    },
+    {
+      "name": "get_unit_stats",
+      "description": "Unit stats"
+    },
+    {
+      "name": "get_unit_maintenance_history",
+      "description": "Unit maintenance history"
+    },
+    {
+      "name": "add_fleet_units",
+      "description": "Add fleet units"
+    },
+    {
+      "name": "update_fleet_unit",
+      "description": "Update fleet unit"
+    },
+    {
+      "name": "delete_fleet_unit",
+      "description": "Delete fleet unit"
+    },
+    {
+      "name": "log_unit_maintenance",
+      "description": "Log unit maintenance"
+    },
+    {
+      "name": "list_calendar_feeds",
+      "description": "List calendar feeds"
+    },
+    {
+      "name": "add_calendar_feed",
+      "description": "Connect a calendar feed"
+    },
+    {
+      "name": "sync_calendar_feed",
+      "description": "Sync a calendar feed"
+    },
+    {
+      "name": "update_calendar_feed",
+      "description": "Update a calendar feed"
+    },
+    {
+      "name": "remove_calendar_feed",
+      "description": "Disconnect a calendar feed"
+    },
+    {
+      "name": "clear_feed_suppression",
+      "description": "Restore a synced hold"
+    },
+    {
+      "name": "get_listing_ical_export_url",
+      "description": "Listing iCal export link"
+    },
+    {
+      "name": "get_calendar_subscription_url",
+      "description": "My calendar subscription link"
+    },
+    {
+      "name": "rotate_calendar_subscription_url",
+      "description": "Rotate calendar subscription link"
+    },
+    {
+      "name": "list_my_routes",
+      "description": "My route library"
+    },
+    {
+      "name": "get_route",
+      "description": "Get a library route"
+    },
+    {
+      "name": "create_route",
+      "description": "Create a library route"
+    },
+    {
+      "name": "update_route",
+      "description": "Update a library route"
+    },
+    {
+      "name": "delete_route",
+      "description": "Archive or delete route"
+    },
+    {
+      "name": "import_gpx_route",
+      "description": "Import a GPX route"
+    },
+    {
+      "name": "get_public_route",
+      "description": "Shared route page"
+    },
+    {
+      "name": "list_listing_routes",
+      "description": "Routes on a listing"
+    },
+    {
+      "name": "attach_route_to_listing",
+      "description": "Attach route to listing"
+    },
+    {
+      "name": "set_listing_routes",
+      "description": "Set listing routes"
+    },
+    {
+      "name": "detach_route_from_listing",
+      "description": "Detach route from listing"
+    },
+    {
+      "name": "create_listing_route",
+      "description": "Add legacy route card"
+    },
+    {
+      "name": "update_listing_route",
+      "description": "Update legacy route card"
+    },
+    {
+      "name": "delete_listing_route",
+      "description": "Delete legacy route card"
+    },
+    {
+      "name": "list_my_insurance_policies",
+      "description": "My insurance policies"
+    },
+    {
+      "name": "add_insurance_policy",
+      "description": "Register insurance policy"
+    },
+    {
+      "name": "update_insurance_policy",
+      "description": "Update insurance policy"
+    },
+    {
+      "name": "delete_insurance_policy",
+      "description": "Delete insurance policy"
+    },
+    {
+      "name": "get_insurance_document_link",
+      "description": "Insurance document link"
+    },
+    {
+      "name": "list_my_waivers",
+      "description": "My waivers"
+    },
+    {
+      "name": "create_waiver",
+      "description": "Create a waiver"
+    },
+    {
+      "name": "update_waiver",
+      "description": "Update a waiver"
+    },
+    {
+      "name": "delete_waiver",
+      "description": "Delete a waiver"
+    },
+    {
+      "name": "get_required_waivers",
+      "description": "Required waivers"
+    },
+    {
+      "name": "list_signed_waivers",
+      "description": "My signed waivers"
+    },
+    {
+      "name": "sign_waiver",
+      "description": "Sign a waiver"
+    },
+    {
+      "name": "list_message_templates",
+      "description": "List message templates"
+    },
+    {
+      "name": "get_message_template",
+      "description": "Get message template"
+    },
+    {
+      "name": "create_message_template",
+      "description": "Create message template"
+    },
+    {
+      "name": "update_message_template",
+      "description": "Update message template"
+    },
+    {
+      "name": "delete_message_template",
+      "description": "Delete message template"
+    },
+    {
+      "name": "set_auto_approve",
+      "description": "Auto-approve bookings"
+    },
+    {
+      "name": "get_report_subscription",
+      "description": "Report email settings"
+    },
+    {
+      "name": "set_report_subscription",
+      "description": "Set report emails"
+    },
+    {
+      "name": "get_tax_summary",
+      "description": "Year-end tax summary"
+    },
+    {
+      "name": "get_payout_details",
+      "description": "Payout details"
+    },
+    {
+      "name": "request_payout",
+      "description": "Request a payout"
+    },
+    {
+      "name": "list_sponsorship_packages",
+      "description": "Promotion packages"
+    },
+    {
+      "name": "list_listing_promotions",
+      "description": "Listing promotions"
+    },
+    {
+      "name": "promote_listing",
+      "description": "Promote a listing"
+    },
+    {
+      "name": "list_my_transactions",
+      "description": "My transactions"
+    },
+    {
+      "name": "get_transaction",
+      "description": "Transaction details"
+    },
+    {
+      "name": "get_my_trust_score",
+      "description": "My trust score"
+    },
+    {
+      "name": "refresh_my_trust_score",
+      "description": "Refresh my trust score"
+    },
+    {
+      "name": "get_booking_risk",
+      "description": "Booking risk check"
     }
   ],
   "user_config": {

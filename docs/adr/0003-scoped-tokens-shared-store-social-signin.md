@@ -45,6 +45,9 @@ of the first cut, which makes least-privilege connections more valuable.
   is used and a warning is logged, because the backend's own distributed
   throttles remain the real control and an outage of a convenience store must
   never take sign-in down.
+- The sign-in throttle counts FAILURES only in both layers (a check reads the
+  counter; a failed attempt increments it), so a legitimate owner is never
+  locked out by successful logins from a shared office address.
 
 ### Social sign-in on the hosted page
 
@@ -58,9 +61,17 @@ of the first cut, which makes least-privilege connections more valuable.
   sign-in request>`; the callback swaps the one-time exchange code for a
   session via `POST /auth/oauth/exchange` and then behaves exactly like a
   password sign-in (same scopes, same code issuance, same client redirect).
-- No same-origin check applies to the callback (it is a top-level navigation
-  from the backend); the sealed `req` envelope, the single-use exchange code
-  and the backend's origin allow-list are the protections.
+- The callback is a top-level navigation from the backend, so no same-origin
+  check can apply there. Because the backend allow-lists only the `return_to`
+  ORIGIN, the consent step is protected on the start leg instead:
+  `/oauth/social/start` accepts only a same-origin navigation
+  (`Sec-Fetch-Site: same-origin`, i.e. a click on the consent page) and binds
+  that browser to the round trip with a nonce carried in the re-sealed `req`
+  and in a short-lived HttpOnly SameSite=Lax cookie that the callback must
+  see. A deep link to the backend cannot set our cookie and a deep link to
+  `/start` is refused, so an attacker cannot route a victim's Google consent
+  into a code bound to the attacker's client. The single-use exchange code and
+  the sealed request complete the protection.
 
 ## Consequences
 

@@ -32,8 +32,18 @@ Aligned with the **Elite Engineer Mandate** (smg-autoresearch). Status as of the
 - [x] **Docs stay honest**: `docs/mcp-tools.md` and `manifest.json` are
       generated from the registry and checked in CI (`npm run gen:docs`).
 
-## 3. Follow-ups (not blocking production)
-- [ ] Distributed rate limiting via a shared store (Upstash) instead of per-instance.
-- [ ] Scoped OAuth tokens (per-capability scopes) on top of the backend role model.
-- [ ] Google / Apple sign-in on the hosted page (users can set a password today).
-- [ ] Tools for claims, disputes and incidental charges (need file-evidence upload).
+## 3. Phase 2 (landed on the same PR)
+- [x] Distributed rate limiting, sign-in throttle and code replay cache via an
+      Upstash Redis REST shared store (fail-open to per-instance memory).
+- [x] Scoped OAuth tokens: 12 scopes, consent page, refresh narrowing, scope
+      aware tool listing and call-time gate.
+- [x] Google / Apple sign-in on the hosted page (backend `return_to` allow-list).
+- [x] 145 more tools: uploads, disputes/claims/incidental charges, rate rules and
+      dynamic pricing, fleet, calendar feeds, message templates, insurance and
+      waivers, saved searches/trips and trip planning, routes, vendor onboarding,
+      vendor extras, booking verification, account security, services.
+
+## 4. Follow-ups
+- [ ] Account deletion, password change and 2FA enrol/disable stay in the web UI.
+- [ ] KYC document upload (browser Blob flow).
+- [ ] SHA-pin GitHub Actions once tag SHAs can be verified.

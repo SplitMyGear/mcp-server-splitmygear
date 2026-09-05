@@ -13,6 +13,12 @@
  *   owner/manager → + `vendor_finance` (earnings, payouts, Stripe status)
  *   owner         → + `vendor_owner` (Stripe Connect onboarding)
  *
+ * On top of the role, an OAuth connection carries the SCOPES the user granted
+ * at sign-in (`ToolContext.scopes`); a tool whose scope was not granted is
+ * neither listed nor callable on that connection. No `scopes` on the context
+ * means unrestricted (a verified raw backend JWT); the operator key gets
+ * `read` only.
+ *
  * Handlers are ALSO gated at call time (defense in depth) and the backend
  * re-checks authorization on every forwarded request — visibility is a UX
  * optimisation, never the security boundary.
@@ -53,6 +59,11 @@ export interface ToolContext {
   /** Backend JWT to forward (absent for the operator key). */
   token?: string;
   kind?: PrincipalKind;
+  /**
+   * OAuth scopes granted to this connection. `undefined` = unrestricted (every
+   * scope); an explicit list limits tools/list and tools/call to those scopes.
+   */
+  scopes?: ToolScope[];
 }
 
 export interface ToolDef<Shape extends ZodRawShape = ZodRawShape> {
@@ -71,7 +82,17 @@ export function defineTool<Shape extends ZodRawShape>(def: ToolDef<Shape>): Tool
   return def;
 }
 
-export function isToolVisible(access: ToolAccess, ctx: ToolContext): boolean {
+/** Was `scope` granted to this connection? (No scope list on the context = everything granted.) */
+export function hasScope(ctx: ToolContext, scope: ToolScope): boolean {
+  return !ctx.scopes || ctx.scopes.includes(scope);
+}
+
+/**
+ * Role/access visibility, plus (when `scope` is given) the OAuth scope check.
+ * `isToolAllowed` is the same test phrased for a whole tool definition.
+ */
+export function isToolVisible(access: ToolAccess, ctx: ToolContext, scope?: ToolScope): boolean {
+  if (scope !== undefined && !hasScope(ctx, scope)) return false;
   switch (access) {
     case 'public':
       return true;
@@ -86,6 +107,15 @@ export function isToolVisible(access: ToolAccess, ctx: ToolContext): boolean {
     case 'vendor_owner':
       return !!ctx.token && canManageVendorPayouts(ctx.role);
   }
+}
+
+export function isToolAllowed(def: Pick<ToolDef<ZodRawShape>, 'access' | 'scope'>, ctx: ToolContext): boolean {
+  return isToolVisible(def.access, ctx, def.scope);
+}
+
+/** Call-time refusal for a tool whose scope this connection was not granted. */
+export function scopeDeniedMessage(scope: ToolScope, toolName: string): string {
+  return `This connection was not granted the '${scope}' permission. Reconnect and grant it to use ${toolName}.`;
 }
 
 const ACCESS_DENIED: Record<Exclude<ToolAccess, 'public'>, string> = {
@@ -123,7 +153,7 @@ function withStatusHint(message: string, status?: number): string {
 export function registerTools(server: McpServer, ctx: ToolContext, defs: ReadonlyArray<ToolDef<ZodRawShape>>): string[] {
   const registered: string[] = [];
   for (const def of defs) {
-    if (!isToolVisible(def.access, ctx)) continue;
+    if (!isToolAllowed(def, ctx)) continue;
     server.registerTool(
       def.name,
       {
@@ -136,6 +166,7 @@ export function registerTools(server: McpServer, ctx: ToolContext, defs: Readonl
         if (!isToolVisible(def.access, ctx)) {
           return fail(def.access === 'public' ? 'Not available' : ACCESS_DENIED[def.access]);
         }
+        if (!hasScope(ctx, def.scope)) return fail(scopeDeniedMessage(def.scope, def.name));
         try {
           return await def.handler(args, ctx);
         } catch (error) {

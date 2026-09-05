@@ -1,6 +1,7 @@
 export {};
 
 import { authMiddleware } from '../src/middleware/auth';
+import { TOOL_SCOPES } from '../src/tools/registry';
 
 import crypto from 'crypto';
 
@@ -48,6 +49,9 @@ describe('Auth Middleware', () => {
     const result = await authMiddleware(mockRequest);
     expect(result.success).toBe(true);
     expect(result.role).toBe('admin');
+    // The operator key is a server-to-server credential: public discovery only.
+    expect(result.kind).toBe('operator');
+    expect(result.scopes).toEqual(['read']);
   });
 
   it('rejects a wrong operator API key (constant-time compare, SPLIT-335)', async () => {
@@ -107,6 +111,9 @@ describe('Auth Middleware', () => {
     expect(result.role).toBe('vendor');
     // The raw token must be surfaced so user-scoped tools can forward it.
     expect(result.token).toBe(token);
+    // A verified first-party session is not scope-limited: every scope, role gates still apply.
+    expect(result.kind).toBe('jwt');
+    expect(result.scopes).toEqual([...TOOL_SCOPES]);
   });
 
   it('rejects a malformed bearer token (not a JWT)', async () => {
@@ -167,9 +174,21 @@ describe('Auth Middleware: OAuth access envelopes', () => {
   it('accepts an MCP-issued access token and forwards the wrapped backend JWT', async () => {
     const { issueTokens } = await import('../src/lib/oauth/tokens');
     const backend = makeJwt({ sub: 'user-9', role: 'vendor_owner', email: 'v@x.test', exp: FUTURE });
-    const tokens = issueTokens({ clientId: 'c1', user: { id: 'user-9', role: 'vendor_owner', email: 'v@x.test' }, backendAccessToken: backend, backendRefreshToken: 'brt' })!;
+    const tokens = issueTokens({ clientId: 'c1', user: { id: 'user-9', role: 'vendor_owner', email: 'v@x.test' }, backendAccessToken: backend, backendRefreshToken: 'brt', scopes: ['finance', 'read'] })!;
     const result = await authMiddleware({ headers: new Headers({ authorization: `Bearer ${tokens.access_token}` }), nextUrl: { pathname: '/api/mcp' } } as any);
     expect(result).toMatchObject({ success: true, userId: 'user-9', role: 'vendor_owner', email: 'v@x.test', token: backend, kind: 'oauth' });
+    // The granted scopes ride along (canonical order) so the registry can filter tools/list.
+    expect(result.scopes).toEqual(['read', 'finance']);
+  });
+
+  it('carries an empty scope set through unchanged (a token that may use no tools)', async () => {
+    const { issueTokens } = await import('../src/lib/oauth/tokens');
+    const backend = makeJwt({ sub: 'user-9', role: 'renter', email: 'v@x.test', exp: FUTURE });
+    const tokens = issueTokens({ clientId: 'c1', user: { id: 'user-9', role: 'renter', email: 'v@x.test' }, backendAccessToken: backend, backendRefreshToken: 'brt', scopes: [] })!;
+    expect(tokens.scope).toBe('');
+    const result = await authMiddleware({ headers: new Headers({ authorization: `Bearer ${tokens.access_token}` }), nextUrl: { pathname: '/api/mcp' } } as any);
+    expect(result.success).toBe(true);
+    expect(result.scopes).toEqual([]);
   });
 
   it('rejects a tampered/foreign envelope and flags it as invalid credentials', async () => {
@@ -179,9 +198,9 @@ describe('Auth Middleware: OAuth access envelopes', () => {
 
   it('refuses to wrap a backend JWT it cannot read, and rejects an envelope whose inner JWT expired', async () => {
     const { issueTokens, openAccessToken } = await import('../src/lib/oauth/tokens');
-    expect(issueTokens({ clientId: 'c1', user: { id: 'u', role: 'renter', email: 'e' }, backendAccessToken: 'not-a-jwt', backendRefreshToken: 'r' })).toBeNull();
+    expect(issueTokens({ clientId: 'c1', user: { id: 'u', role: 'renter', email: 'e' }, backendAccessToken: 'not-a-jwt', backendRefreshToken: 'r', scopes: ['read'] })).toBeNull();
     const expiredInner = makeJwt({ sub: 'u', role: 'renter', exp: Math.floor(Date.now() / 1000) + 1 });
-    const tokens = issueTokens({ clientId: 'c1', user: { id: 'u', role: 'renter', email: 'e' }, backendAccessToken: expiredInner, backendRefreshToken: 'r' })!;
+    const tokens = issueTokens({ clientId: 'c1', user: { id: 'u', role: 'renter', email: 'e' }, backendAccessToken: expiredInner, backendRefreshToken: 'r', scopes: ['read'] })!;
     await new Promise((r) => setTimeout(r, 1100));
     expect(openAccessToken(tokens.access_token)).toBeNull();
   });

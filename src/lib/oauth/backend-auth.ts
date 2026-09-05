@@ -9,6 +9,9 @@
  *   POST /auth/2fa/otp/verify  → tokens once the code is right
  *   POST /auth/refresh         → rotate an access/refresh pair
  *   POST /auth/logout          → revoke a refresh token
+ *   GET  /auth/providers       → which social providers the web flow can serve
+ *   POST /auth/oauth/exchange  → swap the one-time code a Google/Apple
+ *                                round-trip ends with for tokens (or 2FA)
  *
  * Client context: when `MCP_BFF_RELAY_KEY` is configured (the backend's
  * `BFF_RELAY_KEY`), the end user's IP is relayed via the backend's trusted
@@ -49,6 +52,17 @@ export interface TwoFactorChallenge {
 export type LoginOutcome =
   | { kind: 'session'; session: BackendSession }
   | { kind: 'two_factor'; challenge: TwoFactorChallenge };
+
+/** The social providers the backend's web flow can start (`GET /auth/google|apple`). */
+export type SocialProvider = 'google' | 'apple';
+export const SOCIAL_PROVIDERS: readonly SocialProvider[] = ['google', 'apple'];
+
+export function isSocialProvider(value: unknown): value is SocialProvider {
+  return typeof value === 'string' && (SOCIAL_PROVIDERS as readonly string[]).includes(value);
+}
+
+/** How long the sign-in page waits for `GET /auth/providers` before hiding the social buttons. */
+const PROVIDERS_TIMEOUT_MS = 3_000;
 
 /** A user-safe failure from the backend auth endpoints. */
 export class AuthBridgeError extends Error {
@@ -98,16 +112,12 @@ function isSessionShape(value: unknown): value is BackendSession {
   return !!v && typeof v.accessToken === 'string' && typeof v.refreshToken === 'string' && !!v.user && typeof v.user.id === 'string';
 }
 
-export async function backendLogin(email: string, password: string, ctx: ClientContext): Promise<LoginOutcome> {
-  let result: unknown;
-  try {
-    result = await backendRequest('POST', '/users/login', {
-      body: { email, password },
-      headers: relayHeaders(ctx),
-    });
-  } catch (error) {
-    throw toBridgeError(error, 'Sign-in failed');
-  }
+/**
+ * The `/users/login` envelope is either a session or a 2FA challenge; the
+ * social exchange endpoint answers with the exact same shapes (the backend
+ * mints both through one path), so both bridges share this reader.
+ */
+function toLoginOutcome(result: unknown, unexpected: string): LoginOutcome {
   const r = result as Record<string, unknown> | null;
   if (r && r.twoFactorRequired === true && typeof r.challengeToken === 'string') {
     return {
@@ -121,7 +131,61 @@ export async function backendLogin(email: string, password: string, ctx: ClientC
     };
   }
   if (isSessionShape(result)) return { kind: 'session', session: result };
-  throw new AuthBridgeError(502, 'Unexpected response from Splitt sign-in');
+  throw new AuthBridgeError(502, unexpected);
+}
+
+export async function backendLogin(email: string, password: string, ctx: ClientContext): Promise<LoginOutcome> {
+  let result: unknown;
+  try {
+    result = await backendRequest('POST', '/users/login', {
+      body: { email, password },
+      headers: relayHeaders(ctx),
+    });
+  } catch (error) {
+    throw toBridgeError(error, 'Sign-in failed');
+  }
+  return toLoginOutcome(result, 'Unexpected response from Splitt sign-in');
+}
+
+/**
+ * Which social providers the backend can serve on the web flow (public,
+ * unauthenticated). Any failure, including the 3 s timeout, is read as "none
+ * configured": the sign-in page then simply offers no social buttons, and the
+ * password form keeps working.
+ */
+export async function backendSocialProviders(): Promise<SocialProvider[]> {
+  try {
+    const r = (await backendRequest('GET', '/auth/providers', { timeoutMs: PROVIDERS_TIMEOUT_MS })) as Record<string, unknown> | null;
+    return SOCIAL_PROVIDERS.filter((p) => r?.[p] === true);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Swap the one-time exchange code the backend's Google/Apple callback hands
+ * the browser (`?code=...` on our return_to) for a session, or a 2FA challenge
+ * when the account has two-step verification on. Unknown, replayed and
+ * expired codes are one opaque 401 at the backend; a suspended account is a
+ * 401 with its own message, which is kept because the user needs to read it.
+ */
+export async function backendExchangeSocialCode(code: string, ctx: ClientContext): Promise<LoginOutcome> {
+  let result: unknown;
+  try {
+    result = await backendRequest('POST', '/auth/oauth/exchange', {
+      body: { code },
+      headers: relayHeaders(ctx),
+    });
+  } catch (error) {
+    if (error instanceof BackendApiError && error.status === 401 && !/suspended/i.test(error.message)) {
+      throw new AuthBridgeError(401, 'That sign-in link has expired or was already used. Please try again.');
+    }
+    if (error instanceof BackendApiError && error.status === 400) {
+      throw new AuthBridgeError(400, 'That sign-in link is not valid. Please try again.');
+    }
+    throw toBridgeError(error, 'Sign-in failed');
+  }
+  return toLoginOutcome(result, 'Unexpected response from Splitt sign-in');
 }
 
 export async function backendSendOtp(challengeToken: string, ctx: ClientContext): Promise<{ maskedEmail?: string }> {

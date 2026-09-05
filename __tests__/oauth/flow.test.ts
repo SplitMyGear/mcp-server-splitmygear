@@ -24,6 +24,8 @@ import { GET as prmGet } from '../../src/app/.well-known/oauth-protected-resourc
 import { GET as asGet } from '../../src/app/.well-known/oauth-authorization-server/[[...path]]/route';
 import { POST as mcpPost } from '../../src/app/api/mcp/route';
 import { _resetThrottle } from '../../src/lib/oauth/throttle';
+import { SCOPE_DESCRIPTIONS, TOOL_SCOPES } from '../../src/lib/oauth/scopes';
+import { ALL_TOOLS } from '../../src/tools/defs';
 
 const KEY = 'unit-test-signing-key-with-at-least-32-bytes!!';
 const BASE = 'https://mcp.test';
@@ -104,7 +106,9 @@ describe('OAuth 2.1 flow', () => {
       registration_endpoint: `${BASE}/oauth/register`,
       code_challenge_methods_supported: ['S256'],
       token_endpoint_auth_methods_supported: ['none'],
+      scopes_supported: [...TOOL_SCOPES],
     });
+    expect(prm.scopes_supported).toEqual([...TOOL_SCOPES]);
     const unauth = await mcp({}, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} });
     expect(unauth.status).toBe(401);
     expect(unauth.headers.get('www-authenticate')).toBe(`Bearer resource_metadata="${BASE}/.well-known/oauth-protected-resource/api/mcp"`);
@@ -125,6 +129,9 @@ describe('OAuth 2.1 flow', () => {
     expect(html).toContain('Test Client');
     expect(html).toContain('https://client.example/callback');
     expect(html).toContain('unverified app'); // no allow-list configured in this test
+    // No `scope` requested: the consent card says so and lists everything the app gets.
+    expect(html).toContain('is asking for full access to your Splitt account');
+    for (const s of TOOL_SCOPES) expect(html).toContain(SCOPE_DESCRIPTIONS[s]);
     const req = hidden(html, 'req');
 
     // POST login → backend login → code redirect.
@@ -161,6 +168,7 @@ describe('OAuth 2.1 flow', () => {
     expect(tokens.refresh_token.startsWith('smg_rt.')).toBe(true);
     expect(tokens.expires_in).toBeGreaterThan(0);
     expect(tokens.expires_in).toBeLessThanOrEqual(900);
+    expect(tokens.scope).toBe(TOOL_SCOPES.join(' '));
 
     // Replay of the same code is refused.
     const replay = await tokenPost(form({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT, client_id: clientId }));
@@ -201,6 +209,7 @@ describe('OAuth 2.1 flow', () => {
     const refreshed = await refreshRes.json();
     expect(refreshed.access_token).not.toBe(tokens.access_token);
     expect(refreshed.refresh_token).not.toBe(tokens.refresh_token);
+    expect(refreshed.scope).toBe(TOOL_SCOPES.join(' ')); // no scope param = same grant
 
     // A refresh token presented by a different client is refused.
     const otherClient = await registerClient();
@@ -218,6 +227,98 @@ describe('OAuth 2.1 flow', () => {
     const revokeRes = await revokePost(form({ token: refreshed.refresh_token, client_id: clientId }, `${BASE}/oauth/revoke`));
     expect(revokeRes.status).toBe(200);
     expect(calls).toEqual(['POST /auth/refresh', 'POST /auth/logout']);
+  });
+
+  it('issues scoped tokens: consent lists the requested scopes, tools/list is filtered, refresh may only narrow', async () => {
+    const clientId = await registerClient();
+    const { verifier, challenge } = pkce();
+    const page = await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, state: 'sc', code_challenge: challenge, code_challenge_method: 'S256', scope: 'bookings read read' })));
+    expect(page.status).toBe(200);
+    const html = await page.text();
+    expect(html).toContain('will be able to:');
+    expect(html).toContain(SCOPE_DESCRIPTIONS.read);
+    expect(html).toContain(SCOPE_DESCRIPTIONS.bookings);
+    expect(html).not.toContain(SCOPE_DESCRIPTIONS.messaging);
+    expect(html).not.toContain('full access');
+    const req = hidden(html, 'req');
+
+    mockBackendRequest.mockImplementation(async (_m: string, path: string) => {
+      if (path === '/users/login') return { accessToken: backendAccess, refreshToken: 'brt-1', user: { id: 'user-1', email: 'r@x.test', role: 'renter' } };
+      throw new Error(`unexpected ${path}`);
+    });
+    const redirect = await authorizePost(form({ step: 'login', req, email: 'r@x.test', password: 'pw' }, `${BASE}/oauth/authorize`));
+    expect(redirect.status).toBe(302);
+    const code = new URL(redirect.headers.get('location')!).searchParams.get('code')!;
+    const tokenRes = await tokenPost(form({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT, client_id: clientId }));
+    expect(tokenRes.status).toBe(200);
+    const tokens = await tokenRes.json();
+    expect(tokens.scope).toBe('read bookings');
+
+    // tools/list on the scoped token: bookings and public read tools in, everything else out.
+    const listRes = await mcp({ authorization: `Bearer ${tokens.access_token}` }, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} });
+    expect(listRes.status).toBe(200);
+    const names: string[] = (await listRes.json()).result.tools.map((t: any) => t.name);
+    expect(names).toContain('search_listings');
+    expect(names).toContain('list_my_bookings');
+    expect(names).toContain('create_booking');
+    expect(names).not.toContain('get_conversations');
+    expect(names).not.toContain('send_message');
+    expect(names).not.toContain('get_my_profile');
+    for (const n of names) expect(['read', 'bookings']).toContain(ALL_TOOLS.find((t) => t.name === n)!.scope);
+    // ...and a tool outside the grant cannot be called on this connection.
+    const denied = await mcp({ authorization: `Bearer ${tokens.access_token}` }, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'send_message', arguments: { recipientId: '11111111-1111-4111-8111-111111111111', content: 'hi' } } });
+    expect(JSON.stringify(await denied.json())).toContain('send_message not found');
+
+    // Refresh may narrow (scope=read): the new pair carries only `read`.
+    const rotatedAccess = backendJwt({ sub: 'user-1', email: 'r@x.test', role: 'renter', exp: FUTURE + 60 });
+    mockBackendRequest.mockReset();
+    mockBackendRequest.mockImplementation(async (_m: string, path: string) => {
+      if (path === '/auth/refresh') return { accessToken: rotatedAccess, refreshToken: 'brt-2' };
+      throw new Error(`unexpected ${path}`);
+    });
+    const narrowedRes = await tokenPost(form({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: clientId, scope: 'read' }));
+    expect(narrowedRes.status).toBe(200);
+    const narrowed = await narrowedRes.json();
+    expect(narrowed.scope).toBe('read');
+    const narrowedNames: string[] = (await (await mcp({ authorization: `Bearer ${narrowed.access_token}` }, { jsonrpc: '2.0', id: 3, method: 'tools/list', params: {} })).json()).result.tools.map((t: any) => t.name);
+    expect(narrowedNames).toContain('search_listings');
+    expect(narrowedNames).not.toContain('list_my_bookings');
+    expect(narrowedNames).not.toContain('create_booking');
+
+    // Widening back (or to anything not in the grant) and unknown scopes are invalid_scope, and never reach the backend.
+    mockBackendRequest.mockClear();
+    const widen = await tokenPost(form({ grant_type: 'refresh_token', refresh_token: narrowed.refresh_token, client_id: clientId, scope: 'read bookings' }));
+    expect(widen.status).toBe(400);
+    expect((await widen.json()).error).toBe('invalid_scope');
+    const unknown = await tokenPost(form({ grant_type: 'refresh_token', refresh_token: narrowed.refresh_token, client_id: clientId, scope: 'read superuser' }));
+    expect((await unknown.json()).error).toBe('invalid_scope');
+    expect(mockBackendRequest).not.toHaveBeenCalled();
+    // Omitting scope on refresh keeps the (narrowed) grant.
+    const same = await tokenPost(form({ grant_type: 'refresh_token', refresh_token: narrowed.refresh_token, client_id: clientId }));
+    expect(same.status).toBe(200);
+    expect((await same.json()).scope).toBe('read');
+  });
+
+  it('redirects an unknown scope back to the client as invalid_scope with the state preserved', async () => {
+    const clientId = await registerClient();
+    const { challenge } = pkce();
+    const res = await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, state: 's9', code_challenge: challenge, code_challenge_method: 'S256', scope: 'read superuser' })));
+    expect(res.status).toBe(302);
+    const loc = new URL(res.headers.get('location')!);
+    expect(loc.origin + loc.pathname).toBe(REDIRECT);
+    expect(loc.searchParams.get('error')).toBe('invalid_scope');
+    expect(loc.searchParams.get('error_description')).toContain('superuser');
+    expect(loc.searchParams.get('state')).toBe('s9');
+  });
+
+  it('gives the operator key the read scope only (public discovery tools)', async () => {
+    const res = await mcp({ 'x-api-key': 'operator' }, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} });
+    expect(res.status).toBe(200);
+    const names: string[] = (await res.json()).result.tools.map((t: any) => t.name);
+    expect(names).toContain('search_listings');
+    expect(names).not.toContain('get_my_profile');
+    expect(names.length).toBeGreaterThan(0);
+    for (const n of names) expect(ALL_TOOLS.find((t) => t.name === n)!.scope).toBe('read');
   });
 
   it('handles the 2FA email-OTP step', async () => {
@@ -328,6 +429,7 @@ describe('OAuth 2.1 flow', () => {
     const { challenge } = pkce();
     const html = await (await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' })))).text();
     const req = hidden(html, 'req');
+    mockBackendRequest.mockClear(); // the GET asked the backend which social providers to offer; the POSTs below must not reach it
 
     const crossSite = await authorizePost(form({ step: 'login', req, email: 'r@x.test', password: 'pw' }, `${BASE}/oauth/authorize`, { origin: 'https://attacker.example', 'sec-fetch-site': 'cross-site' }));
     expect(crossSite.status).toBe(403);
@@ -389,5 +491,71 @@ describe('OAuth 2.1 flow', () => {
     const { GET: mcpGet, DELETE: mcpDelete } = await import('../../src/app/api/mcp/route');
     expect((await mcpGet()).status).toBe(405);
     expect((await mcpDelete()).status).toBe(405);
+  });
+});
+
+describe('hosted sign-in page: social links', () => {
+  beforeEach(() => {
+    process.env.MCP_OAUTH_SIGNING_KEY = KEY;
+    process.env.MCP_PUBLIC_URL = BASE;
+    mockBackendRequest.mockReset();
+  });
+  afterEach(() => {
+    delete process.env.MCP_OAUTH_SIGNING_KEY;
+    delete process.env.MCP_PUBLIC_URL;
+  });
+
+  async function loginPage(): Promise<string> {
+    const clientId = await registerClient();
+    const { challenge } = pkce();
+    const res = await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' })));
+    expect(res.status).toBe(200);
+    return res.text();
+  }
+  const GOOGLE_LINK = /href="\/oauth\/social\/start\?provider=google&amp;req=smg_rq\./;
+  const APPLE_LINK = /href="\/oauth\/social\/start\?provider=apple&amp;req=smg_rq\./;
+  const PASSWORD_HINT = 'Set a password first from your Splitt profile';
+
+  it('offers exactly the providers the backend reports configured, and drops the password hint', async () => {
+    mockBackendRequest.mockImplementation(async (method: string, path: string, opts: any) => {
+      if (method === 'GET' && path === '/auth/providers') {
+        expect(opts.timeoutMs).toBe(3000);
+        expect(opts.token).toBeUndefined();
+        return { google: true, apple: true };
+      }
+      throw new Error(`unexpected ${method} ${path}`);
+    });
+    const both = await loginPage();
+    expect(both).toMatch(GOOGLE_LINK);
+    expect(both).toMatch(APPLE_LINK);
+    expect(both).toContain('Continue with Google');
+    expect(both).toContain('Continue with Apple');
+    expect(both).not.toContain(PASSWORD_HINT);
+    // The link carries the same sealed request as the password form.
+    const req = hidden(both, 'req');
+    expect(both).toContain(`provider=google&amp;req=${encodeURIComponent(req).replace(/&/g, '&amp;')}`);
+
+    mockBackendRequest.mockImplementation(async () => ({ google: true, apple: false }));
+    const googleOnly = await loginPage();
+    expect(googleOnly).toMatch(GOOGLE_LINK);
+    expect(googleOnly).not.toMatch(APPLE_LINK);
+    expect(googleOnly).not.toContain(PASSWORD_HINT);
+  });
+
+  it('shows no social links (and keeps the password hint) when none is configured or the lookup fails', async () => {
+    mockBackendRequest.mockImplementation(async () => ({ google: false, apple: false }));
+    const none = await loginPage();
+    expect(none).not.toContain('/oauth/social/start');
+    expect(none).toContain(PASSWORD_HINT);
+
+    const { BackendApiError } = jest.requireMock('../../src/lib/backend-client');
+    mockBackendRequest.mockImplementation(async () => { throw new BackendApiError(504, 'Backend request timed out'); });
+    const down = await loginPage();
+    expect(down).not.toContain('/oauth/social/start');
+    expect(down).toContain(PASSWORD_HINT);
+
+    // A garbage answer is not a configured provider either.
+    mockBackendRequest.mockImplementation(async () => ({ google: 'yes', apple: 1 }));
+    expect(await loginPage()).not.toContain('/oauth/social/start');
   });
 });

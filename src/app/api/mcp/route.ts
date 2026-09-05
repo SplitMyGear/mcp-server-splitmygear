@@ -51,7 +51,7 @@ function buildServer(ctx: ToolContext): McpServer {
   server.registerResource(
     'listing-categories',
     'splitmygear://categories',
-    { title: 'Listing categories', description: 'The 19 canonical Title-Case gear categories accepted by search_listings and create_listing.', mimeType: 'application/json' },
+    { title: 'Listing categories', description: 'The canonical Title-Case gear categories accepted by search_listings and create_listing.', mimeType: 'application/json' },
     async (uri) => ({
       contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(LISTING_CATEGORIES.map((id) => ({ id, name: id })), null, 2) }],
     }),
@@ -132,7 +132,7 @@ async function handleRequest(request: NextRequest) {
     // Stateless: a brand-new server + transport per request (no session id),
     // with JSON responses enabled so a single POST completes the
     // initialize/tools-call round-trip without a persistent SSE session.
-    const server = buildServer({ userId: auth.userId, role: auth.role, email: auth.email, token: auth.token, kind: auth.kind });
+    const server = buildServer({ userId: auth.userId, role: auth.role, email: auth.email, token: auth.token, kind: auth.kind, scopes: auth.scopes });
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,

@@ -134,7 +134,8 @@
           "access_token",
           "token_type",
           "expires_in",
-          "refresh_token"
+          "refresh_token",
+          "scope"
         ],
         "properties": {
           "access_token": {
@@ -151,6 +152,10 @@
           },
           "refresh_token": {
             "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "description": "Space-separated granted scopes"
           }
         }
       },
@@ -455,6 +460,14 @@
               "type": "string",
               "format": "uri"
             }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Space-separated subset of scopes_supported. Absent = full access (the consent page says so)."
           }
         ],
         "responses": {
@@ -566,6 +579,10 @@
                   },
                   "resource": {
                     "type": "string"
+                  },
+                  "scope": {
+                    "type": "string",
+                    "description": "refresh_token grant only: narrow the grant to a subset of the token's scopes"
                   }
                 }
               }
@@ -584,7 +601,7 @@
             }
           },
           "400": {
-            "description": "OAuth error",
+            "description": "OAuth error (invalid_grant, invalid_scope, invalid_request ...)",
             "content": {
               "application/json": {
                 "schema": {
@@ -670,6 +687,9 @@
           },
           "404": {
             "description": "OAuth not enabled"
+          },
+          "403": {
+            "description": "Not started from the sign-in page (Sec-Fetch-Site is not same-origin)"
           }
         }
       }
@@ -710,7 +730,16 @@
             "description": "Sign-in page re-rendered with an error message"
           },
           "400": {
-            "description": "Expired sign-in request"
+            "description": "Expired sign-in request, or missing/mismatched sign-in nonce cookie"
+          },
+          "401": {
+            "description": "Exchange code already used or expired, or account suspended (sign-in page re-rendered)"
+          },
+          "429": {
+            "description": "Too many attempts"
+          },
+          "503": {
+            "description": "Splitt unavailable or provider not configured"
           }
         }
       }

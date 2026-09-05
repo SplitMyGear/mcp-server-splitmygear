@@ -9,7 +9,8 @@ import fs from 'fs';
 import path from 'path';
 import { z } from 'zod';
 import { ALL_TOOLS } from '../src/tools/defs';
-import type { ToolAccess } from '../src/tools/registry';
+import { TOOL_SCOPES, type ToolAccess } from '../src/tools/registry';
+import { SCOPE_DESCRIPTIONS } from '../src/lib/oauth/scopes';
 
 const ROOT = path.join(__dirname, '..');
 const UPDATE = process.env.UPDATE_DOCS === '1';
@@ -41,15 +42,23 @@ function renderMarkdown(): string {
   const order: ToolAccess[] = ['public', 'user', 'renter', 'vendor', 'vendor_finance', 'vendor_owner'];
   let md = `# Splitt MCP Server: tool reference\n\n`;
   md += `_Generated from the tool registry by \`npm run gen:docs\`. Do not edit by hand._\n\n`;
-  md += `${ALL_TOOLS.length} tools. The tool list a client sees is filtered by who is signed in: the operator API key sees only the public tools; a renter, vendor seat or owner sees the sections that apply to them. Every user-scoped call forwards the signed-in user's own Splitt session to the backend, which enforces ownership and permissions.\n\n`;
+  md += `${ALL_TOOLS.length} tools. The tool list a client sees is filtered by who is signed in: the operator API key sees only the public tools; a renter, vendor seat or owner sees the sections that apply to them. Every user-scoped call forwards the signed-in user's own Splitt session to the backend, which enforces ownership and permissions. An OAuth connection is further limited to the scopes granted at sign-in (see Scopes below): a tool is listed and callable only when its scope was granted.\n\n`;
+  md += `## Scopes\n\n`;
+  md += `Every tool belongs to exactly one OAuth scope. Clients request scopes with the standard space-separated \`scope\` parameter; a client that sends none is granted all of them and the consent page says so. A refresh may narrow the grant (\`scope\` on the \`refresh_token\` grant) but never widen it. The operator API key has the \`read\` scope only; a verified raw backend JWT has every scope. Role checks still apply on top: granting \`listings\` to a renter account unlocks nothing.\n\n`;
+  md += `| Scope | What the app may do | Tools |\n|---|---|---|\n`;
+  for (const scope of TOOL_SCOPES) {
+    const tools = ALL_TOOLS.filter((t) => t.scope === scope);
+    md += `| \`${scope}\` | ${SCOPE_DESCRIPTIONS[scope]} | ${tools.length ? tools.map((t) => `\`${t.name}\``).join(', ') : '_none yet_'} |\n`;
+  }
+  md += `\n`;
   for (const access of order) {
     const tools = groups.get(access);
     if (!tools?.length) continue;
     md += `## ${ACCESS_LABEL[access]}\n\n`;
-    md += `| Tool | What it does | Arguments |\n|---|---|---|\n`;
+    md += `| Tool | Scope | What it does | Arguments |\n|---|---|---|---|\n`;
     for (const t of tools) {
       const flags = [t.annotations.readOnlyHint ? 'read-only' : t.annotations.destructiveHint ? 'destructive' : 'write'];
-      md += `| \`${t.name}\`<br>_${t.title}_ (${flags.join(', ')}) | ${t.description.replace(/\|/g, '\\|')} | ${describeShape(t.inputSchema as Record<string, z.ZodTypeAny>).replace(/\|/g, '\\|')} |\n`;
+      md += `| \`${t.name}\`<br>_${t.title}_ (${flags.join(', ')}) | \`${t.scope}\` | ${t.description.replace(/\|/g, '\\|')} | ${describeShape(t.inputSchema as Record<string, z.ZodTypeAny>).replace(/\|/g, '\\|')} |\n`;
     }
     md += `\n`;
   }

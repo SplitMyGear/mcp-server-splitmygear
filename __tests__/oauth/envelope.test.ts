@@ -1,6 +1,10 @@
 export {};
+import crypto from 'crypto';
 import { seal, open, ENVELOPE_PREFIX, looksLikeAccessEnvelope, nowSeconds } from '../../src/lib/oauth/envelope';
 import { oauthEnabled, deriveKey, publicBaseUrl, resourceUrl } from '../../src/lib/oauth/config';
+import { SCOPE_DESCRIPTIONS, TOOL_SCOPES, parseScopeParam, formatScope, isSubset, coerceScopes } from '../../src/lib/oauth/scopes';
+import { issueAuthorizationCode, openAuthorizationCode, issueTokens, openAccessToken, openRefreshToken } from '../../src/lib/oauth/tokens';
+import { authorizationServerMetadata, protectedResourceMetadata } from '../../src/lib/oauth/metadata';
 
 const KEY = 'unit-test-signing-key-with-at-least-32-bytes!!';
 
@@ -81,5 +85,81 @@ describe('sealed envelopes', () => {
     const token = seal('rt', { sub: 'u1', iat, exp: iat + 60 });
     process.env.MCP_OAUTH_SIGNING_KEY = 'another-secret-that-is-also-long-enough-000';
     expect(open('rt', token)).toBeNull();
+  });
+});
+
+describe('OAuth scopes', () => {
+  it('describes every scope in one plain sentence, without em-dashes', () => {
+    for (const s of TOOL_SCOPES) {
+      expect(SCOPE_DESCRIPTIONS[s]).toMatch(/^[A-Z].*\.$/);
+      expect(SCOPE_DESCRIPTIONS[s]).not.toMatch(/—/);
+    }
+    expect(Object.keys(SCOPE_DESCRIPTIONS).sort()).toEqual([...TOOL_SCOPES].sort());
+  });
+
+  it('parses the RFC 6749 scope parameter: absent = everything (not requested), duplicates collapse, order is canonical', () => {
+    expect(parseScopeParam(undefined)).toEqual({ ok: true, scopes: [...TOOL_SCOPES], requested: false });
+    expect(parseScopeParam('')).toEqual({ ok: true, scopes: [...TOOL_SCOPES], requested: false });
+    expect(parseScopeParam('   ')).toEqual({ ok: true, scopes: [...TOOL_SCOPES], requested: false });
+    expect(parseScopeParam('bookings read  read')).toEqual({ ok: true, scopes: ['read', 'bookings'], requested: true });
+    expect(parseScopeParam(TOOL_SCOPES.join(' '))).toEqual({ ok: true, scopes: [...TOOL_SCOPES], requested: true });
+    const bad = parseScopeParam('read admin READ');
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) {
+      expect(bad.error).toContain('"admin"');
+      expect(bad.error).toContain('"READ"'); // case-sensitive per the RFC
+      expect(bad.error).toContain('supported scopes');
+    }
+  });
+
+  it('formats, compares and coerces scope lists', () => {
+    expect(formatScope(['bookings', 'read', 'bookings'])).toBe('read bookings');
+    expect(formatScope([])).toBe('');
+    expect(isSubset(['read'], ['read', 'bookings'])).toBe(true);
+    expect(isSubset(['read', 'messaging'], ['read', 'bookings'])).toBe(false);
+    expect(isSubset([], ['read'])).toBe(true);
+    // Envelopes sealed before scopes existed were unrestricted grants: they keep every scope.
+    expect(coerceScopes(undefined)).toEqual([...TOOL_SCOPES]);
+    expect(coerceScopes('read')).toEqual([...TOOL_SCOPES]);
+    // A present list is filtered to known scopes; an empty list stays empty (may use no tools).
+    expect(coerceScopes(['finance', 'nope', 42, 'read'])).toEqual(['read', 'finance']);
+    expect(coerceScopes([])).toEqual([]);
+  });
+
+  it('advertises scopes_supported in both discovery documents', () => {
+    expect(protectedResourceMetadata('https://mcp.test').scopes_supported).toEqual([...TOOL_SCOPES]);
+    expect(authorizationServerMetadata('https://mcp.test').scopes_supported).toEqual([...TOOL_SCOPES]);
+  });
+});
+
+describe('scoped token envelopes', () => {
+  const seg = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const backendJwt = (payload: Record<string, unknown>) => `${seg({ alg: 'HS256', typ: 'JWT' })}.${seg(payload)}.sig`;
+  const user = { id: 'u1', role: 'renter', email: 'r@x.test' };
+  beforeEach(() => { process.env.MCP_OAUTH_SIGNING_KEY = KEY; });
+  afterEach(() => { delete process.env.MCP_OAUTH_SIGNING_KEY; });
+
+  it('carries the granted scopes through code, access and refresh tokens and echoes them in the response', () => {
+    const at = backendJwt({ sub: 'u1', role: 'renter', exp: nowSeconds() + 600 });
+    const code = issueAuthorizationCode({ clientId: 'c', redirectUri: 'https://c/cb', codeChallenge: 'x'.repeat(43), user, backendAccessToken: at, backendRefreshToken: 'brt', scopes: ['bookings', 'read', 'read'] });
+    const opened = openAuthorizationCode(code)!;
+    expect(opened.sc).toEqual(['read', 'bookings']);
+    const tokens = issueTokens({ clientId: 'c', user, backendAccessToken: at, backendRefreshToken: 'brt', scopes: opened.sc })!;
+    expect(tokens.scope).toBe('read bookings');
+    expect(openAccessToken(tokens.access_token)!.scp).toEqual(['read', 'bookings']);
+    expect(openRefreshToken(tokens.refresh_token)!.scp).toEqual(['read', 'bookings']);
+  });
+
+  it('treats envelopes sealed before scopes existed as unrestricted grants', () => {
+    const iat = nowSeconds();
+    const at = backendJwt({ sub: 'u1', role: 'renter', exp: iat + 600 });
+    const legacyAccess = seal('at', { sub: 'u1', role: 'renter', email: 'e', cid: 'c', bt: at, iat, exp: iat + 600 });
+    expect(openAccessToken(legacyAccess)!.scp).toEqual([...TOOL_SCOPES]);
+    const legacyRefresh = seal('rt', { sub: 'u1', role: 'renter', email: 'e', cid: 'c', brt: 'brt', bt: at, iat, exp: iat + 600 });
+    expect(openRefreshToken(legacyRefresh)!.scp).toEqual([...TOOL_SCOPES]);
+    const legacyCode = seal('code', { cid: 'c', ru: 'https://c/cb', cc: 'x'.repeat(43), sub: 'u1', role: 'renter', email: 'e', at, rt: 'brt', jti: crypto.randomBytes(8).toString('hex'), iat, exp: iat + 60 });
+    expect(openAuthorizationCode(legacyCode)!.sc).toEqual([...TOOL_SCOPES]);
+    // A code envelope missing its essentials is still rejected.
+    expect(openAuthorizationCode(seal('code', { iat, exp: iat + 60 }))).toBeNull();
   });
 });
