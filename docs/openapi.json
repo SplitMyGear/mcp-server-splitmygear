@@ -34,7 +34,20 @@
             "authorizationUrl": "/oauth/authorize",
             "tokenUrl": "/oauth/token",
             "refreshUrl": "/oauth/token",
-            "scopes": {}
+            "scopes": {
+              "read": "Public discovery (search, details, availability, quotes, reviews, pricing)",
+              "profile": "Own account, settings, notifications, trust score",
+              "bookings": "Renter-side bookings, payments links, waivers, pickup/return verification",
+              "favorites": "Wishlist, saved searches, saved trips",
+              "messaging": "Conversations and messages",
+              "reviews": "Write and manage reviews",
+              "listings": "Vendor catalogue: listings, pricing rules, fleet, calendar feeds, routes, insurance, waivers, services",
+              "vendor_bookings": "Vendor-side booking operations",
+              "experiences": "Hosting experiences and schedules",
+              "finance": "Earnings, payouts, promotions, tax and reports",
+              "claims": "Disputes, damage claims and incidental charges",
+              "files": "Uploading evidence and photos"
+            }
           }
         }
       },
@@ -617,6 +630,87 @@
           },
           "400": {
             "description": "Missing token"
+          }
+        }
+      }
+    },
+    "/oauth/social/start": {
+      "get": {
+        "summary": "Start Google/Apple sign-in from the hosted page",
+        "description": "Redirects the browser to the Splitt backend's provider flow (GET /api/v1/auth/{provider}) with a return_to pointing back at /oauth/social/callback carrying the sealed sign-in request.",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "google",
+                "apple"
+              ]
+            }
+          },
+          {
+            "name": "req",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Sealed sign-in request envelope from the hosted page"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the backend provider flow"
+          },
+          "400": {
+            "description": "Unknown provider or expired sign-in request"
+          },
+          "404": {
+            "description": "OAuth not enabled"
+          }
+        }
+      }
+    },
+    "/oauth/social/callback": {
+      "get": {
+        "summary": "Return leg of Google/Apple sign-in",
+        "description": "The backend redirects here with a one-time exchange code (or an error). The code is swapped for a Splitt session via POST /api/v1/auth/oauth/exchange and the OAuth authorization code is issued to the client exactly as after a password sign-in.",
+        "parameters": [
+          {
+            "name": "req",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the client redirect_uri with code and state"
+          },
+          "200": {
+            "description": "Sign-in page re-rendered with an error message"
+          },
+          "400": {
+            "description": "Expired sign-in request"
           }
         }
       }
