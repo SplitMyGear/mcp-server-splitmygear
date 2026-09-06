@@ -25,7 +25,10 @@ function defaultBackend() {
     // SPLIT-220: the createBooking listing pre-fetch hits the canonical /rentals
     // alias; the /bookings mutation paths are a different controller, unchanged.
     if (method === 'GET' && path.startsWith('/rentals/')) return { pricePerDay: '50.00' };
-    if (method === 'POST' && path === '/bookings') return { id: 'booking-1', status: 'pending', totalPrice: 100 };
+    // The create path prices via the public, server-authoritative quote.
+    if (method === 'POST' && path === '/bookings/quote') return { total: 123.45, nights: 2 };
+    if (method === 'POST' && path === '/payments/checkout-session') return { success: true, checkoutUrl: 'https://checkout.stripe.com/c/pay_123' };
+    if (method === 'POST' && path === '/bookings') return { id: 'booking-1', status: 'draft', totalPrice: 123.45 };
     if (method === 'PUT' && /^\/bookings\/.+\/status$/.test(path)) return { id: 'booking-1', status: 'cancelled' };
     if (method === 'GET' && /^\/bookings\/.+$/.test(path)) return { id: 'booking-1', status: 'pending' };
     throw new Error(`unexpected request ${method} ${path}`);
@@ -47,13 +50,18 @@ describe('Booking Tools (backend REST)', () => {
     });
     expect(result.success).toBe(true);
     expect(result.booking?.id).toBe('booking-1');
-    // SPLIT-220: the price pre-fetch hits the canonical /rentals/:id alias.
-    const prefetch = mockBackendRequest.mock.calls.find((c) => c[0] === 'GET');
-    expect(prefetch?.[1]).toBe('/rentals/listing-1');
-    // The POST carried the token and mapped checkIn/checkOut → startDate/endDate.
+    // Pricing comes from the public quote endpoint (no token needed), not a listing pre-fetch.
+    const quote = mockBackendRequest.mock.calls.find((c) => c[0] === 'POST' && c[1] === '/bookings/quote');
+    expect(quote?.[2].body).toMatchObject({ listingId: 'listing-1', startDate: '2026-07-01', endDate: '2026-07-03' });
+    expect(quote?.[2].token).toBeUndefined();
+    // The POST carried the token, mapped checkIn/checkOut → startDate/endDate, and the quoted total.
     const post = mockBackendRequest.mock.calls.find((c) => c[0] === 'POST' && c[1] === '/bookings');
     expect(post?.[2]).toMatchObject({ token: TOKEN });
-    expect(post?.[2].body).toMatchObject({ listingId: 'listing-1', startDate: '2026-07-01', endDate: '2026-07-03' });
+    expect(post?.[2].body).toMatchObject({ listingId: 'listing-1', startDate: '2026-07-01', endDate: '2026-07-03', totalPrice: 123.45 });
+    expect(result.quote).toEqual({ total: 123.45, nights: 2 });
+    // No payment link unless asked for.
+    expect(result.paymentUrl).toBeUndefined();
+    expect(mockBackendRequest.mock.calls.find((c) => c[1] === '/payments/checkout-session')).toBeUndefined();
     // guests is NOT forwarded (backend whitelist would 400 on it).
     expect(post?.[2].body).not.toHaveProperty('guests');
   });

@@ -1,0 +1,51 @@
+# CI for the Splitt MCP server: every push and pull request must lint,
+# type-check, pass the unit/route tests, and produce a Next.js build. Vercel's
+# Git integration deploys `main` only after this is green (branch protection).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npx eslint . --ext .ts,.tsx --max-warnings=0
+
+      - name: Type-check
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Test
+        run: npx jest --ci --coverage
+        env:
+          MCP_API_KEY: ci-operator-key
+
+      - name: Build
+        run: npx next build
+        env:
+          MCP_API_KEY: ci-operator-key
+          NEXT_TELEMETRY_DISABLED: '1'
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

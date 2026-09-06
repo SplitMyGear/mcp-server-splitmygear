@@ -38,6 +38,14 @@ interface RequestOptions {
   /** The caller's backend JWT, forwarded as `Authorization: Bearer <token>`. */
   token?: string;
   body?: unknown;
+  /**
+   * Extra request headers (e.g. the trusted-relay client-IP headers the OAuth
+   * login bridge sends so the backend's per-IP login throttle keys on the END
+   * USER, not on this server's egress address). Never overrides Authorization.
+   */
+  headers?: Record<string, string>;
+  /** Override the default per-request timeout (ms) for multi-step tool flows. */
+  timeoutMs?: number;
 }
 
 /**
@@ -50,7 +58,7 @@ export async function backendRequest<T = unknown>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(options.headers ?? {}) };
   if (options.token) {
     headers['Authorization'] = `Bearer ${options.token}`;
   }
@@ -63,7 +71,7 @@ export async function backendRequest<T = unknown>(
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       // AbortSignal.timeout (Node 18+/20) bounds every upstream call so a stalled
       // backend can't hang the serverless function to its maxDuration.
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(options.timeoutMs ?? REQUEST_TIMEOUT_MS),
     });
   } catch (err) {
     // A timeout abort, DNS failure, or connection reset reaches here as a raw

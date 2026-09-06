@@ -17,6 +17,7 @@ jest.mock('@/tools/messaging', () => ({ messagingTools: new Proxy({}, { get: () 
 jest.mock('@/middleware/rate-limit', () => ({ rateLimiter: jest.fn().mockResolvedValue({ success: true }) }));
 
 import { POST } from '../src/app/api/mcp/route';
+import { ALL_TOOLS } from '../src/tools/defs';
 
 function mcpRequest(body: unknown, withKey = true): any {
   const headers: Record<string, string> = {
@@ -64,5 +65,20 @@ describe('/api/mcp route handler (M2 stateless transport)', () => {
     expect(a.status).toBe(200);
     expect(b.status).toBe(200);
     expect(await b.text()).not.toContain('Already connected');
+  });
+
+  it('lists only read-scoped public tools for the operator key', async () => {
+    const res = await POST(mcpRequest({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }));
+    expect(res.status).toBe(200);
+    const names: string[] = (await res.json()).result.tools.map((t: { name: string }) => t.name);
+    expect(names).toContain('search_listings');
+    expect(names).not.toContain('get_my_profile');
+    expect(names).not.toContain('get_personalized_recommendations'); // read scope, but needs a signed-in user
+    expect(names.length).toBeGreaterThan(0);
+    for (const n of names) {
+      const def = ALL_TOOLS.find((t) => t.name === n)!;
+      expect(def.access).toBe('public');
+      expect(def.scope).toBe('read');
+    }
   });
 });

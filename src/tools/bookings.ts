@@ -1,5 +1,6 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
 import type { GetResponse, PostResponse, BookingResponseDto } from '@/lib/api-contract';
+import { call, compact, qs, type Result } from './_shared';
 
 /**
  * Booking tools call the SplitMyGear backend REST API (/api/v1) forwarding the
@@ -59,65 +60,137 @@ function validateBookingDates(checkIn: string, checkOut: string): string | null 
 }
 
 export const bookingTools = {
+  /**
+   * Create a rental booking. The backend re-prices authoritatively (SPLIT-157),
+   * but its DTO requires a positive `totalPrice`, so we first ask
+   * `POST /bookings/quote` — the same server-side pricing the checkout page
+   * shows — and send that total (falling back to a nominal value if the quote
+   * fails; an invalid listing surfaces from the POST). The booking is a DRAFT
+   * until paid, so when `withPaymentLink` is set we also open a Stripe
+   * Checkout session and return its URL for the renter to complete payment.
+   */
   async createBooking(data: {
     listingId: string;
     checkIn: string;
     checkOut: string;
     token: string;
-  }): Promise<{ success: boolean; booking?: CreatedBooking; error?: string }> {
+    protectionPlan?: 'none' | 'basic' | 'standard' | 'premier';
+    quantity?: number;
+    numberOfGuests?: number;
+    selectedAddOns?: Array<{ name: string; quantity: number }>;
+    deliveryRequested?: boolean;
+    promoCode?: string;
+    bringingPets?: boolean;
+    withPaymentLink?: boolean;
+  }): Promise<{ success: boolean; booking?: CreatedBooking; quote?: unknown; paymentUrl?: string; paymentError?: string; error?: string }> {
     if (!data.token) return { success: false, error: AUTH_REQUIRED };
     const dateError = validateBookingDates(data.checkIn, data.checkOut);
     if (dateError) return { success: false, error: dateError };
     try {
-      // The backend recomputes the authoritative total (SPLIT-157) but its DTO
-      // requires a positive totalPrice. Send a best-effort estimate from the
-      // public listing; the response reflects the server's real price.
       let totalPrice = 1;
-      try {
-        const listing = await backendRequest<{ pricePerDay?: number | string }>(
-          'GET',
-          // SPLIT-220: canonical `/rentals` alias (byte-identical to `/listings`,
-          // `@Controller(['listings', 'rentals'])`); the `/bookings` mutation
-          // path below is a different controller and stays as-is.
-          `/rentals/${data.listingId}`,
-        );
-        const perDay = parseFloat(String(listing?.pricePerDay ?? '0')) || 0;
-        const days = Math.max(
-          1,
-          Math.ceil((new Date(data.checkOut).getTime() - new Date(data.checkIn).getTime()) / 86_400_000),
-        );
-        if (perDay > 0) totalPrice = Math.round(perDay * days * 100) / 100;
-      } catch {
-        // Listing lookup failed — fall back to a nominal value; the server
-        // recomputes regardless, and an invalid listingId surfaces below.
+      let quote: unknown;
+      // Three sequential backend calls must fit the function's 30 s budget:
+      // quote 8 s + create 12 s + checkout 8 s.
+      const quoteResult = await this.getQuote({
+        listingId: data.listingId,
+        startDate: data.checkIn,
+        endDate: data.checkOut,
+        quantity: data.quantity,
+        numberOfGuests: data.numberOfGuests,
+        protectionPlan: data.protectionPlan,
+        selectedAddOns: data.selectedAddOns,
+        deliveryRequested: data.deliveryRequested,
+        bringingPets: data.bringingPets,
+      }, 8_000);
+      if (quoteResult.ok) {
+        quote = quoteResult.data;
+        const total = Number((quoteResult.data as { total?: unknown })?.total);
+        if (Number.isFinite(total) && total > 0) totalPrice = Math.round(total * 100) / 100;
       }
 
       const booking = await backendRequest<CreatedBooking>('POST', '/bookings', {
         token: data.token,
-        body: {
+        timeoutMs: 12_000,
+        body: compact({
           listingId: data.listingId,
           startDate: data.checkIn,
           endDate: data.checkOut,
           totalPrice,
-        },
+          protectionPlan: data.protectionPlan,
+          quantity: data.quantity,
+          numberOfGuests: data.numberOfGuests,
+          selectedAddOns: data.selectedAddOns,
+          deliveryRequested: data.deliveryRequested,
+          promoCode: data.promoCode,
+          bringingPets: data.bringingPets,
+        }),
       });
-      return { success: true, booking };
+
+      if (!data.withPaymentLink) return { success: true, booking, quote };
+      const bookingId = (booking as { id?: string })?.id;
+      if (!bookingId) return { success: true, booking, quote, paymentError: 'Booking created but no id was returned; cannot open checkout.' };
+      const checkout = await this.createCheckoutSession(bookingId, data.token, 8_000);
+      return checkout.ok
+        ? { success: true, booking, quote, paymentUrl: checkout.data.checkoutUrl }
+        : { success: true, booking, quote, paymentError: checkout.error };
     } catch (error) {
       return { success: false, error: toMessage(error, 'Failed to create booking') };
     }
   },
 
+  /** Public, server-authoritative price breakdown (no booking is created). */
+  getQuote(input: {
+    listingId: string;
+    startDate: string;
+    endDate: string;
+    quantity?: number;
+    numberOfGuests?: number;
+    protectionPlan?: string;
+    selectedAddOns?: Array<{ name: string; quantity: number }>;
+    deliveryRequested?: boolean;
+    bringingPets?: boolean;
+  }, timeoutMs?: number): Promise<Result<unknown>> {
+    return call('POST', '/bookings/quote', { body: compact(input), timeoutMs });
+  },
+
+  /** Stripe Checkout for a DRAFT booking; the backend picks its own return URLs. */
+  createCheckoutSession(bookingId: string, token: string, timeoutMs?: number): Promise<Result<{ checkoutUrl?: string; sessionId?: string }>> {
+    return call('POST', '/payments/checkout-session', { token, body: { bookingId }, timeoutMs });
+  },
+
+  setProtectionPlan(bookingId: string, plan: 'none' | 'basic' | 'standard' | 'premier', token: string) {
+    return call('PATCH', `/bookings/${bookingId}/protection`, { token, body: { plan } });
+  },
+
+  listMyBookings(token: string, limit = 50, offset = 0) {
+    return call<FetchedBooking[]>('GET', `/bookings/my-bookings${qs({ limit, offset })}`, { token });
+  },
+
+  getHistory(bookingId: string, token: string) {
+    return call('GET', `/bookings/${bookingId}/history`, { token });
+  },
+
+  previewCancellation(bookingId: string, token: string) {
+    return call('GET', `/bookings/${bookingId}/cancellation-preview`, { token });
+  },
+
+  respondToRescheduleProposal(bookingId: string, action: 'accept' | 'decline', token: string) {
+    return call('POST', `/bookings/${bookingId}/reschedule-proposal/${action}`, { token, body: {} });
+  },
+
   async cancelBooking(
     bookingId: string,
     token: string,
+    reason?: 'severe_weather',
   ): Promise<{ success: boolean; booking?: UpdatedBooking; message?: string; error?: string }> {
     if (!token) return { success: false, error: AUTH_REQUIRED };
     try {
       // The backend enforces that only the renter/vendor may cancel and handles
       // any refund. Ownership is derived from the forwarded token, not a param.
+      // `reason` is vendor/admin-only on the backend (a renter self-tag → 403).
       const booking = await backendRequest<UpdatedBooking>('PUT', `/bookings/${bookingId}/status`, {
         token,
-        body: { status: 'cancelled' },
+        body: compact({ status: 'cancelled', reason }),
       });
       return { success: true, booking, message: 'Booking cancelled successfully' };
     } catch (error) {
