@@ -28,3 +28,17 @@
 - **Stop a workflow only when the tree is clean.** Agents write mid-flight;
   before killing a run, check `git status` and be ready to revert their
   partial files (they never commit).
+
+## Prefix guards need a boundary test before they ship (PR #734 review, 2026-09-06)
+
+- Symptom: `pathAllowed` kept a broad `pathname.startsWith(prefix)` next to the
+  strict `=== prefix || startsWith(prefix + '/')` clauses, so `/auth/callback-evil`
+  passed a pin meant for `/auth/callback`. Existing tests only probed paths that
+  did not share the string prefix, so CI stayed green.
+- Rule: when writing any allow-list or prefix match, write the sibling case
+  (`<pinned>-evil`, `<pinned>XYZ`) as a rejection test FIRST, then the sub-path
+  acceptance, then the guard. A guard that is a strict superset of another
+  clause in the same expression is a smell: delete the broad one.
+- Rule: after an adversarial review, re-read every predicate that gates a
+  security decision with the question "what string still satisfies this that
+  the doc comment says it should not?"
