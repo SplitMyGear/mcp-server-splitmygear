@@ -40,6 +40,16 @@ interface ClientRecord {
 
 export type RegistrationError = { error: 'invalid_redirect_uri' | 'invalid_client_metadata'; error_description: string };
 
+/**
+ * May this redirect URI be registered, under the CURRENT operator policy?
+ *
+ * Loopback is always allowed (RFC 8252 §7.3: it never leaves the user's
+ * machine). Every other https host must be on the operator's allow-list, and
+ * an empty allow-list therefore permits nothing (SPLIT-1420) — the phishing
+ * guard has to fail closed, because anyone may call `/oauth/register` and a
+ * lookalike "Claude" client pointing at an attacker's redirect turns
+ * `/oauth/authorize` on the real MCP origin into a credential-harvesting page.
+ */
 export function isAllowedRedirectUri(value: string): boolean {
   let url: URL;
   try {
@@ -50,10 +60,7 @@ export function isAllowedRedirectUri(value: string): boolean {
   if (url.hash) return false;
   if (url.protocol === 'http:') return isLoopbackHost(url.hostname);
   if (url.protocol !== 'https:') return false;
-  // With an operator allow-list, only listed hosts may register (phishing
-  // guard: anyone can otherwise register a lookalike "Claude" client that
-  // sends the user to an attacker-controlled redirect).
-  return allowedRedirectHosts().length === 0 || isAllowListedHost(url.hostname);
+  return isAllowListedHost(url.hostname);
 }
 
 /** A redirect URI is "verified" when it is loopback or on the operator allow-list. */
@@ -80,9 +87,12 @@ export function registerClient(metadata: unknown): RegisteredClient | Registrati
     if (typeof uri !== 'string' || !isAllowedRedirectUri(uri)) {
       return {
         error: 'invalid_redirect_uri',
+        // Name the environment variable: an empty allow-list now rejects every
+        // https host, and an operator staring at a registration failure needs
+        // to know it is policy, not a malformed URI.
         error_description: allowedRedirectHosts().length
-          ? 'redirect_uris must be http://localhost loopback URLs or https:// URLs on an allow-listed host'
-          : 'redirect_uris must be https:// URLs or http://localhost loopback URLs',
+          ? 'redirect_uris must be http://localhost loopback URLs or https:// URLs on a host allow-listed in MCP_OAUTH_ALLOWED_REDIRECT_HOSTS'
+          : 'No redirect hosts are allow-listed on this server, so only http://localhost loopback URLs may register. The operator must set MCP_OAUTH_ALLOWED_REDIRECT_HOSTS.',
       };
     }
   }
@@ -120,7 +130,25 @@ export function registerClient(metadata: unknown): RegisteredClient | Registrati
   };
 }
 
-/** Verify a client id's signature and decode its registration record. */
+/**
+ * Verify a client id's signature and decode its registration record.
+ *
+ * WHY THERE IS NO EXPIRY (SPLIT-1420, and `client_id_expires_at: 0` in the
+ * registration response per RFC 7591 §3.2.1). A client id here is a public
+ * identifier, not a credential: it carries no authority, grants nothing on its
+ * own, and every id this server ever issued is invalidated wholesale the
+ * moment `MCP_OAUTH_SIGNING_KEY` is rotated. A fixed TTL would buy no security
+ * and would silently break long-lived connections whose MCP client does not
+ * re-run dynamic registration.
+ *
+ * What an expiry WOULD have bought — that a client registered under an old,
+ * looser policy cannot keep using it forever — is bought directly instead: the
+ * redirect URIs are re-checked against the CURRENT allow-list on every
+ * resolution, not just at registration. So tightening (or first setting)
+ * `MCP_OAUTH_ALLOWED_REDIRECT_HOSTS` takes effect immediately for ids already
+ * out in the wild, and an id minted while the list was empty stops working the
+ * moment the operator narrows it. That is the revocation lever; time is not.
+ */
 export function resolveClient(clientId: unknown): RegisteredClient | null {
   if (typeof clientId !== 'string') return null;
   const parts = clientId.split('.');
@@ -136,6 +164,8 @@ export function resolveClient(clientId: unknown): RegisteredClient | null {
     return null;
   }
   if (!record || !Array.isArray(record.ru) || record.ru.some((u) => typeof u !== 'string')) return null;
+  // Current policy, not the policy at registration time.
+  if (!record.ru.every((u) => isAllowedRedirectUri(u))) return null;
   return {
     client_id: clientId,
     client_name: record.n,

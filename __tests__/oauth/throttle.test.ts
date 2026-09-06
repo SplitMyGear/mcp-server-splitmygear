@@ -5,7 +5,7 @@
  * store is unavailable.
  */
 export {};
-import { isThrottled, recordAttempt, clearAttempts, _resetThrottle } from '../../src/lib/oauth/throttle';
+import { isThrottled, recordAttempt, claimAttempt, refundAttempt, clearAttempts, _resetThrottle } from '../../src/lib/oauth/throttle';
 import { markCodeRedeemed } from '../../src/lib/oauth/tokens';
 import { _resetSharedStoreForTests } from '../../src/lib/shared-store';
 
@@ -219,5 +219,180 @@ describe('authorization-code replay cache', () => {
     mockFetch.mockRejectedValue(new Error('timeout'));
     expect(await markCodeRedeemed(down, exp())).toBe(true);
     expect(await markCodeRedeemed(down, exp())).toBe(false);
+  });
+});
+
+/**
+ * SPLIT-1420: the ceiling has to hold against a CONCURRENT burst, which is the
+ * case the old check-then-record shape could not handle. These tests drive the
+ * attempts in PARALLEL on purpose — run sequentially they pass against the
+ * buggy code too and prove nothing.
+ */
+describe('sign-in throttle: concurrency', () => {
+  const originalEnv = process.env;
+  const STORE_URL_C = 'https://example-redis.upstash.io';
+  const BURST = 25;
+
+  /** A minimal, ATOMIC Redis: each command mutates the map without yielding. */
+  function fakeRedis() {
+    const keys = new Map<string, number>();
+    const run = (cmd: (string | number)[]): { result?: unknown; error?: string } => {
+      const [op, key] = cmd as [string, string];
+      if (op === 'GET') return { result: keys.has(key) ? String(keys.get(key)) : null };
+      if (op === 'INCR') return { result: keys.set(key, (keys.get(key) ?? 0) + 1).get(key) };
+      if (op === 'DECR') return { result: keys.set(key, (keys.get(key) ?? 0) - 1).get(key) };
+      if (op === 'EXPIRE') return { result: 1 };
+      return { error: `unsupported ${op}` };
+    };
+    const fetchMock = jest.fn(async (url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      const payload = String(url).endsWith('/pipeline')
+        ? (body as (string | number)[][]).map(run)
+        : run(body as (string | number)[]);
+      return { ok: true, status: 200, text: async () => JSON.stringify(payload) };
+    });
+    return { keys, fetchMock };
+  }
+
+  /** Stand-in for the backend round-trip that sits between check and record. */
+  const backendCall = () => new Promise((r) => setImmediate(r));
+
+  /** The SHAPE THIS TICKET REMOVED: read the counter, do the work, then record. */
+  async function attemptTheOldWay(key: string, now: number): Promise<'allowed' | 'refused'> {
+    if (await isThrottled(key, now)) return 'refused';
+    await backendCall();
+    await recordAttempt(key, now);
+    return 'allowed';
+  }
+
+  /** The shape now in use: the claim IS the check. */
+  async function attemptTheNewWay(key: string, now: number): Promise<'allowed' | 'refused'> {
+    if (!(await claimAttempt(key, now))) return 'refused';
+    await backendCall();
+    return 'allowed';
+  }
+
+  const allowed = (rs: string[]) => rs.filter((r) => r === 'allowed').length;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    for (const name of STORE_ENV) delete process.env[name];
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    _resetSharedStoreForTests();
+    _resetThrottle();
+  });
+  afterEach(() => {
+    process.env = originalEnv;
+    jest.restoreAllMocks();
+  });
+
+  it('holds the ceiling against a parallel burst, per instance (the old shape does not)', async () => {
+    const now = 1_700_000_000_000;
+    (global as unknown as { fetch: jest.Mock }).fetch = jest.fn();
+
+    // Baseline: this is what the vulnerability looked like. Every request in
+    // the burst reads the same pre-burst counter and is waved through.
+    const old = await Promise.all(Array.from({ length: BURST }, () => attemptTheOldWay('ip:198.51.100.1', now)));
+    expect(allowed(old)).toBe(BURST);
+    expect(allowed(old)).toBeGreaterThan(MAX_ATTEMPTS);
+
+    // The fix: exactly the budget gets through, no matter how they interleave.
+    const fixed = await Promise.all(Array.from({ length: BURST }, () => attemptTheNewWay('ip:198.51.100.2', now)));
+    expect(allowed(fixed)).toBe(MAX_ATTEMPTS);
+  });
+
+  it('holds the ceiling against a parallel burst across instances (shared store)', async () => {
+    const now = 1_700_000_000_000;
+    const { keys, fetchMock } = fakeRedis();
+    (global as unknown as { fetch: jest.Mock }).fetch = fetchMock as unknown as jest.Mock;
+    process.env.UPSTASH_REDIS_REST_URL = STORE_URL_C;
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'test-store-token';
+
+    const old = await Promise.all(Array.from({ length: BURST }, () => attemptTheOldWay('ip:203.0.113.1', now)));
+    expect(allowed(old)).toBe(BURST); // every GET saw the same zero
+
+    _resetThrottle(); // the local layer must not be what saves us
+    const fixed = await Promise.all(Array.from({ length: BURST }, () => attemptTheNewWay('ip:203.0.113.2', now)));
+    expect(allowed(fixed)).toBe(MAX_ATTEMPTS);
+
+    // Every claim in the burst was counted, including the refused ones.
+    const windowId = Math.floor(now / WINDOW_MS);
+    expect(keys.get(`mcp:login:ip:203.0.113.2:${windowId}`)).toBe(BURST);
+  });
+
+  it('refunds a claim that was not a failure, so successes never spend the budget', async () => {
+    const now = 1_700_000_000_000;
+    const { keys, fetchMock } = fakeRedis();
+    (global as unknown as { fetch: jest.Mock }).fetch = fetchMock as unknown as jest.Mock;
+    process.env.UPSTASH_REDIS_REST_URL = STORE_URL_C;
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'test-store-token';
+    const windowId = Math.floor(now / WINDOW_MS);
+    const key = `mcp:login:ip:203.0.113.5:${windowId}`;
+
+    // 50 successful sign-ins in one window: each claims, then hands it back.
+    for (let i = 0; i < 50; i++) {
+      expect(await claimAttempt('ip:203.0.113.5', now)).toBe(true);
+      await refundAttempt('ip:203.0.113.5', now);
+    }
+    expect(keys.get(key)).toBe(0);
+    expect(await isThrottled('ip:203.0.113.5', now)).toBe(false);
+
+    // Failures still accumulate normally afterwards.
+    for (let i = 0; i < MAX_ATTEMPTS; i++) expect(await claimAttempt('ip:203.0.113.5', now)).toBe(true);
+    expect(await claimAttempt('ip:203.0.113.5', now)).toBe(false);
+    expect(await isThrottled('ip:203.0.113.5', now)).toBe(true);
+  });
+
+  it('refunds locally too, one slot at a time, and never inflates the budget', async () => {
+    const now = 1_700_000_000_000;
+    const key = 'ip:192.0.2.7';
+    (global as unknown as { fetch: jest.Mock }).fetch = jest.fn();
+
+    for (let i = 0; i < MAX_ATTEMPTS; i++) expect(await claimAttempt(key, now)).toBe(true);
+    // A refused claim still counts — the counter cannot be read without
+    // consuming — so the caller hands it back, restoring the pre-attempt state.
+    expect(await claimAttempt(key, now)).toBe(false);
+    await refundAttempt(key, now);
+    expect(await claimAttempt(key, now)).toBe(false); // still at the ceiling
+    await refundAttempt(key, now);
+
+    // Freeing one real slot admits exactly one more attempt, and no more.
+    await refundAttempt(key, now);
+    expect(await claimAttempt(key, now)).toBe(true);
+    expect(await claimAttempt(key, now)).toBe(false);
+    await refundAttempt(key, now);
+
+    // Over-refunding cannot hand out extra budget: the counter floors at zero,
+    // so the ceiling is still exactly MAX_ATTEMPTS afterwards.
+    for (let i = 0; i < 50; i++) await refundAttempt(key, now);
+    const results = await Promise.all(Array.from({ length: BURST }, () => attemptTheNewWay(key, now)));
+    expect(allowed(results)).toBe(MAX_ATTEMPTS);
+  });
+
+  it('warns exactly once per instance when no shared store is configured, naming what is degraded', async () => {
+    (global as unknown as { fetch: jest.Mock }).fetch = jest.fn();
+    const warn = console.warn as jest.Mock;
+    await claimAttempt('ip:198.51.100.9');
+    await claimAttempt('ip:198.51.100.9');
+    await claimAttempt('email:someone@x.test');
+
+    const degradation = warn.mock.calls.map((c) => String(c[0])).filter((m) => m.includes('NO SHARED STORE CONFIGURED'));
+    expect(degradation).toHaveLength(1);
+    // It has to say WHICH protections are degraded, or it is just noise.
+    expect(degradation[0]).toContain('rate limit');
+    expect(degradation[0]).toContain('sign-in failure throttle');
+    expect(degradation[0]).toContain('replay');
+    expect(degradation[0]).toContain('UPSTASH_REDIS_REST_URL');
+    expect(degradation[0]).toContain('MCP_REQUIRE_SHARED_STORE=1');
+  });
+
+  it('says nothing when a shared store IS configured', async () => {
+    const { fetchMock } = fakeRedis();
+    (global as unknown as { fetch: jest.Mock }).fetch = fetchMock as unknown as jest.Mock;
+    process.env.UPSTASH_REDIS_REST_URL = STORE_URL_C;
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'test-store-token';
+    await claimAttempt('ip:198.51.100.11');
+    const warn = console.warn as jest.Mock;
+    expect(warn.mock.calls.filter((c) => String(c[0]).includes('NO SHARED STORE'))).toHaveLength(0);
   });
 });

@@ -24,7 +24,7 @@
 import crypto from 'crypto';
 import { open, seal, nowSeconds } from './envelope';
 import { readBackendJwtClaims } from '@/lib/jwt';
-import { redeemOnce, sharedStoreEnabled } from '@/lib/shared-store';
+import { redeemOnce, sharedStoreEnabled, warnIfNoSharedStore } from '@/lib/shared-store';
 import { coerceScopes, formatScope, type ToolScope } from './scopes';
 import type { BackendUser } from './backend-auth';
 
@@ -143,6 +143,8 @@ function markRedeemedLocally(jti: string, exp: number, now: number): boolean {
  * store is not configured or unavailable for this request.
  */
 export async function markCodeRedeemed(jti: string, exp: number): Promise<boolean> {
+  // Once per cold instance, say out loud that single-use is per-instance here.
+  warnIfNoSharedStore();
   const now = nowSeconds();
   if (redeemedCodes.has(jti)) return false;
   if (sharedStoreEnabled()) {

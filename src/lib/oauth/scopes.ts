@@ -79,11 +79,19 @@ export function isSubset(a: readonly ToolScope[], b: readonly ToolScope[]): bool
 /**
  * Normalise a scope list read back from a sealed envelope. Unknown entries are
  * dropped (a scope retired from the taxonomy simply stops unlocking anything).
- * A missing list comes from an envelope sealed before scopes existed: those
- * grants were unrestricted at the time, so they keep every scope until they
- * expire (access tokens within minutes, refresh tokens within their TTL).
+ *
+ * FAILS CLOSED (SPLIT-1420): anything that is not a list of scopes — missing,
+ * null, a bare string, a number — yields NO scopes, not every scope. This is an
+ * authorization decision reached while parsing untrusted-shaped data, and the
+ * only safe default for one of those is "grants nothing". It previously
+ * returned the full taxonomy so that envelopes sealed before scopes existed
+ * would keep working; those grants are all long expired (access tokens live
+ * minutes, refresh tokens their TTL, and rotating MCP_OAUTH_SIGNING_KEY voids
+ * every envelope anyway), and the cost of being wrong in that direction is a
+ * silent full-access grant. A caller that lands here re-authorizes; the sign-in
+ * page is one redirect away.
  */
 export function coerceScopes(value: unknown): ToolScope[] {
-  if (!Array.isArray(value)) return [...TOOL_SCOPES];
+  if (!Array.isArray(value)) return [];
   return canonical(value.filter((v): v is ToolScope => typeof v === 'string' && isToolScope(v)));
 }

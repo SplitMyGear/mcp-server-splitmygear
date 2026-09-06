@@ -134,6 +134,36 @@ function toLoginOutcome(result: unknown, unexpected: string): LoginOutcome {
   throw new AuthBridgeError(502, unexpected);
 }
 
+/**
+ * The ONE thing an unauthenticated caller is ever told about a rejected
+ * password. Deliberately says nothing about whether the address is registered.
+ */
+const GENERIC_LOGIN_FAILURE = 'Invalid email or password.';
+
+/**
+ * A rejection the user genuinely needs to read, and which cannot be an
+ * enumeration oracle because the backend only reaches it AFTER the password
+ * verified (`auth.service.validateUser`: the suspension check lives inside the
+ * successful-compare branch). Matching on the wording is coupling we would
+ * rather not have, but the backend signals this with a 401 and a string and
+ * nothing else; the existing social-exchange bridge below already does the
+ * same, so both paths follow one rule. Failing to match is SAFE — the message
+ * simply collapses to the generic one.
+ */
+const POST_AUTHENTICATION_401 = /suspended/i;
+
+/**
+ * Sign in with a password.
+ *
+ * The backend's 401 body is NOT relayed verbatim (SPLIT-1420). As of this
+ * writing it cannot leak anything — an unknown address and a wrong password
+ * come out of the same `throw new UnauthorizedException('Invalid email or
+ * password')`, with a dummy bcrypt compare equalising the timing — but this
+ * page is unauthenticated, and a future backend wording change would silently
+ * turn it into a user-enumeration oracle for every MCP client. So the oracle
+ * is closed HERE, where the untrusted audience is, instead of being assumed
+ * closed upstream.
+ */
 export async function backendLogin(email: string, password: string, ctx: ClientContext): Promise<LoginOutcome> {
   let result: unknown;
   try {
@@ -142,7 +172,11 @@ export async function backendLogin(email: string, password: string, ctx: ClientC
       headers: relayHeaders(ctx),
     });
   } catch (error) {
-    throw toBridgeError(error, 'Sign-in failed');
+    const bridged = toBridgeError(error, 'Sign-in failed');
+    if ((bridged.status === 401 || bridged.status === 403) && !POST_AUTHENTICATION_401.test(bridged.message)) {
+      throw new AuthBridgeError(bridged.status, GENERIC_LOGIN_FAILURE);
+    }
+    throw bridged;
   }
   return toLoginOutcome(result, 'Unexpected response from Splitt sign-in');
 }

@@ -17,6 +17,7 @@
  */
 import crypto from 'crypto';
 import net from 'net';
+import { sharedStoreEnabled, sharedStoreRequired } from '@/lib/shared-store';
 
 /** Minimum length of the sealing secret; generate it with `openssl rand -base64 48`. */
 const MIN_SECRET_LENGTH = 32;
@@ -33,9 +34,42 @@ export function oauthSigningSecret(): string | undefined {
   return secret;
 }
 
-/** True when the OAuth layer is configured and may issue/validate artifacts. */
+/**
+ * True when the OAuth layer is configured and may issue/validate artifacts.
+ *
+ * Two preconditions. The signing secret is unconditional — without it nothing
+ * can be sealed. The shared store is conditional on the operator asking for it
+ * (`MCP_REQUIRE_SHARED_STORE=1`): several of OAuth's security properties (the
+ * sign-in failure throttle, the authorization-code single-use cache) are only
+ * cross-instance when a shared store backs them, and an operator who wants
+ * those enforced rather than best-effort can make their absence fatal instead
+ * of merely loud. It is opt-in, not the default, because refusing by default
+ * would take the only user-facing sign-in path offline over a paid dependency
+ * — see the reasoning in `lib/shared-store.warnIfNoSharedStore`.
+ */
 export function oauthEnabled(): boolean {
-  return oauthSigningSecret() !== undefined;
+  if (oauthSigningSecret() === undefined) return false;
+  if (sharedStoreRequired() && !sharedStoreEnabled()) {
+    warnOAuthDisabledWithoutStore();
+    return false;
+  }
+  return true;
+}
+
+let storeGateWarned = false;
+function warnOAuthDisabledWithoutStore(): void {
+  if (storeGateWarned) return;
+  storeGateWarned = true;
+  console.warn(
+    '[oauth] DISABLED: MCP_REQUIRE_SHARED_STORE=1 but no shared store is configured. ' +
+      'Every OAuth endpoint will fail closed until UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN ' +
+      '(or the Vercel KV equivalents) are set, or the requirement is lifted.',
+  );
+}
+
+/** Test hook: forget the one-shot OAuth gate warning. */
+export function _resetOAuthConfigForTests(): void {
+  storeGateWarned = false;
 }
 
 /**
@@ -111,11 +145,17 @@ export function validIp(value: string | null | undefined): string | undefined {
 }
 
 /**
- * Optional allow-list of redirect hosts for dynamic client registration
+ * REQUIRED allow-list of redirect hosts for dynamic client registration
  * (`MCP_OAUTH_ALLOWED_REDIRECT_HOSTS`, comma-separated; a leading dot allows
  * subdomains, e.g. `claude.ai,.claude.com`). Loopback is always allowed.
- * Unset = any https host may register, and the sign-in page labels the app
- * as unverified.
+ *
+ * EMPTY MEANS DENY (SPLIT-1420). It used to mean "allow any https host", which
+ * let anyone register a client called "Claude" whose redirect_uri points at
+ * their own server: `/oauth/authorize` on the real MCP origin then renders a
+ * genuine Splitt sign-in page that hands the resulting code to the attacker.
+ * An unset environment variable must not be what stands between a deployment
+ * and an open redirector, so the default is now the safe one and an operator
+ * opts IN to each host they trust.
  */
 export function allowedRedirectHosts(): string[] {
   return (process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS || '')

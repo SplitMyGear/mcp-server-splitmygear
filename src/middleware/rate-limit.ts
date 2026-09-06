@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { trustProxyHeaders, validIp } from '@/lib/oauth/config';
-import { incrementWindow, sharedStoreEnabled } from '@/lib/shared-store';
+import { incrementWindow, sharedStoreEnabled, warnIfNoSharedStore } from '@/lib/shared-store';
 
 /**
  * Rate limiter (M8 / SPLIT-254; distributed variant on top).
@@ -90,6 +90,8 @@ export async function rateLimiter(
   request: NextRequest,
   userId?: string
 ): Promise<RateLimitResult> {
+  // Once per cold instance, say out loud that this limiter is per-instance.
+  warnIfNoSharedStore();
   // Key on the authenticated principal (user id) when there is one; otherwise
   // (operator key) on the caller's network address. Namespaced so a user id
   // can never collide with an IP string.

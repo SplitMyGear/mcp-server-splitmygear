@@ -23,12 +23,25 @@
  *
  * Primitives (all return `null` when the store is unavailable):
  * - `incrementWindow(key, windowSeconds)`: fixed-window counter. INCR plus
- *   EXPIRE-if-no-ttl in one pipeline; returns the count after this hit.
+ *   EXPIRE-if-no-ttl in one pipeline; returns the count after this hit. INCR is
+ *   ATOMIC at the server, which is what lets a caller use "increment, then look
+ *   at the number I got back" as a race-free check-and-consume (see
+ *   `oauth/throttle`); a GET followed by a later INCR is NOT race-free.
+ * - `decrementWindow(key, windowSeconds)`: the inverse, for giving back a slot
+ *   claimed by `incrementWindow` that turned out not to count.
  * - `setIfAbsent(key, ttlSeconds)`: SET ... EX ttl NX; true when this call
  *   created the key, false when it already existed.
  * - `redeemOnce(key, ttlSeconds)`: `setIfAbsent` under a name that reads well
  *   for one-time tokens (authorization codes): true the first time, false on a
  *   replay.
+ *
+ * WITHOUT a store every one of these resolves `null` and the callers fall back
+ * to per-instance memory, which on Vercel means "per concurrent lambda" — i.e.
+ * near-useless against an attacker who simply opens several connections. That
+ * degradation is deliberate but must never be SILENT: `warnIfNoSharedStore()`
+ * names the affected protections once per instance, and an operator who wants
+ * the strict posture instead sets `MCP_REQUIRE_SHARED_STORE=1` (see
+ * `sharedStoreRequired`, consumed by `oauth/config.oauthEnabled`).
  */
 
 const KEY_PREFIX = 'mcp:';
@@ -50,6 +63,7 @@ interface StoreConfig {
 }
 
 let lastWarnAt = 0;
+let degradationWarned = false;
 
 /**
  * Resolve the store credentials from the environment, read on every call so a
@@ -71,6 +85,53 @@ function storeConfig(): StoreConfig | null {
 /** True when a shared store is configured (credentials present), regardless of reachability. */
 export function sharedStoreEnabled(): boolean {
   return storeConfig() !== null;
+}
+
+/**
+ * The protections that silently become per-instance (and therefore per
+ * concurrent lambda) when no shared store is configured. Listed by name so the
+ * startup warning below tells an operator exactly what they are running
+ * without, rather than a vague "degraded" line.
+ */
+const DEGRADED_WITHOUT_STORE = [
+  'the per-principal MCP rate limit',
+  'the hosted sign-in failure throttle',
+  'the authorization-code single-use (replay) cache',
+];
+
+/**
+ * Whether the operator has demanded a shared store as a hard precondition
+ * (`MCP_REQUIRE_SHARED_STORE=1`). Default OFF: see `warnIfNoSharedStore` for
+ * why the degraded mode is allowed to run at all.
+ */
+export function sharedStoreRequired(): boolean {
+  return process.env.MCP_REQUIRE_SHARED_STORE === '1';
+}
+
+/**
+ * Say ONCE per instance, loudly, that the cross-instance protections are not
+ * actually cross-instance. Called from each degraded path (rate limiter,
+ * sign-in throttle, code replay cache), so on serverless it lands on the first
+ * request a cold instance serves — the closest thing to "startup" there is.
+ *
+ * Why this is a warning and not a refusal by default: the shared store is a
+ * paid dependency, and failing closed on it would take the ONLY user-facing
+ * sign-in path offline entirely. The Splitt backend remains the authoritative
+ * throttle (it is fed the real client IP via `MCP_BFF_RELAY_KEY`) and PKCE S256
+ * — mandatory here — already binds an authorization code to its requester, so
+ * the degraded layer is defence-in-depth that is thinner, not absent. An
+ * operator who prefers the strict posture flips `MCP_REQUIRE_SHARED_STORE=1`
+ * and OAuth then refuses to enable at all.
+ */
+export function warnIfNoSharedStore(): void {
+  if (degradationWarned || sharedStoreEnabled()) return;
+  degradationWarned = true;
+  console.warn(
+    '[shared-store] NO SHARED STORE CONFIGURED (UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN, ' +
+      'or the Vercel KV equivalents). These protections are per-instance only and a distributed ' +
+      `attacker can outrun them: ${DEGRADED_WITHOUT_STORE.join(', ')}. ` +
+      'Configure the store, or set MCP_REQUIRE_SHARED_STORE=1 to refuse to serve OAuth without one.',
+  );
 }
 
 /** Namespace a key under `mcp:` exactly once (a caller passing the full key is left alone). */
@@ -166,30 +227,51 @@ function asCount(value: unknown): number | null {
  * plain `EXPIRE` is issued so the key still expires. `null` means the store is
  * unavailable: use the local fallback for this request.
  */
-export async function incrementWindow(key: string, windowSeconds: number): Promise<number | null> {
+export function incrementWindow(key: string, windowSeconds: number): Promise<number | null> {
+  return stepWindow('INCR', key, windowSeconds);
+}
+
+/**
+ * Decrement a fixed-window counter and return the count after this hit — the
+ * inverse of `incrementWindow`, used to hand back a slot that was claimed
+ * optimistically and turned out not to be spent (a sign-in attempt that
+ * SUCCEEDED does not count against a failure budget).
+ *
+ * Always paired with a preceding `incrementWindow` on the SAME key, so the
+ * counter cannot be driven below zero by normal use. `EXPIRE ... NX` rides
+ * along for the pathological case where the window key expired in between:
+ * DECR would otherwise resurrect it at -1 with no TTL and leave it there.
+ */
+export function decrementWindow(key: string, windowSeconds: number): Promise<number | null> {
+  return stepWindow('DECR', key, windowSeconds);
+}
+
+/** INCR/DECR plus EXPIRE-if-no-ttl in one round trip; `null` when the store is unavailable. */
+async function stepWindow(command: 'INCR' | 'DECR', key: string, windowSeconds: number): Promise<number | null> {
   const cfg = storeConfig();
   if (!cfg) return null;
 
   const fullKey = namespacedKey(key);
   const ttl = ttlSeconds(windowSeconds);
-  const replies = await pipeline(cfg, [['INCR', fullKey], ['EXPIRE', fullKey, ttl, 'NX']], 'INCR');
+  const replies = await pipeline(cfg, [[command, fullKey], ['EXPIRE', fullKey, ttl, 'NX']], command);
   if (!replies) return null;
 
-  const [incr, expire] = replies;
-  if (incr.error !== undefined) {
-    warnUnavailable('INCR', incr.error);
+  const [step, expire] = replies;
+  if (step.error !== undefined) {
+    warnUnavailable(command, step.error);
     return null;
   }
-  const count = asCount(incr.result);
+  const count = asCount(step.result);
   if (count === null) {
-    warnUnavailable('INCR', 'non-numeric INCR result');
+    warnUnavailable(command, `non-numeric ${command} result`);
     return null;
   }
 
-  if (expire.error !== undefined && count === 1) {
+  if (expire.error !== undefined && (count === 1 || count <= 0)) {
     // The counter exists without a TTL: fall back to a plain EXPIRE so the
-    // window still closes. Only on the first hit, otherwise every request
-    // would push the expiry out again. Its outcome does not change the count.
+    // window still closes. Only when this call created the key (INCR to 1, or
+    // a DECR that resurrected it), otherwise every request would push the
+    // expiry out again. Its outcome does not change the count.
     await execute(cfg, ['EXPIRE', fullKey, ttl], 'EXPIRE');
   }
 
@@ -247,7 +329,8 @@ export function redeemOnce(key: string, ttlSecondsWanted: number): Promise<boole
   return setIfAbsent(key, ttlSecondsWanted);
 }
 
-/** Test hook: forget the warn throttle so each test observes the first warning. */
+/** Test hook: forget both warn throttles so each test observes the first warning. */
 export function _resetSharedStoreForTests(): void {
   lastWarnAt = 0;
+  degradationWarned = false;
 }

@@ -20,10 +20,18 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/**
+ * `form-action 'self'` is the one that matters most on a page that carries a
+ * password field: `default-src 'none'` does NOT restrict form submission, so
+ * without it any injected or rewritten `<form action>` could post the
+ * credentials straight to another origin. `base-uri 'none'` already blocks the
+ * `<base href>` trick that would repoint this page's `action=""`.
+ */
 export const PAGE_HEADERS: Record<string, string> = {
   'Content-Type': 'text/html; charset=utf-8',
   'Cache-Control': 'no-store',
-  'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; frame-ancestors 'none'",
+  'Content-Security-Policy':
+    "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
   'X-Frame-Options': 'DENY',
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',

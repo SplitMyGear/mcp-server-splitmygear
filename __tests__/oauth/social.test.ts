@@ -125,6 +125,8 @@ describe('social sign-in on the hosted page', () => {
     process.env.MCP_PUBLIC_URL = BASE;
     process.env.MCP_BFF_RELAY_KEY = 'relay-secret';
     process.env.MCP_TRUST_PROXY_HEADERS = '1';
+    // SPLIT-1420: an https redirect host must be allow-listed to register.
+    process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS = 'client.example';
     _resetThrottle();
     mockBackendRequest.mockReset();
   });
@@ -133,6 +135,7 @@ describe('social sign-in on the hosted page', () => {
     delete process.env.MCP_PUBLIC_URL;
     delete process.env.MCP_BFF_RELAY_KEY;
     delete process.env.MCP_TRUST_PROXY_HEADERS;
+    delete process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS;
   });
 
   describe('start leg', () => {
@@ -322,6 +325,35 @@ describe('social sign-in on the hosted page', () => {
       // The nonce from one start does not unlock another start's request.
       const second = await start(req);
       expect((await socialCallback(callbackRequest(second.returnTo, { code: EXCHANGE_CODE }, cookie))).status).toBe(400);
+      expect(mockBackendRequest).not.toHaveBeenCalled();
+    });
+
+    it('refuses a multi-byte nonce cookie of equal character length instead of crashing (SPLIT-1420)', async () => {
+      const { req } = await signInPage();
+      const { returnTo, cookie } = await start(req);
+      mockBackendRequest.mockReset();
+
+      // The nonce is base64url, i.e. ASCII: one UTF-16 unit per byte. A cookie
+      // with the SAME String.length but a multi-byte character encodes to more
+      // BYTES, so the old `cookie.length !== expected.length` guard waved it
+      // through and crypto.timingSafeEqual threw RangeError on the mismatched
+      // buffers -- an unhandled 500 on the callback, reachable by anyone who
+      // can set a cookie. It must be an ordinary, boring refusal.
+      const multiByte = `\u00e9${'A'.repeat(cookie.length - 1)}`;
+      expect(multiByte.length).toBe(cookie.length);
+      expect(Buffer.byteLength(multiByte, 'utf8')).toBeGreaterThan(Buffer.byteLength(cookie, 'utf8'));
+
+      const res = await socialCallback(callbackRequest(returnTo, { code: EXCHANGE_CODE }, multiByte));
+      expect(res.status).toBe(400);
+      expect(await res.text()).toContain('did not start from the Splitt sign-in page');
+
+      // Several multi-byte characters, and one at the end rather than the start.
+      const trailing = `${'A'.repeat(cookie.length - 3)}\u00fc\u00df\u00ff`;
+      expect(trailing.length).toBe(cookie.length);
+      expect((await socialCallback(callbackRequest(returnTo, { code: EXCHANGE_CODE }, trailing))).status).toBe(400);
+
+      // A cookie that is genuinely shorter is still refused the ordinary way.
+      expect((await socialCallback(callbackRequest(returnTo, { code: EXCHANGE_CODE }, 'A'))).status).toBe(400);
       expect(mockBackendRequest).not.toHaveBeenCalled();
     });
 

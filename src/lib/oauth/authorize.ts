@@ -45,7 +45,7 @@ import {
 } from './backend-auth';
 import { renderErrorPage, renderLoginPage, renderOtpPage, PAGE_HEADERS } from './pages';
 import { coerceScopes, parseScopeParam, type ToolScope } from './scopes';
-import { isThrottled, recordAttempt } from './throttle';
+import { claimAttempt, refundAttempt } from './throttle';
 import { clientIp, isSameOriginPost, readParams, type OAuthErrorCode } from './http';
 
 /** How long a rendered sign-in page stays submittable. */
@@ -233,26 +233,84 @@ export async function handleAuthorizeGet(request: Request): Promise<Response> {
 }
 
 /**
- * Throttle keys for a sign-in attempt: the caller's (trusted) IP and the
- * targeted account. Only FAILURES are recorded, so a legitimate owner is never
- * locked out by someone else's guesses (mirrors the backend's SPLIT-427 rule),
- * and nothing is cleared on success (a valid login must not reset the budget
- * for guesses at other accounts). Without a trusted IP the per-IP key is
- * skipped: the backend's own per-IP throttle still applies to our address.
- * (With a shared store the check itself is what is counted; see throttle.ts.)
+ * Throttle keys for a sign-in attempt, split by WHERE they are enforced.
+ *
+ * `gate` keys identify the CALLER (their IP, the social round-trip they
+ * started). Only they can spend them, so refusing up front is safe.
+ *
+ * `deferred` keys identify the TARGET (the account being signed in to).
+ * Anyone who knows an email address can spend one of these, so gating on them
+ * up front is a targeted account-lockout DoS (CWE-645): ten wrong passwords
+ * for victim@example.com and the real owner cannot sign in for ten minutes,
+ * renewable forever. They are therefore claimed (so distributed guessing at a
+ * single account is still counted and still capped) but only ENFORCED once the
+ * backend has already rejected the credentials — a correct password returns
+ * before the deferred budget is ever consulted, so the owner gets in no matter
+ * how hard someone else has been guessing.
+ *
+ * This is the ordering the Splitt backend itself adopted in SPLIT-427: its
+ * per-email lockout is evaluated only inside the failed-credential branch,
+ * never ahead of it. The comment this replaces claimed to mirror that rule
+ * while doing the opposite — checking the per-account counter BEFORE the
+ * credential check, which is exactly the DoS SPLIT-427 removed.
+ *
+ * Trade-off, stated plainly: the per-account counter no longer keeps a
+ * password-spray away from the backend, only from succeeding. The backend's
+ * own per-IP (10) and per-email (15) throttles over the same ten-minute window
+ * are the authoritative control, and they see the real caller's address
+ * because we relay it (`MCP_BFF_RELAY_KEY`). Without a trusted IP the per-IP
+ * key is skipped entirely; the backend still throttles our egress address.
  */
-function throttleKeys(ip: string | undefined, email: string | undefined): string[] {
-  const keys: string[] = [];
-  if (ip) keys.push(`ip:${ip}`);
-  if (email) keys.push(`email:${email.trim().toLowerCase()}`);
-  return keys;
+interface AttemptKeys {
+  gate: string[];
+  deferred: string[];
 }
-async function anyThrottled(keys: string[]): Promise<boolean> {
-  const results = await Promise.all(keys.map((k) => isThrottled(k)));
-  return results.some(Boolean);
+
+function throttleKeys(ip: string | undefined, account: string | undefined): AttemptKeys {
+  return {
+    gate: ip ? [`ip:${ip}`] : [],
+    deferred: account ? [`email:${account.trim().toLowerCase()}`] : [],
+  };
 }
-async function recordFailure(keys: string[]): Promise<void> {
-  await Promise.all(keys.map((k) => recordAttempt(k)));
+
+interface Attempt {
+  /** false when the CALLER's own budget is spent: refuse before touching the backend. */
+  allowed: boolean;
+  /** true when the TARGET account's budget is spent — only meaningful once the credentials failed. */
+  accountBudgetSpent: boolean;
+  /** Hand every claimed slot back: this attempt was not a failure. Idempotent. */
+  refund(): Promise<void>;
+}
+
+/**
+ * Claim one slot on every key for this attempt, atomically (see throttle.ts:
+  * the claim IS the check, so a concurrent burst cannot all read "under the
+ * limit" and sail past the ceiling together).
+ *
+ * A refused attempt gives its slots straight back: being turned away is not a
+ * failed guess, and letting refusals accumulate would let an attacker hold a
+ * lockout open indefinitely.
+ */
+async function beginAttempt(keys: AttemptKeys): Promise<Attempt> {
+  // One timestamp for the whole attempt so a claim and its refund always land
+  // on the same fixed window, even across a window boundary mid-request.
+  const now = Date.now();
+  const claim = async (key: string) => ({ key, ok: await claimAttempt(key, now) });
+  const [gate, deferred] = await Promise.all([
+    Promise.all(keys.gate.map(claim)),
+    Promise.all(keys.deferred.map(claim)),
+  ]);
+
+  let settled = false;
+  const refund = async (): Promise<void> => {
+    if (settled) return;
+    settled = true;
+    await Promise.all([...gate, ...deferred].map((c) => refundAttempt(c.key, now)));
+  };
+
+  const allowed = gate.every((c) => c.ok);
+  if (!allowed) await refund();
+  return { allowed, accountBudgetSpent: deferred.some((c) => !c.ok), refund };
 }
 
 export async function handleAuthorizePost(request: Request): Promise<Response> {
@@ -273,14 +331,19 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
     const password = params.password || '';
     if (!email || !password) return loginPage(rq, { email, error: 'Enter your email and password.' }, 400);
     if (email.length > MAX_EMAIL_LENGTH) return loginPage(rq, { email: '', error: 'Enter a valid email address.' }, 400);
-    const keys = throttleKeys(ctx.ip, email);
-    if (await anyThrottled(keys)) return loginPage(rq, { email, error: THROTTLED_MESSAGE }, 429);
+    const attempt = await beginAttempt(throttleKeys(ctx.ip, email));
+    if (!attempt.allowed) return loginPage(rq, { email, error: THROTTLED_MESSAGE }, 429);
 
     try {
       const outcome = await backendLogin(email, password, ctx);
+      // The credentials were accepted (session or 2FA challenge): give the
+      // slots back so a real sign-in never spends the failure budget.
+      await attempt.refund();
       return await completeLogin(rq, outcome, ctx, email.toLowerCase());
     } catch (error) {
-      await recordFailure(keys);
+      // A rejected attempt keeps its claims: they ARE the failure record. Only
+      // now does the targeted account's budget apply (see throttleKeys).
+      if (attempt.accountBudgetSpent) return loginPage(rq, { email, error: THROTTLED_MESSAGE }, 429);
       return loginPage(rq, { email, error: bridgeErrorMessage(error, 'Sign-in failed. Please try again.') }, pageStatusFor(error));
     }
   }
@@ -288,10 +351,14 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
   if (step === 'otp' || step === 'otp_resend') {
     const chal = open<ChallengePayload>('chal', params.chal);
     if (!chal) return html(renderErrorPage('Verification expired', 'This verification step has expired. Go back to the application and connect again.'), 400);
-    const keys = throttleKeys(ctx.ip, chal.em ?? chal.me);
-    if (await anyThrottled(keys)) return otpPage(chal.rq, chal.ct, chal.me, THROTTLED_MESSAGE, chal.em);
+    const attempt = await beginAttempt(throttleKeys(ctx.ip, chal.em ?? chal.me));
+    if (!attempt.allowed) return otpPage(chal.rq, chal.ct, chal.me, THROTTLED_MESSAGE, chal.em);
 
     if (step === 'otp_resend') {
+      // Asking for a new code is not a guess, so it never spends the failure
+      // budget (the backend caps resends itself). The claim above was only how
+      // the gate is read atomically; hand it straight back.
+      await attempt.refund();
       try {
         const sent = await backendSendOtp(chal.ct, ctx);
         return otpPage(chal.rq, chal.ct, sent.maskedEmail || chal.me, 'A new code is on its way.', chal.em);
@@ -301,16 +368,20 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
     }
 
     const code = (params.code || '').trim();
-    if (!code) return otpPage(chal.rq, chal.ct, chal.me, 'Enter the code from your email.', chal.em);
+    if (!code) {
+      await attempt.refund(); // nothing was tried
+      return otpPage(chal.rq, chal.ct, chal.me, 'Enter the code from your email.', chal.em);
+    }
     try {
       const session = await backendVerifyOtp(chal.ct, code, ctx);
+      await attempt.refund();
       return successRedirect(chal.rq, session);
     } catch (error) {
-      await recordFailure(keys);
       if (error instanceof AuthBridgeError && error.status === 401) {
         // Challenge consumed/expired → start over with the original request intact.
         return loginPage(chal.rq, { error: 'That verification session has expired. Please sign in again.' }, 401);
       }
+      if (attempt.accountBudgetSpent) return otpPage(chal.rq, chal.ct, chal.me, THROTTLED_MESSAGE, chal.em);
       return otpPage(chal.rq, chal.ct, chal.me, bridgeErrorMessage(error, 'Verification failed.'), chal.em);
     }
   }
@@ -399,9 +470,24 @@ function cookieValue(request: Request, name: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Constant-time nonce comparison.
+ *
+ * The length guard has to be on the BYTES, not on `String.length`: the cookie
+ * value is attacker-supplied and `String.length` counts UTF-16 code units,
+ * so `'é'` (1 unit, 2 bytes) passes a length check against `'a'` (1 unit,
+ * 1 byte) and `timingSafeEqual` then THROWS on the mismatched buffers —
+ * an unhandled 500 on the callback, reachable by anyone who can set a cookie.
+ * Encode first, compare the buffer lengths, and only then compare in constant
+ * time. (Buffer.from defaults to utf8; it is spelled out here because this is
+ * exactly the assumption that was wrong.)
+ */
 function nonceMatches(cookie: string | undefined, expected: string | undefined): boolean {
-  if (!cookie || !expected || cookie.length !== expected.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(cookie), Buffer.from(expected));
+  if (!cookie || !expected) return false;
+  const actual = Buffer.from(cookie, 'utf8');
+  const wanted = Buffer.from(expected, 'utf8');
+  if (actual.length !== wanted.length) return false;
+  return crypto.timingSafeEqual(actual, wanted);
 }
 
 /** The request without its social binding: what later renders and the code issuance work from. */
@@ -496,20 +582,24 @@ export async function handleSocialCallbackGet(request: Request): Promise<Respons
     return done(loginPage(rq, { error: message }, status));
   }
 
-  // Per IP and per started sign-in (the nonce), like the password path is per
-  // IP and per account: a leaked callback URL cannot be hammered with guesses.
-  const keys = [...throttleKeys(ctx.ip, undefined), `social:${bound.sn}`];
-  if (await anyThrottled(keys)) return done(loginPage(rq, { error: THROTTLED_MESSAGE }, 429));
+  // Per IP and per started sign-in (the nonce): a leaked callback URL cannot be
+  // hammered with guesses. Both identify the CALLER — only whoever started this
+  // round-trip can spend them — so both gate the attempt up front. There is no
+  // account key here, and so nothing a stranger could spend on a victim's
+  // behalf (see throttleKeys).
+  const base = throttleKeys(ctx.ip, undefined);
+  const attempt = await beginAttempt({ gate: [...base.gate, `social:${bound.sn}`], deferred: base.deferred });
+  if (!attempt.allowed) return done(loginPage(rq, { error: THROTTLED_MESSAGE }, 429));
+  // Claims below are KEPT: a malformed or rejected exchange code is a failure.
   if (!EXCHANGE_CODE_PATTERN.test(code)) {
-    await recordFailure(keys);
     return done(loginPage(rq, { error: 'That sign-in link is not valid. Please try again.' }, 400));
   }
 
   try {
     const outcome = await backendExchangeSocialCode(code, ctx);
+    await attempt.refund();
     return done(await completeLogin(rq, outcome, ctx));
   } catch (err) {
-    await recordFailure(keys);
     return done(loginPage(rq, { error: bridgeErrorMessage(err, 'Sign-in failed. Please try again.') }, pageStatusFor(err)));
   }
 }

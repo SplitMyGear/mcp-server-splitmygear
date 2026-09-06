@@ -82,10 +82,17 @@ authorization server** that fronts the backend's login:
 - Proxy headers are trusted only on Vercel or with `MCP_TRUST_PROXY_HEADERS=1`,
   values are validated as IP addresses before being relayed, and failures are
   throttled per IP and per account without ever resetting on success.
+  **Amended by SPLIT-1420:** the per-account counter is now enforced only after
+  the credentials have already been rejected, so it cannot be used to lock a
+  victim out; and the check consumes its slot atomically instead of reading a
+  counter it increments later.
 - Open registration is phishable by design (anyone can name a client
   "Claude"). The page shows the exact redirect address and labels the app
   "unverified" unless its host is on `MCP_OAUTH_ALLOWED_REDIRECT_HOSTS`, which
   also restricts registration when set.
+  **Amended by SPLIT-1420:** registration is no longer open. The allow-list is
+  mandatory for every non-loopback redirect host — an empty list denies rather
+  than permits — and is re-evaluated on each use of a client id.
 - `client_id` is mandatory on refresh and revocation; a rejected refresh (400/
   401/403) is `invalid_grant` so clients re-authenticate instead of retrying.
 - Derived keys are bound to the deployment (`MCP_PUBLIC_URL` / `VERCEL_URL`), so

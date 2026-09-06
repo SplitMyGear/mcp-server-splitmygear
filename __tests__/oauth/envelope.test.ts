@@ -1,7 +1,7 @@
 export {};
 import crypto from 'crypto';
 import { seal, open, ENVELOPE_PREFIX, looksLikeAccessEnvelope, nowSeconds } from '../../src/lib/oauth/envelope';
-import { oauthEnabled, deriveKey, publicBaseUrl, resourceUrl, validIp } from '../../src/lib/oauth/config';
+import { oauthEnabled, deriveKey, publicBaseUrl, resourceUrl, validIp, _resetOAuthConfigForTests } from '../../src/lib/oauth/config';
 import { SCOPE_DESCRIPTIONS, TOOL_SCOPES, parseScopeParam, formatScope, isSubset, coerceScopes } from '../../src/lib/oauth/scopes';
 import { issueAuthorizationCode, openAuthorizationCode, issueTokens, openAccessToken, openRefreshToken } from '../../src/lib/oauth/tokens';
 import { authorizationServerMetadata, protectedResourceMetadata } from '../../src/lib/oauth/metadata';
@@ -13,6 +13,52 @@ describe('OAuth config', () => {
     delete process.env.MCP_OAUTH_SIGNING_KEY;
     delete process.env.MCP_PUBLIC_URL;
     delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
+    delete process.env.MCP_REQUIRE_SHARED_STORE;
+    delete process.env.UPSTASH_REDIS_REST_URL;
+    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    _resetOAuthConfigForTests();
+    jest.restoreAllMocks();
+  });
+
+  it('runs WITHOUT a shared store by default: degraded, but serving (SPLIT-1420)', () => {
+    // The judgement call this pins. OAuth's throttle and code-replay cache are
+    // only cross-instance with a shared store, but refusing to serve without
+    // one would take the only user-facing sign-in path offline over a paid
+    // dependency -- while the controls that actually stand between an attacker
+    // and an account (the backend's own throttles, mandatory PKCE S256) are
+    // unaffected. So the default is: serve, and say so loudly.
+    process.env.MCP_OAUTH_SIGNING_KEY = KEY;
+    expect(oauthEnabled()).toBe(true);
+  });
+
+  it('refuses to enable at all when the operator demands a shared store and there is none', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    process.env.MCP_OAUTH_SIGNING_KEY = KEY;
+    process.env.MCP_REQUIRE_SHARED_STORE = '1';
+    expect(oauthEnabled()).toBe(false);
+    // ...and the operator is told why, once, rather than silently losing OAuth.
+    expect(warn.mock.calls.map((c) => String(c[0])).join('\n')).toContain('MCP_REQUIRE_SHARED_STORE=1');
+    oauthEnabled();
+    oauthEnabled();
+    expect(warn.mock.calls.filter((c) => String(c[0]).includes('[oauth] DISABLED'))).toHaveLength(1);
+
+    // Configure the store and it comes back.
+    process.env.UPSTASH_REDIS_REST_URL = 'https://example-redis.upstash.io';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'token';
+    expect(oauthEnabled()).toBe(true);
+
+    // The Vercel KV names satisfy the requirement too.
+    delete process.env.UPSTASH_REDIS_REST_URL;
+    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    process.env.KV_REST_API_URL = 'https://example-kv.upstash.io';
+    process.env.KV_REST_API_TOKEN = 'token';
+    expect(oauthEnabled()).toBe(true);
+    delete process.env.KV_REST_API_URL;
+    delete process.env.KV_REST_API_TOKEN;
+
+    // A signing key is still required regardless of the store.
+    delete process.env.MCP_OAUTH_SIGNING_KEY;
+    expect(oauthEnabled()).toBe(false);
   });
 
   it('is disabled without a signing key, with a short one, and with a low-entropy one', () => {
@@ -130,9 +176,14 @@ describe('OAuth scopes', () => {
     expect(isSubset(['read'], ['read', 'bookings'])).toBe(true);
     expect(isSubset(['read', 'messaging'], ['read', 'bookings'])).toBe(false);
     expect(isSubset([], ['read'])).toBe(true);
-    // Envelopes sealed before scopes existed were unrestricted grants: they keep every scope.
-    expect(coerceScopes(undefined)).toEqual([...TOOL_SCOPES]);
-    expect(coerceScopes('read')).toEqual([...TOOL_SCOPES]);
+    // SPLIT-1420: anything that is not a scope LIST grants nothing. This is an
+    // authorization decision over untrusted-shaped data, so it fails closed;
+    // it used to return the whole taxonomy, i.e. a silent full-access grant.
+    expect(coerceScopes(undefined)).toEqual([]);
+    expect(coerceScopes(null)).toEqual([]);
+    expect(coerceScopes('read')).toEqual([]);
+    expect(coerceScopes(42)).toEqual([]);
+    expect(coerceScopes({ 0: 'read', length: 1 })).toEqual([]);
     // A present list is filtered to known scopes; an empty list stays empty (may use no tools).
     expect(coerceScopes(['finance', 'nope', 42, 'read'])).toEqual(['read', 'finance']);
     expect(coerceScopes([])).toEqual([]);
@@ -162,15 +213,18 @@ describe('scoped token envelopes', () => {
     expect(openRefreshToken(tokens.refresh_token)!.scp).toEqual(['read', 'bookings']);
   });
 
-  it('treats envelopes sealed before scopes existed as unrestricted grants', () => {
+  it('treats an envelope with no scope list as granting NOTHING, not everything (SPLIT-1420)', () => {
     const iat = nowSeconds();
     const at = backendJwt({ sub: 'u1', role: 'renter', exp: iat + 600 });
+    // Such an envelope predates scopes. It used to be read as an unrestricted
+    // grant, so a single missing field silently unlocked every tool; now it
+    // unlocks none and the client simply re-authorizes.
     const legacyAccess = seal('at', { sub: 'u1', role: 'renter', email: 'e', cid: 'c', bt: at, iat, exp: iat + 600 });
-    expect(openAccessToken(legacyAccess)!.scp).toEqual([...TOOL_SCOPES]);
+    expect(openAccessToken(legacyAccess)!.scp).toEqual([]);
     const legacyRefresh = seal('rt', { sub: 'u1', role: 'renter', email: 'e', cid: 'c', brt: 'brt', bt: at, iat, exp: iat + 600 });
-    expect(openRefreshToken(legacyRefresh)!.scp).toEqual([...TOOL_SCOPES]);
+    expect(openRefreshToken(legacyRefresh)!.scp).toEqual([]);
     const legacyCode = seal('code', { cid: 'c', ru: 'https://c/cb', cc: 'x'.repeat(43), sub: 'u1', role: 'renter', email: 'e', at, rt: 'brt', jti: crypto.randomBytes(8).toString('hex'), iat, exp: iat + 60 });
-    expect(openAuthorizationCode(legacyCode)!.sc).toEqual([...TOOL_SCOPES]);
+    expect(openAuthorizationCode(legacyCode)!.sc).toEqual([]);
     // A code envelope missing its essentials is still rejected.
     expect(openAuthorizationCode(seal('code', { iat, exp: iat + 60 }))).toBeNull();
   });

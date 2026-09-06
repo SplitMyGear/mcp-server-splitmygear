@@ -23,6 +23,9 @@ export async function POST(request: Request) {
     {
       client_id: result.client_id,
       client_id_issued_at: result.client_id_issued_at,
+      // RFC 7591 §3.2.1: 0 = never expires. Deliberate — see resolveClient for
+      // why a TTL buys nothing here and what replaces it.
+      client_id_expires_at: 0,
       client_name: result.client_name,
       redirect_uris: result.redirect_uris,
       token_endpoint_auth_method: 'none',

@@ -76,6 +76,10 @@ of the first cut, which makes least-privilege connections more valuable.
 
 ## Consequences
 
+- **Amended by SPLIT-1420:** running without the shared store is still allowed
+  but no longer silent — every affected path logs a startup warning naming the
+  degraded protections — and `MCP_REQUIRE_SHARED_STORE=1` makes its absence
+  refuse to enable OAuth at all.
 - New env vars: `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` (or
   `KV_REST_API_*`) on this server; `SOCIAL_AUTH_RETURN_ORIGINS` on the backend
   must include this server's callback, path pinned

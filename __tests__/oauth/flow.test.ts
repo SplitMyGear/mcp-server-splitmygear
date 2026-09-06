@@ -81,6 +81,8 @@ describe('OAuth 2.1 flow', () => {
     process.env.MCP_API_KEY = 'operator';
     process.env.MCP_BFF_RELAY_KEY = 'relay-secret';
     process.env.MCP_TRUST_PROXY_HEADERS = '1';
+    // SPLIT-1420: an https redirect host must be allow-listed to register.
+    process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS = 'client.example';
     _resetThrottle();
     mockBackendRequest.mockReset();
   });
@@ -90,6 +92,7 @@ describe('OAuth 2.1 flow', () => {
     delete process.env.MCP_API_KEY;
     delete process.env.MCP_BFF_RELAY_KEY;
     delete process.env.MCP_TRUST_PROXY_HEADERS;
+    delete process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS;
   });
 
   it('serves discovery metadata (root and path-aware) and advertises it on 401', async () => {
@@ -128,7 +131,10 @@ describe('OAuth 2.1 flow', () => {
     const html = await page.text();
     expect(html).toContain('Test Client');
     expect(html).toContain('https://client.example/callback');
-    expect(html).toContain('unverified app'); // no allow-list configured in this test
+    // SPLIT-1420: only allow-listed hosts can register at all, so a client that
+    // got this far is by definition operator-vetted and carries no warning.
+    expect(html).not.toContain('unverified app');
+    expect(html).not.toContain('Splitt has not verified this app');
     // No `scope` requested: the consent card says so and lists everything the app gets.
     expect(html).toContain('is asking for full access to your Splitt account');
     for (const s of TOOL_SCOPES) expect(html).toContain(SCOPE_DESCRIPTIONS[s]);
@@ -413,7 +419,7 @@ describe('OAuth 2.1 flow', () => {
 
   it('counts failed OTP guesses against the real account email (not the masked one), so they throttle the password form too', async () => {
     // Sign in with odd casing: the throttle key is the lower-cased real address.
-    const { chal, state } = await otpStep('R@X.test');
+    const { chal, state, BackendApiError } = await otpStep('R@X.test');
     for (let i = 0; i < 10; i++) {
       const res = await authorizePost(form({ step: 'otp', chal, code: '000000' }, `${BASE}/oauth/authorize`));
       expect(res.status).toBe(200);
@@ -426,19 +432,87 @@ describe('OAuth 2.1 flow', () => {
     expect(await throttled.text()).toContain('Too many sign-in attempts');
     expect(state.sent.filter((p) => p === '/auth/2fa/otp/verify')).toHaveLength(10);
 
-    // The same account from ANOTHER network is throttled on the password form
-    // (per-email key), while a different account from that network is not.
+    // SPLIT-1420 — the account's budget is now spent, but that must NOT bar the
+    // owner. From ANOTHER network the sign-in still reaches the backend, and
+    // correct credentials still get through: this is the CWE-645 property, and
+    // it is the ordering the backend itself uses (SPLIT-427). The previous
+    // behaviour asserted here was the bug — anyone who knew the address could
+    // burn the budget and lock the real owner out for ten minutes, renewably.
     const clientId = await registerClient();
     const { challenge } = pkce();
     const html = await (await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' })))).text();
     const req = hidden(html, 'req');
     const otherNet = { 'x-real-ip': '198.51.100.7' };
+    state.sent.length = 0;
     const sameAccount = await authorizePost(form({ step: 'login', req, email: 'r@x.test', password: 'pw' }, `${BASE}/oauth/authorize`, otherNet));
-    expect(sameAccount.status).toBe(429);
-    expect(state.sent).not.toContain('/users/login');
+    expect(state.sent).toContain('/users/login'); // NOT refused ahead of the credential check
+    expect(sameAccount.status).toBe(200);
+    expect(await sameAccount.text()).toContain('Check your email'); // straight on to the 2FA step
+
+    // Where the spent budget DOES bite: once the credentials have been
+    // rejected, the per-account counter applies and the guess is refused.
+    state.sent.length = 0;
+    mockBackendRequest.mockImplementation(async (_method: string, path: string) => {
+      state.sent.push(path);
+      throw new BackendApiError(401, 'Invalid email or password');
+    });
+    const wrongPassword = await authorizePost(form({ step: 'login', req, email: 'r@x.test', password: 'nope' }, `${BASE}/oauth/authorize`, otherNet));
+    expect(wrongPassword.status).toBe(429);
+    expect(await wrongPassword.text()).toContain('Too many sign-in attempts');
+
+    // A different account from that network is unaffected throughout.
     mockBackendRequest.mockImplementation(async () => ({ accessToken: backendAccess, refreshToken: 'brt-2', user: { id: 'user-2', email: 'other@x.test', role: 'renter' } }));
     const otherAccount = await authorizePost(form({ step: 'login', req, email: 'other@x.test', password: 'pw' }, `${BASE}/oauth/authorize`, otherNet));
     expect(otherAccount.status).toBe(302);
+  });
+
+  it('never relays a backend 401 that would say whether the address is registered (SPLIT-1420)', async () => {
+    // The sign-in page is unauthenticated, so whatever it prints is readable
+    // by anyone. Today the backend answers an unknown address and a wrong
+    // password from the SAME throw ('Invalid email or password'), with a dummy
+    // bcrypt compare equalising the timing -- verified against
+    // apps/api/src/user/user.controller.ts. But this page must not DEPEND on
+    // that: a future backend wording change would silently turn every MCP
+    // deployment into a user-enumeration oracle. So the collapse happens here,
+    // where the untrusted audience is.
+    const clientId = await registerClient();
+    const { challenge } = pkce();
+    const html = await (await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' })))).text();
+    const req = hidden(html, 'req');
+    const { BackendApiError } = jest.requireMock('../../src/lib/backend-client');
+
+    const pageFor = async (error: Error, email = 'r@x.test'): Promise<string> => {
+      _resetThrottle();
+      mockBackendRequest.mockImplementation(async () => { throw error; });
+      const res = await authorizePost(form({ step: 'login', req, email, password: 'nope' }, `${BASE}/oauth/authorize`));
+      expect(res.status).toBe(401);
+      return res.text();
+    };
+
+    // A backend that DID distinguish must not be echoed either way...
+    const unknownUser = await pageFor(new BackendApiError(401, 'No account exists for that email address'));
+    const wrongPassword = await pageFor(new BackendApiError(401, 'Incorrect password for this account'));
+    for (const page of [unknownUser, wrongPassword]) {
+      expect(page).toContain('Invalid email or password.');
+      expect(page).not.toContain('No account');
+      expect(page).not.toContain('Incorrect password');
+      expect(page).not.toContain('address');
+    }
+    // ...and the two pages must be indistinguishable in the part that matters.
+    const errorBox = (h: string) => h.match(/<div class="error"[^>]*>([\s\S]*?)<\/div>/)?.[1];
+    expect(errorBox(unknownUser)).toBe(errorBox(wrongPassword));
+    expect(errorBox(unknownUser)).toBe('Invalid email or password.');
+
+    // Today's actual backend message collapses to the same fixed string.
+    expect(await pageFor(new BackendApiError(401, 'Invalid email or password'))).toContain('Invalid email or password.');
+    // A 403 is treated the same way: it must not become a side channel either.
+    expect(await pageFor(new BackendApiError(403, 'This email is registered but not yet verified'))).not.toContain('registered');
+
+    // The one 401 the user genuinely needs to read survives, because the
+    // backend only reaches it AFTER the password verified -- it cannot be an
+    // oracle, and a suspended user who is told nothing just retries forever.
+    const suspended = await pageFor(new BackendApiError(401, 'Your account has been suspended. Please contact support.'));
+    expect(suspended).toContain('Your account has been suspended.');
   });
 
   it('caps state at 512 characters (redirected as invalid_request without echoing it) and the sign-in email at 254', async () => {
@@ -613,11 +687,13 @@ describe('hosted sign-in page: social links', () => {
   beforeEach(() => {
     process.env.MCP_OAUTH_SIGNING_KEY = KEY;
     process.env.MCP_PUBLIC_URL = BASE;
+    process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS = 'client.example';
     mockBackendRequest.mockReset();
   });
   afterEach(() => {
     delete process.env.MCP_OAUTH_SIGNING_KEY;
     delete process.env.MCP_PUBLIC_URL;
+    delete process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS;
   });
 
   async function loginPage(): Promise<string> {
