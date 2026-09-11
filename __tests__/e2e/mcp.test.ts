@@ -265,11 +265,9 @@ describe('E2E: Complete User Flows', () => {
       params: {
         name: 'create_booking',
         arguments: {
-          listingId: 'test-listing',
-          checkIn: '2024-06-01',
-          checkOut: '2024-06-03',
-          guests: 2,
-          userId: 'test-user',
+          listingId: '11111111-1111-4111-8111-111111111111',
+          checkIn: '2026-06-01',
+          checkOut: '2026-06-03',
         },
       },
     };
@@ -291,9 +289,7 @@ describe('E2E: Complete User Flows', () => {
       params: {
         name: 'cancel_booking',
         arguments: {
-          bookingId: 'test-booking',
-          userId: 'test-user',
-          reason: 'No longer needed',
+          bookingId: '22222222-2222-4222-8222-222222222222',
         },
       },
     };
@@ -315,9 +311,9 @@ describe('E2E: Complete User Flows', () => {
       params: {
         name: 'check_availability',
         arguments: {
-          listingId: 'test-listing',
-          checkIn: '2024-06-01',
-          checkOut: '2024-06-03',
+          listingId: '11111111-1111-4111-8111-111111111111',
+          checkIn: '2026-06-01',
+          checkOut: '2026-06-03',
           guests: 2,
         },
       },

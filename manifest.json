@@ -1,10 +1,10 @@
 {
   "dxt_version": "0.1",
   "name": "Splitt",
-  "display_name": "Splitt \u2014 Outdoor Gear Rental",
-  "version": "1.0.0",
-  "description": "Search, browse, and book outdoor gear rentals on Splitt. Supports natural language search, availability checks, pricing analysis, AI-generated listing descriptions, experiences, and more.",
-  "long_description": "The Splitt MCP server gives AI agents full access to the Splitt outdoor gear rental platform. Browse 19 gear categories (camping, hiking, water sports, snow sports, climbing, biking, fishing, photography, and more), search with natural language, check availability, view pricing, and book gear or outdoor experiences. Vendors can generate AI-powered listing descriptions and get competitive pricing insights. Authenticated users can manage bookings and conversations. All access requires an API key (no public tier).",
+  "display_name": "Splitt: Outdoor Gear Rental",
+  "version": "2.0.0",
+  "description": "Search, book and manage outdoor gear rentals and experiences on Splitt as a renter or vendor. Sign in with your Splitt account (OAuth) or use an operator key for public search.",
+  "long_description": "The Splitt MCP server lets an assistant act for you on the Splitt outdoor gear rental marketplace. Renters: search 19 gear categories with natural language, check availability, get exact price quotes, book (payment on a Stripe-hosted page), manage and cancel bookings, message vendors, leave reviews and keep favorites. Vendors: create and price listings with AI help, publish, block dates, handle incoming bookings, propose reschedules, respond to reviews, host experiences and schedules, and see earnings and payouts. Sign in with your Splitt account via OAuth (two-step verification supported); the tool list adapts to your role. An operator API key alternatively unlocks the public search tools only.",
   "author": {
     "name": "Splitt",
     "url": "https://go-splitt.com"
@@ -23,83 +23,887 @@
   "tools": [
     {
       "name": "search_listings",
-      "description": "Search for gear with filters or natural language"
+      "description": "Search gear rentals"
     },
     {
       "name": "get_listing_details",
-      "description": "Get full details for a specific listing"
+      "description": "Get listing details"
     },
     {
       "name": "check_availability",
-      "description": "Check if a listing is available for dates"
+      "description": "Check availability"
+    },
+    {
+      "name": "get_listing_calendar",
+      "description": "Get availability calendar"
     },
     {
       "name": "get_similar_listings",
-      "description": "Find similar gear using semantic similarity"
+      "description": "Find similar gear"
     },
     {
-      "name": "get_personalized_recommendations",
-      "description": "Get gear recommendations based on history"
+      "name": "get_listing_reviews",
+      "description": "Get listing reviews"
     },
     {
-      "name": "create_booking",
-      "description": "Create a gear rental booking"
-    },
-    {
-      "name": "cancel_booking",
-      "description": "Cancel a booking with optional refund"
-    },
-    {
-      "name": "get_booking_status",
-      "description": "Get the status of a booking"
+      "name": "get_booking_quote",
+      "description": "Get a price quote"
     },
     {
       "name": "suggest_listing_price",
-      "description": "Get AI-powered price suggestions for a gear category"
+      "description": "Suggest a listing price"
     },
     {
       "name": "analyze_competitor_pricing",
-      "description": "Compare a listing against local competitors"
-    },
-    {
-      "name": "generate_listing_description",
-      "description": "Generate an AI listing description from keywords"
-    },
-    {
-      "name": "improve_listing_title",
-      "description": "Optimize a listing title for SEO"
+      "description": "Analyze competitor pricing"
     },
     {
       "name": "search_experiences",
-      "description": "Browse outdoor adventures and tours"
+      "description": "Search experiences"
     },
     {
       "name": "get_experience_details",
-      "description": "Get full info and schedules for an experience"
+      "description": "Get experience details"
+    },
+    {
+      "name": "list_search_alerts",
+      "description": "My saved searches"
+    },
+    {
+      "name": "create_search_alert",
+      "description": "Save a search"
+    },
+    {
+      "name": "update_search_alert",
+      "description": "Edit a saved search"
+    },
+    {
+      "name": "toggle_search_alert",
+      "description": "Pause / resume alert"
+    },
+    {
+      "name": "delete_search_alert",
+      "description": "Delete saved search"
+    },
+    {
+      "name": "list_saved_trips",
+      "description": "My saved trips"
+    },
+    {
+      "name": "save_trip",
+      "description": "Save a trip"
+    },
+    {
+      "name": "delete_saved_trip",
+      "description": "Delete saved trip"
+    },
+    {
+      "name": "email_trip_plan",
+      "description": "Email me this trip"
+    },
+    {
+      "name": "plan_trip",
+      "description": "Plan a trip"
+    },
+    {
+      "name": "get_trip_pois",
+      "description": "Points of interest"
+    },
+    {
+      "name": "get_trip_ideas_for_listing",
+      "description": "Make a day of it"
+    },
+    {
+      "name": "suggest_locations",
+      "description": "Suggest locations"
+    },
+    {
+      "name": "generate_ai_trip_plan",
+      "description": "AI gear plan"
+    },
+    {
+      "name": "list_destinations",
+      "description": "List destinations"
+    },
+    {
+      "name": "get_destination",
+      "description": "Destination details"
+    },
+    {
+      "name": "list_categories",
+      "description": "List categories"
+    },
+    {
+      "name": "get_category",
+      "description": "Category details"
+    },
+    {
+      "name": "get_my_profile",
+      "description": "Who am I"
+    },
+    {
+      "name": "update_my_profile",
+      "description": "Update my profile"
+    },
+    {
+      "name": "get_vendor_onboarding_status",
+      "description": "Vendor onboarding status"
+    },
+    {
+      "name": "list_notifications",
+      "description": "List notifications"
+    },
+    {
+      "name": "mark_notifications_read",
+      "description": "Mark notifications read"
+    },
+    {
+      "name": "get_unread_counts",
+      "description": "Unread counts"
+    },
+    {
+      "name": "create_booking",
+      "description": "Book gear"
+    },
+    {
+      "name": "get_payment_link",
+      "description": "Get payment link"
+    },
+    {
+      "name": "set_booking_protection",
+      "description": "Set protection plan"
+    },
+    {
+      "name": "list_my_bookings",
+      "description": "List my bookings"
+    },
+    {
+      "name": "get_booking_status",
+      "description": "Get booking"
+    },
+    {
+      "name": "get_booking_history",
+      "description": "Booking timeline"
+    },
+    {
+      "name": "preview_cancellation",
+      "description": "Preview cancellation refund"
+    },
+    {
+      "name": "cancel_booking",
+      "description": "Cancel booking"
+    },
+    {
+      "name": "respond_to_reschedule_proposal",
+      "description": "Respond to reschedule proposal"
+    },
+    {
+      "name": "get_personalized_recommendations",
+      "description": "Recommendations for me"
     },
     {
       "name": "book_experience",
-      "description": "Book spots on an experience"
+      "description": "Book an experience"
     },
     {
-      "name": "send_message",
-      "description": "Send a message to a renter or vendor"
+      "name": "list_my_experience_bookings",
+      "description": "My experience bookings"
+    },
+    {
+      "name": "get_experience_booking",
+      "description": "Get experience booking"
+    },
+    {
+      "name": "cancel_experience_booking",
+      "description": "Cancel experience booking"
+    },
+    {
+      "name": "create_review",
+      "description": "Write a review"
+    },
+    {
+      "name": "list_my_reviews",
+      "description": "My reviews"
+    },
+    {
+      "name": "update_review",
+      "description": "Edit my review"
+    },
+    {
+      "name": "delete_review",
+      "description": "Delete my review"
+    },
+    {
+      "name": "list_favorites",
+      "description": "My favorites"
+    },
+    {
+      "name": "toggle_favorite",
+      "description": "Save / unsave listing"
     },
     {
       "name": "get_conversations",
-      "description": "List your active conversations"
+      "description": "List conversations"
+    },
+    {
+      "name": "get_conversation_messages",
+      "description": "Read a conversation"
+    },
+    {
+      "name": "send_message",
+      "description": "Send a message"
+    },
+    {
+      "name": "mark_conversation_read",
+      "description": "Mark conversation read"
     },
     {
       "name": "generate_ai_message_draft",
-      "description": "Draft a professional message using AI"
+      "description": "Draft a message"
+    },
+    {
+      "name": "generate_listing_description",
+      "description": "Generate listing description"
+    },
+    {
+      "name": "improve_listing_title",
+      "description": "Improve listing title"
+    },
+    {
+      "name": "get_booking_verification",
+      "description": "Booking verification records"
+    },
+    {
+      "name": "get_inspection_checklist_template",
+      "description": "Inspection checklist template"
+    },
+    {
+      "name": "get_inspection_completion",
+      "description": "Inspection completion status"
+    },
+    {
+      "name": "submit_inspection_checklist",
+      "description": "Submit inspection checklist"
+    },
+    {
+      "name": "upload_handoff_photos",
+      "description": "Upload condition photos"
+    },
+    {
+      "name": "create_handoff_token",
+      "description": "Create handoff token"
+    },
+    {
+      "name": "verify_handoff_token",
+      "description": "Verify handoff token"
+    },
+    {
+      "name": "get_security_status",
+      "description": "Security status"
+    },
+    {
+      "name": "sign_out_all_sessions",
+      "description": "Sign out everywhere"
+    },
+    {
+      "name": "export_my_data",
+      "description": "Export my data"
+    },
+    {
+      "name": "get_notification_preferences",
+      "description": "Notification preferences"
+    },
+    {
+      "name": "set_notification_preference",
+      "description": "Set notification preference"
+    },
+    {
+      "name": "get_email_preferences",
+      "description": "Email preferences"
+    },
+    {
+      "name": "set_email_preferences",
+      "description": "Set email preferences"
+    },
+    {
+      "name": "get_terms_status",
+      "description": "Terms of Service status"
+    },
+    {
+      "name": "accept_terms",
+      "description": "Accept Terms of Service"
+    },
+    {
+      "name": "resend_verification_email",
+      "description": "Resend verification email"
+    },
+    {
+      "name": "get_identity_verification_status",
+      "description": "Identity verification status"
+    },
+    {
+      "name": "apply_to_become_vendor",
+      "description": "Apply as vendor"
+    },
+    {
+      "name": "start_vendor_onboarding",
+      "description": "Start vendor onboarding"
+    },
+    {
+      "name": "complete_vendor_business_profile",
+      "description": "Vendor business profile"
+    },
+    {
+      "name": "start_vendor_stripe_onboarding",
+      "description": "Set up vendor payouts"
+    },
+    {
+      "name": "check_vendor_stripe_status",
+      "description": "Check Stripe status"
+    },
+    {
+      "name": "confirm_vendor_stripe",
+      "description": "Confirm Stripe step"
+    },
+    {
+      "name": "get_vendor_agreement",
+      "description": "Vendor agreement"
+    },
+    {
+      "name": "sign_vendor_agreement",
+      "description": "Sign vendor agreement"
+    },
+    {
+      "name": "upload_file",
+      "description": "Upload a file"
+    },
+    {
+      "name": "list_disputes",
+      "description": "My disputes"
+    },
+    {
+      "name": "get_dispute",
+      "description": "Get a dispute"
+    },
+    {
+      "name": "open_dispute",
+      "description": "Open a dispute"
+    },
+    {
+      "name": "list_claims",
+      "description": "My damage claims"
+    },
+    {
+      "name": "get_claim",
+      "description": "Get a damage claim"
+    },
+    {
+      "name": "file_damage_claim",
+      "description": "File a damage claim"
+    },
+    {
+      "name": "respond_to_claim",
+      "description": "Respond to a damage claim"
+    },
+    {
+      "name": "add_claim_evidence",
+      "description": "Add claim evidence"
+    },
+    {
+      "name": "list_incidental_charges",
+      "description": "My incidental charges"
+    },
+    {
+      "name": "get_incidental_charge",
+      "description": "Get an incidental charge"
+    },
+    {
+      "name": "file_incidental_charge",
+      "description": "File an incidental charge"
+    },
+    {
+      "name": "respond_to_incidental_charge",
+      "description": "Respond to an incidental charge"
+    },
+    {
+      "name": "cancel_incidental_charge",
+      "description": "Withdraw an incidental charge"
+    },
+    {
+      "name": "search_services",
+      "description": "Search services"
+    },
+    {
+      "name": "get_service_details",
+      "description": "Get service details"
+    },
+    {
+      "name": "book_service",
+      "description": "Book a service"
+    },
+    {
+      "name": "list_my_service_bookings",
+      "description": "My service bookings"
+    },
+    {
+      "name": "get_service_booking",
+      "description": "Get service booking"
+    },
+    {
+      "name": "cancel_service_booking",
+      "description": "Cancel service booking"
+    },
+    {
+      "name": "review_service",
+      "description": "Review a service"
+    },
+    {
+      "name": "update_service_booking_status",
+      "description": "Confirm / complete service booking"
+    },
+    {
+      "name": "list_my_services",
+      "description": "My services"
+    },
+    {
+      "name": "create_service",
+      "description": "Create a service"
+    },
+    {
+      "name": "update_service",
+      "description": "Update a service"
+    },
+    {
+      "name": "delete_service",
+      "description": "Delete a service"
+    },
+    {
+      "name": "list_my_listings",
+      "description": "My listings"
+    },
+    {
+      "name": "create_listing",
+      "description": "Create a listing"
+    },
+    {
+      "name": "update_listing",
+      "description": "Update a listing"
+    },
+    {
+      "name": "set_listing_published",
+      "description": "Publish / unpublish listing"
+    },
+    {
+      "name": "delete_listing",
+      "description": "Delete a listing"
+    },
+    {
+      "name": "duplicate_listing",
+      "description": "Duplicate a listing"
+    },
+    {
+      "name": "generate_listing_draft",
+      "description": "AI listing draft"
+    },
+    {
+      "name": "get_listing_performance",
+      "description": "Listing performance"
+    },
+    {
+      "name": "list_blackout_dates",
+      "description": "List blackout dates"
+    },
+    {
+      "name": "add_blackout_dates",
+      "description": "Block dates"
+    },
+    {
+      "name": "remove_blackout_date",
+      "description": "Unblock dates"
+    },
+    {
+      "name": "list_incoming_bookings",
+      "description": "Bookings on my listings"
+    },
+    {
+      "name": "set_booking_return_status",
+      "description": "Mark returned / overdue"
+    },
+    {
+      "name": "propose_booking_reschedule",
+      "description": "Propose new dates"
+    },
+    {
+      "name": "withdraw_reschedule_proposal",
+      "description": "Withdraw reschedule proposal"
+    },
+    {
+      "name": "set_booking_vendor_notes",
+      "description": "Private booking notes"
+    },
+    {
+      "name": "respond_to_review",
+      "description": "Respond to a review"
+    },
+    {
+      "name": "get_vendor_dashboard",
+      "description": "Vendor dashboard"
+    },
+    {
+      "name": "get_vendor_earnings",
+      "description": "Earnings"
+    },
+    {
+      "name": "get_vendor_payouts",
+      "description": "Payouts"
+    },
+    {
+      "name": "get_stripe_connect_status",
+      "description": "Stripe Connect status"
+    },
+    {
+      "name": "start_stripe_connect_onboarding",
+      "description": "Set up payouts (Stripe)"
+    },
+    {
+      "name": "list_my_experiences",
+      "description": "My experiences"
+    },
+    {
+      "name": "create_experience",
+      "description": "Create an experience"
+    },
+    {
+      "name": "update_experience",
+      "description": "Update an experience"
+    },
+    {
+      "name": "set_experience_status",
+      "description": "Publish / archive experience"
+    },
+    {
+      "name": "add_experience_schedule",
+      "description": "Add a schedule slot"
+    },
+    {
+      "name": "delete_experience_schedule",
+      "description": "Remove a schedule slot"
+    },
+    {
+      "name": "list_experience_host_bookings",
+      "description": "Bookings on my experiences"
+    },
+    {
+      "name": "update_experience_booking_status",
+      "description": "Confirm / complete / cancel experience booking"
+    },
+    {
+      "name": "list_rate_rules",
+      "description": "List seasonal rate rules"
+    },
+    {
+      "name": "create_rate_rule",
+      "description": "Create a rate rule"
+    },
+    {
+      "name": "update_rate_rule",
+      "description": "Update a rate rule"
+    },
+    {
+      "name": "delete_rate_rule",
+      "description": "Delete a rate rule"
+    },
+    {
+      "name": "apply_starter_seasons",
+      "description": "Apply starter seasons"
+    },
+    {
+      "name": "get_dynamic_pricing_config",
+      "description": "Dynamic pricing config"
+    },
+    {
+      "name": "set_dynamic_pricing_config",
+      "description": "Configure dynamic pricing"
+    },
+    {
+      "name": "preview_dynamic_price",
+      "description": "Preview dynamic price"
+    },
+    {
+      "name": "get_dynamic_pricing_recommendations",
+      "description": "Pricing recommendations"
+    },
+    {
+      "name": "generate_dynamic_pricing_recommendations",
+      "description": "Generate recommendations"
+    },
+    {
+      "name": "apply_dynamic_pricing",
+      "description": "Apply dynamic price"
+    },
+    {
+      "name": "get_suggested_initial_price",
+      "description": "Suggested starting price"
+    },
+    {
+      "name": "get_market_insights",
+      "description": "Market insights"
+    },
+    {
+      "name": "get_fleet_summary",
+      "description": "Fleet summary"
+    },
+    {
+      "name": "list_fleet_units",
+      "description": "List fleet units"
+    },
+    {
+      "name": "get_unit_stats",
+      "description": "Unit stats"
+    },
+    {
+      "name": "get_unit_maintenance_history",
+      "description": "Unit maintenance history"
+    },
+    {
+      "name": "add_fleet_units",
+      "description": "Add fleet units"
+    },
+    {
+      "name": "update_fleet_unit",
+      "description": "Update fleet unit"
+    },
+    {
+      "name": "delete_fleet_unit",
+      "description": "Delete fleet unit"
+    },
+    {
+      "name": "log_unit_maintenance",
+      "description": "Log unit maintenance"
+    },
+    {
+      "name": "list_calendar_feeds",
+      "description": "List calendar feeds"
+    },
+    {
+      "name": "add_calendar_feed",
+      "description": "Connect a calendar feed"
+    },
+    {
+      "name": "sync_calendar_feed",
+      "description": "Sync a calendar feed"
+    },
+    {
+      "name": "update_calendar_feed",
+      "description": "Update a calendar feed"
+    },
+    {
+      "name": "remove_calendar_feed",
+      "description": "Disconnect a calendar feed"
+    },
+    {
+      "name": "clear_feed_suppression",
+      "description": "Restore a synced hold"
+    },
+    {
+      "name": "get_listing_ical_export_url",
+      "description": "Listing iCal export link"
+    },
+    {
+      "name": "get_calendar_subscription_url",
+      "description": "My calendar subscription link"
+    },
+    {
+      "name": "rotate_calendar_subscription_url",
+      "description": "Rotate calendar subscription link"
+    },
+    {
+      "name": "list_my_routes",
+      "description": "My route library"
+    },
+    {
+      "name": "get_route",
+      "description": "Get a library route"
+    },
+    {
+      "name": "create_route",
+      "description": "Create a library route"
+    },
+    {
+      "name": "update_route",
+      "description": "Update a library route"
+    },
+    {
+      "name": "delete_route",
+      "description": "Archive or delete route"
+    },
+    {
+      "name": "import_gpx_route",
+      "description": "Import a GPX route"
+    },
+    {
+      "name": "get_public_route",
+      "description": "Shared route page"
+    },
+    {
+      "name": "list_listing_routes",
+      "description": "Routes on a listing"
+    },
+    {
+      "name": "attach_route_to_listing",
+      "description": "Attach route to listing"
+    },
+    {
+      "name": "set_listing_routes",
+      "description": "Set listing routes"
+    },
+    {
+      "name": "detach_route_from_listing",
+      "description": "Detach route from listing"
+    },
+    {
+      "name": "create_listing_route",
+      "description": "Add legacy route card"
+    },
+    {
+      "name": "update_listing_route",
+      "description": "Update legacy route card"
+    },
+    {
+      "name": "delete_listing_route",
+      "description": "Delete legacy route card"
+    },
+    {
+      "name": "list_my_insurance_policies",
+      "description": "My insurance policies"
+    },
+    {
+      "name": "add_insurance_policy",
+      "description": "Register insurance policy"
+    },
+    {
+      "name": "update_insurance_policy",
+      "description": "Update insurance policy"
+    },
+    {
+      "name": "delete_insurance_policy",
+      "description": "Delete insurance policy"
+    },
+    {
+      "name": "get_insurance_document_link",
+      "description": "Insurance document link"
+    },
+    {
+      "name": "list_my_waivers",
+      "description": "My waivers"
+    },
+    {
+      "name": "create_waiver",
+      "description": "Create a waiver"
+    },
+    {
+      "name": "update_waiver",
+      "description": "Update a waiver"
+    },
+    {
+      "name": "delete_waiver",
+      "description": "Delete a waiver"
+    },
+    {
+      "name": "get_required_waivers",
+      "description": "Required waivers"
+    },
+    {
+      "name": "list_signed_waivers",
+      "description": "My signed waivers"
+    },
+    {
+      "name": "sign_waiver",
+      "description": "Sign a waiver"
+    },
+    {
+      "name": "list_message_templates",
+      "description": "List message templates"
+    },
+    {
+      "name": "get_message_template",
+      "description": "Get message template"
+    },
+    {
+      "name": "create_message_template",
+      "description": "Create message template"
+    },
+    {
+      "name": "update_message_template",
+      "description": "Update message template"
+    },
+    {
+      "name": "delete_message_template",
+      "description": "Delete message template"
+    },
+    {
+      "name": "set_auto_approve",
+      "description": "Auto-approve bookings"
+    },
+    {
+      "name": "get_report_subscription",
+      "description": "Report email settings"
+    },
+    {
+      "name": "set_report_subscription",
+      "description": "Set report emails"
+    },
+    {
+      "name": "get_tax_summary",
+      "description": "Year-end tax summary"
+    },
+    {
+      "name": "get_payout_details",
+      "description": "Payout details"
+    },
+    {
+      "name": "request_payout",
+      "description": "Request a payout"
+    },
+    {
+      "name": "list_sponsorship_packages",
+      "description": "Promotion packages"
+    },
+    {
+      "name": "list_listing_promotions",
+      "description": "Listing promotions"
+    },
+    {
+      "name": "promote_listing",
+      "description": "Promote a listing"
+    },
+    {
+      "name": "list_my_transactions",
+      "description": "My transactions"
+    },
+    {
+      "name": "get_transaction",
+      "description": "Transaction details"
+    },
+    {
+      "name": "get_my_trust_score",
+      "description": "My trust score"
+    },
+    {
+      "name": "refresh_my_trust_score",
+      "description": "Refresh my trust score"
+    },
+    {
+      "name": "get_booking_risk",
+      "description": "Booking risk check"
     }
   ],
   "user_config": {
     "api_key": {
       "type": "string",
-      "title": "API Key (required)",
-      "description": "Your Splitt API key, sent as the x-api-key header. Required for all access — the server has no public tier and rejects unauthenticated requests.",
-      "required": true,
+      "title": "Operator API key (optional)",
+      "description": "Only for operator (server-to-server) access to the public tools. Leave empty to sign in with your Splitt account via OAuth, which unlocks the renter and vendor tools.",
+      "required": false,
       "secret": true
     }
   }

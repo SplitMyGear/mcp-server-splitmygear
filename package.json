@@ -7,9 +7,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --ext .ts,.tsx --max-warnings=0",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "verify": "npm run lint && npm run typecheck && npm test && npm run build",
     "test": "jest",
     "test:watch": "jest --watch",
+    "gen:docs": "UPDATE_DOCS=1 jest __tests__/docs-sync.test.ts",
     "gen:api": "openapi-typescript openapi/openapi.json -o src/generated/api-types.gen.ts"
   },
   "dependencies": {

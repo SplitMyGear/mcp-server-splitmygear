@@ -1,10 +1,10 @@
 {
   "openapi": "3.0.3",
-  "x-note": "Describes this MCP server's own HTTP endpoint (this repo). Distinct from openapi/openapi.json, which is a snapshot of the SplitMyGear BACKEND's REST API contract that this server calls.",
+  "x-note": "Describes this MCP server's own HTTP endpoints (this repo). Distinct from openapi/openapi.json, which is a snapshot of the Splitt BACKEND's REST API contract that this server calls.",
   "info": {
     "title": "Splitt MCP Server",
-    "description": "MCP (Model Context Protocol) server for Splitt - AI-first rental platform. This server exposes tools that AI agents can use to interact with the Splitt platform.",
-    "version": "1.0.0",
+    "description": "MCP (Model Context Protocol) server for Splitt, the outdoor gear rental marketplace. Exposes role-aware tools for renters and vendors over MCP Streamable HTTP, plus an OAuth 2.1 authorization server so MCP clients can sign users in with their Splitt account.",
+    "version": "2.0.0",
     "contact": {
       "name": "Splitt",
       "url": "https://go-splitt.com"
@@ -15,293 +15,756 @@
   },
   "servers": [
     {
-      "url": "https://mcp-server-splitmygear.vercel.app/api/mcp",
-      "description": "Production server"
-    },
-    {
-      "url": "http://localhost:3000/api/mcp",
-      "description": "Development server"
+      "url": "https://mcp-server-splitmygear.vercel.app"
     }
   ],
+  "components": {
+    "securitySchemes": {
+      "operatorKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "Operator key: public tools only."
+      },
+      "oauth": {
+        "type": "oauth2",
+        "description": "Sign in as a Splitt user (PKCE S256, public clients).",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "/oauth/authorize",
+            "tokenUrl": "/oauth/token",
+            "refreshUrl": "/oauth/token",
+            "scopes": {
+              "read": "Public discovery (search, details, availability, quotes, reviews, pricing)",
+              "profile": "Own account, settings, notifications, trust score",
+              "bookings": "Renter-side bookings, payments links, waivers, pickup/return verification",
+              "favorites": "Wishlist, saved searches, saved trips",
+              "messaging": "Conversations and messages",
+              "reviews": "Write and manage reviews",
+              "listings": "Vendor catalogue: listings, pricing rules, fleet, calendar feeds, routes, insurance, waivers, services",
+              "vendor_bookings": "Vendor-side booking operations",
+              "experiences": "Hosting experiences and schedules",
+              "finance": "Earnings, payouts, promotions, tax and reports",
+              "claims": "Disputes, damage claims and incidental charges",
+              "files": "Uploading evidence and photos"
+            }
+          }
+        }
+      },
+      "backendJwt": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "A raw Splitt backend JWT (first-party integrations)."
+      }
+    },
+    "schemas": {
+      "JsonRpcRequest": {
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "method"
+        ],
+        "properties": {
+          "jsonrpc": {
+            "type": "string",
+            "enum": [
+              "2.0"
+            ]
+          },
+          "id": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "method": {
+            "type": "string",
+            "example": "tools/call"
+          },
+          "params": {
+            "type": "object"
+          }
+        }
+      },
+      "JsonRpcResponse": {
+        "type": "object",
+        "properties": {
+          "jsonrpc": {
+            "type": "string"
+          },
+          "id": {},
+          "result": {
+            "type": "object"
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "OAuthError": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "error_description": {
+            "type": "string"
+          }
+        }
+      },
+      "TokenResponse": {
+        "type": "object",
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in",
+          "refresh_token",
+          "scope"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expires_in": {
+            "type": "integer"
+          },
+          "refresh_token": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "description": "Space-separated granted scopes"
+          }
+        }
+      },
+      "ClientRegistration": {
+        "type": "object",
+        "required": [
+          "redirect_uris"
+        ],
+        "properties": {
+          "client_name": {
+            "type": "string"
+          },
+          "redirect_uris": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "token_endpoint_auth_method": {
+            "type": "string",
+            "enum": [
+              "none"
+            ]
+          },
+          "grant_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "response_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ClientInformation": {
+        "type": "object",
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "client_id_issued_at": {
+            "type": "integer"
+          },
+          "client_name": {
+            "type": "string"
+          },
+          "redirect_uris": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "token_endpoint_auth_method": {
+            "type": "string"
+          },
+          "grant_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "response_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
   "paths": {
     "/api/mcp": {
       "post": {
-        "summary": "MCP Server endpoint",
-        "description": "Main MCP server endpoint that handles JSON-RPC requests for tools and resources",
-        "operationId": "handleMcpRequest",
+        "summary": "MCP Streamable HTTP endpoint",
+        "description": "JSON-RPC 2.0 over HTTP (stateless; JSON responses). The tool list returned by tools/list depends on the authenticated principal. A 401 carries WWW-Authenticate with the RFC 9728 resource_metadata URL.",
+        "security": [
+          {
+            "operatorKey": []
+          },
+          {
+            "oauth": []
+          },
+          {
+            "backendJwt": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/McpRequest"
-              },
-              "examples": {
-                "listTools": {
-                  "summary": "List available tools",
-                  "value": {
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "method": "tools/list",
-                    "params": {}
-                  }
-                },
-                "searchListings": {
-                  "summary": "Search for listings",
-                  "value": {
-                    "jsonrpc": "2.0",
-                    "id": 2,
-                    "method": "tools/call",
-                    "params": {
-                      "name": "search_listings",
-                      "arguments": {
-                        "location": "Seattle",
-                        "category": "camping"
-                      }
-                    }
-                  }
-                },
-                "createBooking": {
-                  "summary": "Create a booking",
-                  "value": {
-                    "jsonrpc": "2.0",
-                    "id": 3,
-                    "method": "tools/call",
-                    "params": {
-                      "name": "create_booking",
-                      "arguments": {
-                        "listingId": "listing-123",
-                        "checkIn": "2024-06-01",
-                        "checkOut": "2024-06-03",
-                        "guests": 2,
-                        "userId": "user-456"
-                      }
-                    }
-                  }
-                }
+                "$ref": "#/components/schemas/JsonRpcRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Successful response",
+            "description": "JSON-RPC response",
+            "headers": {
+              "X-RateLimit-Remaining": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/McpResponse"
+                  "$ref": "#/components/schemas/JsonRpcResponse"
                 }
               }
             }
           },
           "401": {
-            "description": "Unauthorized - Invalid or missing authentication",
-            "content": {
-              "application/json": {
+            "description": "Missing or invalid credentials",
+            "headers": {
+              "WWW-Authenticate": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": {
-                  "error": "Invalid API key"
+                  "type": "string"
                 }
               }
             }
           },
           "429": {
-            "description": "Rate limit exceeded",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": {
-                  "error": "Rate limit exceeded. Maximum 20 requests per minute."
-                }
-              }
-            }
+            "description": "Rate limited"
           },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": {
-                  "error": "Internal Server Error"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
+          "400": {
+            "description": "Malformed JSON-RPC request"
           },
-          {
-            "apiKeyAuth": []
+          "406": {
+            "description": "Accept header must allow application/json"
+          },
+          "415": {
+            "description": "Content-Type must be application/json"
           }
-        ]
+        }
       },
       "get": {
-        "summary": "MCP Server info endpoint",
-        "description": "Returns server capabilities and available tools",
-        "operationId": "getServerInfo",
+        "summary": "Not supported (stateless transport)",
         "responses": {
-          "200": {
-            "description": "Server information",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "name": {
-                      "type": "string",
-                      "example": "splitmygear-mcp"
-                    },
-                    "version": {
-                      "type": "string",
-                      "example": "1.0.0"
-                    },
-                    "description": {
-                      "type": "string",
-                      "example": "MCP Server for Splitt - AI-first rental platform"
-                    }
-                  }
-                }
-              }
-            }
+          "405": {
+            "description": "Method not allowed; use POST"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Not supported (stateless transport)",
+        "responses": {
+          "405": {
+            "description": "Method not allowed; use POST"
           }
         }
       },
       "options": {
         "summary": "CORS preflight",
-        "description": "Handles CORS preflight requests",
-        "operationId": "handleCors",
+        "responses": {
+          "204": {
+            "description": "No content"
+          }
+        }
+      }
+    },
+    "/.well-known/oauth-protected-resource": {
+      "get": {
+        "summary": "RFC 9728 protected resource metadata",
         "responses": {
           "200": {
-            "description": "CORS headers",
-            "headers": {
-              "Access-Control-Allow-Origin": {
-                "schema": {
-                  "type": "string"
-                },
-                "example": "*"
-              },
-              "Access-Control-Allow-Methods": {
-                "schema": {
-                  "type": "string"
-                },
-                "example": "GET, POST, OPTIONS"
-              },
-              "Access-Control-Allow-Headers": {
-                "schema": {
-                  "type": "string"
-                },
-                "example": "Content-Type, Authorization, x-api-key"
+            "description": "Metadata"
+          },
+          "404": {
+            "description": "OAuth not enabled"
+          }
+        }
+      }
+    },
+    "/.well-known/oauth-protected-resource/api/mcp": {
+      "get": {
+        "summary": "RFC 9728 metadata (path-aware variant)",
+        "responses": {
+          "200": {
+            "description": "Metadata"
+          },
+          "404": {
+            "description": "OAuth not enabled"
+          }
+        }
+      }
+    },
+    "/.well-known/oauth-authorization-server": {
+      "get": {
+        "summary": "RFC 8414 authorization server metadata",
+        "responses": {
+          "200": {
+            "description": "Metadata"
+          },
+          "404": {
+            "description": "OAuth not enabled"
+          }
+        }
+      }
+    },
+    "/oauth/register": {
+      "post": {
+        "summary": "RFC 7591 dynamic client registration (public clients)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientRegistration"
               }
             }
           }
-        }
-      }
-    }
-  },
-  "components": {
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT",
-        "description": "Backend-issued JWT from POST /api/v1/users/login (HS256). Forwarded by user-scoped tools to the Splitt backend, which is the single authority for auth/RBAC/ownership."
-      },
-      "apiKeyAuth": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "x-api-key",
-        "description": "API key for service-to-service communication"
-      }
-    },
-    "schemas": {
-      "McpRequest": {
-        "type": "object",
-        "required": ["jsonrpc", "id", "method"],
-        "properties": {
-          "jsonrpc": {
-            "type": "string",
-            "const": "2.0",
-            "description": "JSON-RPC version"
+        },
+        "responses": {
+          "201": {
+            "description": "Registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientInformation"
+                }
+              }
+            }
           },
-          "id": {
-            "type": "integer",
-            "description": "Request identifier"
+          "400": {
+            "description": "Invalid metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
           },
-          "method": {
-            "type": "string",
-            "enum": ["tools/list", "tools/call", "resources/list", "resources/read"],
-            "description": "MCP method to invoke"
-          },
-          "params": {
-            "type": "object",
-            "description": "Method parameters"
-          }
-        }
-      },
-      "McpResponse": {
-        "type": "object",
-        "properties": {
-          "jsonrpc": {
-            "type": "string",
-            "const": "2.0"
-          },
-          "id": {
-            "type": "integer"
-          },
-          "result": {
-            "type": "object",
-            "description": "Method result"
-          },
-          "error": {
-            "$ref": "#/components/schemas/JsonRpcError"
-          }
-        }
-      },
-      "JsonRpcError": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "integer"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "object"
-          }
-        }
-      },
-      "ErrorResponse": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "string",
-            "description": "Error message"
+          "503": {
+            "description": "OAuth not enabled"
           }
         }
       }
-    }
-  },
-  "tags": [
-    {
-      "name": "Listing Tools",
-      "description": "Tools for searching and viewing listings"
     },
-    {
-      "name": "Booking Tools",
-      "description": "Tools for creating and managing bookings"
+    "/oauth/authorize": {
+      "get": {
+        "summary": "Authorization endpoint: renders the hosted Splitt sign-in page",
+        "parameters": [
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "code"
+              ]
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "code_challenge",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code_challenge_method",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "S256"
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resource",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Space-separated subset of scopes_supported. Absent = full access (the consent page says so)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sign-in page (HTML)"
+          },
+          "302": {
+            "description": "Error redirect to redirect_uri"
+          },
+          "400": {
+            "description": "Unknown client or unregistered redirect_uri (never redirected)"
+          }
+        }
+      },
+      "post": {
+        "summary": "Sign-in form submission (login, 2FA code, resend, cancel)",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "step": {
+                    "type": "string",
+                    "enum": [
+                      "login",
+                      "otp",
+                      "otp_resend",
+                      "cancel"
+                    ]
+                  },
+                  "req": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "chal": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "302": {
+            "description": "Redirect to redirect_uri with code and state"
+          },
+          "200": {
+            "description": "Re-rendered page (2FA step or error)"
+          },
+          "401": {
+            "description": "Bad credentials (page re-rendered)"
+          },
+          "429": {
+            "description": "Too many attempts"
+          },
+          "403": {
+            "description": "Cross-site form submission blocked"
+          },
+          "503": {
+            "description": "Splitt sign-in temporarily unavailable"
+          }
+        }
+      }
     },
-    {
-      "name": "Resources",
-      "description": "Static resources provided by the server"
+    "/oauth/token": {
+      "post": {
+        "summary": "Token endpoint: authorization_code (PKCE) and refresh_token grants",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "grant_type",
+                  "client_id"
+                ],
+                "properties": {
+                  "grant_type": {
+                    "type": "string",
+                    "enum": [
+                      "authorization_code",
+                      "refresh_token"
+                    ]
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "code_verifier": {
+                    "type": "string"
+                  },
+                  "redirect_uri": {
+                    "type": "string"
+                  },
+                  "client_id": {
+                    "type": "string"
+                  },
+                  "refresh_token": {
+                    "type": "string"
+                  },
+                  "resource": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string",
+                    "description": "refresh_token grant only: narrow the grant to a subset of the token's scopes"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "OAuth error (invalid_grant, invalid_scope, invalid_request ...)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "OAuth not enabled or backend unavailable"
+          }
+        }
+      }
+    },
+    "/oauth/revoke": {
+      "post": {
+        "summary": "RFC 7009 token revocation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token",
+                  "client_id"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string"
+                  },
+                  "client_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Revoked (or unknown token)"
+          },
+          "400": {
+            "description": "Missing token"
+          }
+        }
+      }
+    },
+    "/oauth/social/start": {
+      "get": {
+        "summary": "Start Google/Apple sign-in from the hosted page",
+        "description": "Redirects the browser to the Splitt backend's provider flow (GET /api/v1/auth/{provider}) with a return_to pointing back at /oauth/social/callback carrying the sealed sign-in request.",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "google",
+                "apple"
+              ]
+            }
+          },
+          {
+            "name": "req",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Sealed sign-in request envelope from the hosted page"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the backend provider flow"
+          },
+          "400": {
+            "description": "Unknown provider or expired sign-in request"
+          },
+          "404": {
+            "description": "OAuth not enabled"
+          },
+          "403": {
+            "description": "Not started from the sign-in page (Sec-Fetch-Site is not same-origin)"
+          }
+        }
+      }
+    },
+    "/oauth/social/callback": {
+      "get": {
+        "summary": "Return leg of Google/Apple sign-in",
+        "description": "The backend redirects here with a one-time exchange code (or an error). The code is swapped for a Splitt session via POST /api/v1/auth/oauth/exchange and the OAuth authorization code is issued to the client exactly as after a password sign-in.",
+        "parameters": [
+          {
+            "name": "req",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the client redirect_uri with code and state"
+          },
+          "200": {
+            "description": "Sign-in page re-rendered with an error message"
+          },
+          "400": {
+            "description": "Expired sign-in request, or missing/mismatched sign-in nonce cookie"
+          },
+          "401": {
+            "description": "Exchange code already used or expired, or account suspended (sign-in page re-rendered)"
+          },
+          "429": {
+            "description": "Too many attempts"
+          },
+          "503": {
+            "description": "Splitt unavailable or provider not configured"
+          }
+        }
+      }
+    },
+    "/.well-known/oauth-authorization-server/api/mcp": {
+      "get": {
+        "summary": "RFC 8414 metadata (path-aware variant)",
+        "responses": {
+          "200": {
+            "description": "Metadata"
+          },
+          "404": {
+            "description": "OAuth not enabled"
+          }
+        }
+      }
     }
-  ]
+  }
 }

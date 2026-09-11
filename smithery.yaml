@@ -9,7 +9,7 @@ startCommand:
     properties:
       apiKey:
         type: string
-        description: "Required Splitt API key (x-api-key). Authentication is mandatory — there is no public tier. A user JWT may be supplied instead for user-scoped tools."
+        description: "Optional operator API key (sent as x-api-key) for the public search/pricing tools. Leave empty to sign in with your Splitt account via OAuth 2.1, which unlocks the renter and vendor tools."
     required: []
   configHeadersFunction: |
     (config) => {

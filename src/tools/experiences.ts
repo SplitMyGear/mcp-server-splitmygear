@@ -1,4 +1,5 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
+import { call, compact } from './_shared';
 
 /**
  * Experience tools are thin clients of the backend REST API (SPLIT-226). The
@@ -23,6 +24,29 @@ import { backendRequest, BackendApiError } from '@/lib/backend-client';
 // envelopes. A backend `Experience` entity schema + typed `@ApiResponse` would
 // let these be generated like the listing tools.
 type ExperienceRecord = Record<string, unknown>;
+
+/** Fields of the backend's CreateExperienceDto the MCP exposes. */
+export interface ExperienceInput {
+  title: string;
+  description: string;
+  shortDescription?: string;
+  category?: string;
+  duration: number;
+  durationUnit: string;
+  minGuests?: number;
+  maxGuests?: number;
+  pricePerPerson: number;
+  pricePerChild?: number;
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  meetingPoint?: string;
+  whatsIncluded?: string[];
+  whatToBring?: string[];
+  requirements?: string;
+  cancellationPolicy?: string;
+  imageUrls?: string[];
+}
 
 const AUTH_REQUIRED =
   'Authentication required: call with a user Bearer token (obtained from POST /api/v1/users/login).';
@@ -89,8 +113,12 @@ export const experienceTools = {
     experienceId: string;
     scheduleId?: string;
     guests: number;
+    children?: number;
+    guestNotes?: string;
+    isPrivateGroup?: boolean;
+    withPaymentLink?: boolean;
     token: string;
-  }): Promise<{ success: boolean; booking?: Record<string, unknown>; bookingId?: string; error?: string }> {
+  }): Promise<{ success: boolean; booking?: Record<string, unknown>; bookingId?: string; paymentUrl?: string; paymentError?: string; error?: string }> {
     if (!params.token) return { success: false, error: AUTH_REQUIRED };
     try {
       const result = await backendRequest<{ success: boolean; booking: { id: string; [k: string]: unknown } }>(
@@ -98,16 +126,74 @@ export const experienceTools = {
         '/packages/bookings',
         {
           token: params.token,
-          body: {
+          body: compact({
             experienceId: params.experienceId,
-            ...(params.scheduleId ? { scheduleId: params.scheduleId } : {}),
+            scheduleId: params.scheduleId,
             numberOfGuests: params.guests,
-          },
+            numberOfChildren: params.children,
+            guestNotes: params.guestNotes,
+            isPrivateGroup: params.isPrivateGroup,
+          }),
         },
       );
-      return { success: true, booking: result.booking, bookingId: result.booking?.id };
+      // Tolerate both `{ booking }` envelopes and a bare booking object.
+      const booking = (result?.booking ?? (result as unknown)) as { id?: string; [k: string]: unknown } | undefined;
+      const bookingId = booking?.id;
+      if (!params.withPaymentLink || !bookingId) return { success: true, booking, bookingId };
+      const checkout = await this.createCheckoutSession(bookingId, params.token);
+      return checkout.ok
+        ? { success: true, booking, bookingId, paymentUrl: checkout.data?.checkoutUrl }
+        : { success: true, booking, bookingId, paymentError: checkout.error };
     } catch (error) {
       return { success: false, error: toMessage(error, 'Failed to book experience') };
     }
+  },
+
+  /** Stripe Checkout for an experience booking (backend picks return URLs). */
+  createCheckoutSession(bookingId: string, token: string) {
+    return call<{ checkoutUrl?: string; sessionId?: string }>('POST', `/packages/bookings/${bookingId}/checkout-session`, { token, body: {} });
+  },
+
+  listMyExperienceBookings(token: string) {
+    return call('GET', '/packages/bookings/my', { token });
+  },
+
+  getExperienceBooking(bookingId: string, token: string) {
+    return call('GET', `/packages/bookings/${bookingId}`, { token });
+  },
+
+  /** Guest cancel, or host confirm/cancel/complete — the backend's lifecycle matrix decides who may. */
+  transitionExperienceBooking(bookingId: string, action: 'confirm' | 'cancel' | 'complete', token: string) {
+    return call('POST', `/packages/bookings/${bookingId}/${action}`, { token, body: {} });
+  },
+
+  // ── Host (vendor) management ─────────────────────────────────────────────
+
+  listMyExperiences(token: string) {
+    return call('GET', '/packages/my-experiences', { token });
+  },
+
+  createExperience(token: string, input: ExperienceInput) {
+    return call('POST', '/packages', { token, body: compact(input) });
+  },
+
+  updateExperience(experienceId: string, token: string, input: Partial<ExperienceInput>) {
+    return call('PUT', `/packages/${experienceId}`, { token, body: compact(input) });
+  },
+
+  setExperienceStatus(experienceId: string, action: 'publish' | 'archive', token: string) {
+    return call('POST', `/packages/${experienceId}/${action}`, { token, body: {} });
+  },
+
+  addSchedule(experienceId: string, token: string, input: { date: string; startTime: string; endTime?: string; spotsTotal?: number; customPrice?: number; notes?: string }) {
+    return call('POST', `/packages/${experienceId}/schedules`, { token, body: compact(input) });
+  },
+
+  deleteSchedule(experienceId: string, scheduleId: string, token: string) {
+    return call('DELETE', `/packages/${experienceId}/schedules/${scheduleId}`, { token });
+  },
+
+  listHostBookings(token: string) {
+    return call('GET', '/packages/host/bookings', { token });
   },
 };
