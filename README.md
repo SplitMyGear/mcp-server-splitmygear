@@ -187,7 +187,7 @@ Your local server will be at `http://localhost:3000/api/mcp`.
 ```env
 MCP_API_KEY=               # REQUIRED — operator key clients send via x-api-key
 BACKEND_API_URL=           # optional — defaults to the production backend /api/v1
-MCP_BACKEND_JWT_SECRET=    # optional — verify forwarded JWT signatures locally (defense in depth)
+MCP_BACKEND_JWT_SECRET=    # RECOMMENDED — the backend's JWT_SECRET; verifies bearer tokens in-process
 # AI provider for the content/draft tools (first key present wins): OPENCODE → OPENROUTER → OPENAI
 OPENCODE_API_KEY=          # https://opencode.ai/zen — free tier
 OPENROUTER_API_KEY=        # https://openrouter.ai — free tier
@@ -199,6 +199,12 @@ MCP_RATE_LIMIT_TIER=public # internal | beta | public | default
 > Without `MCP_API_KEY` the server fails closed (every request 401s). Without an
 > AI provider key the three AI content tools degrade gracefully (they return a
 > "disabled" notice); every other tool is unaffected.
+>
+> `MCP_BACKEND_JWT_SECRET` changes the SPEED of bearer auth, never its strength.
+> Set, the HS256 signature is proven in-process. Unset, the MCP asks the backend
+> to identify the caller (`GET /users/profile`, the same authority every tool
+> forwards to) and caches the answer for 60s. Both paths fail closed: an
+> unverifiable bearer is rejected, never decoded and trusted.
 
 ### Tests
 
