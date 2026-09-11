@@ -38,6 +38,13 @@ interface RequestOptions {
   /** The caller's backend JWT, forwarded as `Authorization: Bearer <token>`. */
   token?: string;
   body?: unknown;
+  /**
+   * Override the default per-request timeout. The identity probe in lib/jwt.ts
+   * uses a tighter budget: it runs BEFORE the tool's own backend call, and two
+   * full-length stalls back to back would exceed the function's 30s
+   * maxDuration and surface as an opaque 500 instead of a clean 401.
+   */
+  timeoutMs?: number;
 }
 
 /**
@@ -63,7 +70,7 @@ export async function backendRequest<T = unknown>(
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       // AbortSignal.timeout (Node 18+/20) bounds every upstream call so a stalled
       // backend can't hang the serverless function to its maxDuration.
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(options.timeoutMs ?? REQUEST_TIMEOUT_MS),
     });
   } catch (err) {
     // A timeout abort, DNS failure, or connection reset reaches here as a raw
