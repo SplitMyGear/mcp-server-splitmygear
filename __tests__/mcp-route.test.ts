@@ -14,7 +14,14 @@ jest.mock('@/tools/pricing', () => ({ pricingTools: new Proxy({}, { get: () => j
 jest.mock('@/tools/content', () => ({ contentTools: new Proxy({}, { get: () => jest.fn().mockResolvedValue({}) }) }));
 jest.mock('@/tools/experiences', () => ({ experienceTools: new Proxy({}, { get: () => jest.fn().mockResolvedValue({}) }) }));
 jest.mock('@/tools/messaging', () => ({ messagingTools: new Proxy({}, { get: () => jest.fn().mockResolvedValue({}) }) }));
-jest.mock('@/middleware/rate-limit', () => ({ rateLimiter: jest.fn().mockResolvedValue({ success: true }) }));
+// Both budgets are stubbed open here: this suite is about the transport, and
+// the tool-call budget has its own suite (tool-call-rate-limit.test.ts) which
+// exercises the REAL limiter through this same route.
+jest.mock('@/middleware/rate-limit', () => ({
+  rateLimiter: jest.fn().mockResolvedValue({ success: true }),
+  toolCallRateLimiter: jest.fn().mockResolvedValue({ success: true }),
+  countToolCalls: jest.fn().mockReturnValue(0),
+}));
 
 import { POST } from '../src/app/api/mcp/route';
 

@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --max-warnings=0",
     "test": "jest",
     "test:watch": "jest --watch",
     "gen:api": "openapi-typescript openapi/openapi.json -o src/generated/api-types.gen.ts"

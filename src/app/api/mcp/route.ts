@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
 import { listingTools } from '@/tools/listings';
@@ -9,7 +9,12 @@ import { contentTools } from '@/tools/content';
 import { experienceTools } from '@/tools/experiences';
 import { messagingTools } from '@/tools/messaging';
 import { authMiddleware } from '@/middleware/auth';
-import { rateLimiter } from '@/middleware/rate-limit';
+import {
+  countToolCalls,
+  rateLimiter,
+  toolCallRateLimiter,
+  type RateLimitResult,
+} from '@/middleware/rate-limit';
 
 interface AuthContext {
   userId?: string;
@@ -413,6 +418,16 @@ export async function POST(request: NextRequest) {
   return handleRequest(request);
 }
 
+// The limiter computes WHICH ceiling was hit (requests vs tool calls) and that
+// message used to be discarded for a flat "Rate limit exceeded", leaving the
+// two 429s indistinguishable to the caller and to anyone reading logs.
+function rateLimited(result: RateLimitResult): Response {
+  return new Response(JSON.stringify({ error: result.error ?? 'Rate limit exceeded' }), {
+    status: 429,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 async function handleRequest(request: NextRequest) {
   try {
     const authResult = await authMiddleware(request);
@@ -425,10 +440,44 @@ async function handleRequest(request: NextRequest) {
 
     const rateLimitResult = await rateLimiter(request, authResult.userId);
     if (!rateLimitResult.success) {
-      return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
-        status: 429,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return rateLimited(rateLimitResult);
+    }
+
+    // SPLIT-1449: the request budget above counts HTTP requests, but one POST
+    // may carry a BATCH of tool calls and the transport dispatches every member
+    // — so N invocations cost 1 unit and the ceiling bounded HTTP traffic, not
+    // the backend work it fans out to. Charging `toolCallsPerMinute` needs the
+    // body, which only exists here, ahead of the transport.
+    //
+    // A Request body is a single-use stream, so reading it here would leave the
+    // transport nothing to parse. That is exactly what the SDK's
+    // HandleRequestOptions.parsedBody exists for ("Pre-parsed request body. If
+    // provided, the transport will use this instead of parsing req.json()") —
+    // parse ONCE, hand the value over, and the stream is read exactly as many
+    // times as before.
+    let parsedBody: unknown;
+    let bodyParsed = false;
+    if (request.method === 'POST') {
+      try {
+        parsedBody = await request.json();
+        bodyParsed = true;
+      } catch {
+        // Unparseable body: charge nothing and pass no `parsedBody`, so the
+        // transport answers with its own canonical -32700 parse error instead
+        // of a second, divergent one from here. (Its `req.json()` retry rejects
+        // on the already-consumed stream and lands in that same branch.)
+      }
+    }
+
+    if (bodyParsed) {
+      const toolCallResult = await toolCallRateLimiter(
+        request,
+        countToolCalls(parsedBody),
+        authResult.userId
+      );
+      if (!toolCallResult.success) {
+        return rateLimited(toolCallResult);
+      }
     }
 
     // Stateless: a brand-new server + transport per request (no session id),
@@ -440,7 +489,7 @@ async function handleRequest(request: NextRequest) {
       enableJsonResponse: true,
     });
     await server.connect(transport);
-    return transport.handleRequest(request);
+    return transport.handleRequest(request, bodyParsed ? { parsedBody } : undefined);
   } catch (error) {
     console.error('MCP Server Error:', error);
     return new Response(JSON.stringify({ error: 'Internal Server Error' }), {

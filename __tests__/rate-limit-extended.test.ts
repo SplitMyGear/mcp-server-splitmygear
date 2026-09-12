@@ -1,5 +1,3 @@
-import { NextRequest } from 'next/server';
-
 const RATE_LIMITS = {
   internal: { requestsPerMinute: 100, toolCallsPerMinute: 1000 },
   beta: { requestsPerMinute: 50, toolCallsPerMinute: 500 },
