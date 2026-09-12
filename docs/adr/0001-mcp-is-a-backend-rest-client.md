@@ -40,9 +40,11 @@ holds no service-role database client and performs no direct DB writes.**
 - A shared `src/lib/backend-client.ts` performs every call (Bearer injection +
   backend error-shape parsing → `BackendApiError`).
 - Auth: deny-by-default. A request presents the operator `MCP_API_KEY` (admin,
-  no per-user token) or a user backend JWT. `src/lib/jwt.ts` decodes the JWT for
-  the acting user and optionally verifies its HS256 signature when
-  `MCP_BACKEND_JWT_SECRET` is set (the backend re-validates regardless).
+  no per-user token) or a user backend JWT. `src/lib/jwt.ts` always VERIFIES the
+  JWT before deriving the acting user — locally against `MCP_BACKEND_JWT_SECRET`
+  when it is configured, otherwise by asking the backend to identify the caller
+  (`GET /users/profile`), the same authority every tool forwards to. A token
+  that cannot be verified is rejected; it is never decoded and trusted.
 
 ## Consequences
 

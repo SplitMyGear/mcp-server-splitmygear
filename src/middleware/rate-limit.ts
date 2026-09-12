@@ -14,6 +14,12 @@ import { NextRequest } from 'next/server';
  * bounded inline sweep when the map grows, so there is no timer.
  */
 
+/**
+ * `toolCallsPerMinute` is DECLARED but not enforced by this limiter, which
+ * counts HTTP requests — and one JSON-RPC POST may carry a batch of tool calls.
+ * Enforcing it needs the request body, i.e. the route handler, not this
+ * middleware; left as a follow-up rather than silently implied.
+ */
 export const RATE_LIMITS = {
   internal: { requestsPerMinute: 100, toolCallsPerMinute: 1000 },
   beta: { requestsPerMinute: 50, toolCallsPerMinute: 500 },
@@ -37,15 +43,54 @@ function sweep(now: number): void {
   }
 }
 
+/**
+ * Resolve the bucket key. The previous derivation
+ * (`userId || request.ip || x-forwarded-for || 'anonymous'`) was bypassable
+ * three ways:
+ *
+ *  1. `x-forwarded-for` is a CLIENT-SUPPLIED header and the whole raw chain was
+ *     used verbatim, so rotating it (`1.1.1.1`, then `2.2.2.2`, …) minted a
+ *     fresh bucket on every request. Prefer the platform-set header, and
+ *     otherwise take the LAST hop of the chain — the entry the trusted proxy
+ *     appended, not anything the client wrote ahead of it.
+ *  2. `userId` came from an UNVERIFIED JWT payload, so rotating `sub` minted
+ *     buckets just as freely. Fixed at the source: middleware/auth.ts now takes
+ *     the principal from a verified identity (lib/jwt.ts).
+ *  3. The two key spaces were not namespaced, so a caller could choose an id
+ *     that collided with another caller's IP key and exhaust their budget.
+ *     Prefixing by principal type keeps them structurally disjoint.
+ *
+ * `NextRequest.ip` was dropped in Next 15 — it only survived here behind a cast
+ * that made a dead branch look live — so read the headers explicitly.
+ */
+function resolveClientId(request: NextRequest, userId?: string): string {
+  if (userId) return `user:${userId}`;
+
+  // Set by the Vercel edge on every inbound request; a client cannot supply it.
+  const platformIp = request.headers.get('x-vercel-forwarded-for');
+  if (platformIp) return `ip:${platformIp.trim()}`;
+
+  const chain = request.headers.get('x-forwarded-for');
+  if (chain) {
+    const hops = chain.split(',').map((hop) => hop.trim()).filter(Boolean);
+    const closest = hops[hops.length - 1];
+    if (closest) return `ip:${closest}`;
+  }
+
+  const realIp = request.headers.get('x-real-ip');
+  if (realIp) return `ip:${realIp.trim()}`;
+
+  // No usable network identity: one shared bucket. Deny-by-default auth runs
+  // BEFORE this, so reaching here means an authenticated operator-key caller
+  // behind an unknown proxy, never the open internet.
+  return 'ip:unknown';
+}
+
 export async function rateLimiter(
   request: NextRequest,
   userId?: string
 ): Promise<RateLimitResult> {
-  const clientId =
-    userId ||
-    (request as unknown as { ip?: string }).ip ||
-    request.headers.get('x-forwarded-for') ||
-    'anonymous';
+  const clientId = resolveClientId(request, userId);
 
   const tier = process.env.MCP_RATE_LIMIT_TIER || 'default';
   const limits = RATE_LIMITS[tier as keyof typeof RATE_LIMITS] || RATE_LIMITS.default;

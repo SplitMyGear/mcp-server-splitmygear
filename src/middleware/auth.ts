@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import crypto from 'crypto';
-import { readBackendJwtClaims } from '@/lib/jwt';
+import { verifyBackendJwt } from '@/lib/jwt';
 
 /**
  * SPLIT-335: constant-time secret comparison. A plain `a === b` short-circuits
@@ -31,8 +31,10 @@ export interface AuthResult {
  *  1. The operator API key (`x-api-key === MCP_API_KEY`) → role `admin`, no
  *     per-user token (cannot drive user-scoped backend mutations).
  *  2. A SplitMyGear backend JWT (`Authorization: Bearer …`, issued by
- *     POST /api/v1/users/login) → decoded for the acting user; user-scoped tools
- *     forward it to the backend, the single authority for auth/RBAC/ownership.
+ *     POST /api/v1/users/login) → VERIFIED (lib/jwt.ts: local HS256 when the
+ *     shared secret is configured, otherwise against the backend itself) for the
+ *     acting user; user-scoped tools forward it to the backend, the single
+ *     authority for auth/RBAC/ownership.
  * No Supabase: the MCP holds no Supabase client (SPLIT-226). The former
  * `api_keys` lookup was dead (the table does not exist) and was the last reason
  * the server depended on @supabase/supabase-js.
@@ -51,14 +53,17 @@ export async function authMiddleware(request: NextRequest): Promise<AuthResult> 
 
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.substring(7).trim();
-    const claims = readBackendJwtClaims(token);
-    if (!claims?.sub) {
+    // Security fix (2026-09-11 review): the principal comes from a VERIFIED
+    // identity, never from the token's own base64 payload. An unverifiable
+    // bearer is rejected rather than decoded-and-trusted.
+    const identity = await verifyBackendJwt(token);
+    if (!identity) {
       return { success: false, error: 'Invalid token' };
     }
     return {
       success: true,
-      userId: claims.sub,
-      role: claims.role || 'renter',
+      userId: identity.userId,
+      role: identity.role,
       token,
     };
   }
