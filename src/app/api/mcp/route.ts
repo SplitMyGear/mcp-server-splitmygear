@@ -7,6 +7,7 @@ import { bookingTools } from '@/tools/bookings';
 import { pricingTools } from '@/tools/pricing';
 import { contentTools } from '@/tools/content';
 import { experienceTools } from '@/tools/experiences';
+import { experienceCategorySchema } from '@/tools/experience-categories';
 import { messagingTools } from '@/tools/messaging';
 import { authMiddleware } from '@/middleware/auth';
 import {
@@ -270,7 +271,9 @@ server.tool(
   'search_experiences',
   {
     location: z.string().optional().describe('City or neighborhood'),
-    category: z.string().optional().describe('Category (Outdoor, Tours, Fitness, etc.)'),
+    category: experienceCategorySchema
+      .optional()
+      .describe('Experience category (lowercase, exactly one of): tours, food, outdoor, arts, fitness, wellness, music, sports, workshop, photography, other'),
   },
   { readOnlyHint: true, openWorldHint: true },
   async ({ location, category }) => {
