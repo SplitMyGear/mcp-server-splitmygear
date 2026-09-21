@@ -1,40 +1,37 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
-import type { Listing } from '@/lib/api-contract';
+import type { GetResponse, Listing } from '@/lib/api-contract';
 
 /**
  * Listing read tools are thin clients of the public backend REST API (SPLIT-226)
- * — the canonical, moderation-filtered source. This drops the direct
- * service-role Supabase reads (which targeted a divergent schema) AND the
- * duplicated embedding/match_listings logic, which now lives behind the
- * backend's /rentals/search/vibe + /rentals/:id/similar endpoints.
+ * — the canonical, moderation-filtered source. Embedding/similarity logic lives
+ * behind the backend's /rentals/search/vibe + /rentals/:id/similar endpoints.
  *
  * SPLIT-220 (taxonomy rename): backend paths use the canonical `/rentals`
  * family. The backend serves both aliases byte-identically
  * (`@Controller(['listings', 'rentals'])`), so the response shape — and these
  * tools' I/O contracts — are unchanged.
  *
- * SPLIT-197 §C-MCP: `ListingRecord` is now the generated `Listing` entity from
- * the backend OpenAPI contract instead of an untyped `Record<string, unknown>`.
- * NOTE: the read routes below (`GET /rentals*`) declare no typed response schema
- * in the spec (only a bare `object`), so their result envelopes are modelled
- * with the narrow local types below over the generated `Listing` element type —
- * a documented contract gap (see `@/lib/api-contract`).
+ * SPLIT-197 §C-MCP: `ListingRecord` is the generated `Listing` entity from the
+ * backend OpenAPI contract. The `GET /rentals*` envelopes are now spec-bound too
+ * (SPLIT-1307, vendored-spec commit b1e2dc8), so they are derived with
+ * `GetResponse<P>` rather than hand-rolled (see `@/lib/api-contract`).
  */
 
 type ListingRecord = Listing;
 
-/** GET /rentals & /rentals/search/vibe & /rentals/{id}/similar wrap results in a
- *  `data` array (vibe/similar also carry `success`). Untyped in the spec. */
-type ListingListResponse = { success?: boolean; data?: ListingRecord[] };
+/** `ListingCollectionResponseDto` — the vibe + similar envelope (`{success,count,data}`). */
+type ListingListResponse = GetResponse<'/api/v1/rentals/search/vibe'>;
 
-/** GET /rentals/{id}/availability. Untyped in the spec (contract gap). */
-type AvailabilityResponse = { isAvailable: boolean; conflicts?: unknown[] };
+/** `ListingBrowseResponseDto` — the browse envelope (`{data,limit,page,total,suggestions?}`). */
+type ListingBrowseResponse = GetResponse<'/api/v1/rentals'>;
 
-export interface SearchFilters {
+/** GET /rentals/{id}/availability. */
+type AvailabilityResponse = GetResponse<'/api/v1/rentals/{id}/availability'>;
+
+interface SearchFilters {
   location?: string;
   checkIn?: string;
   checkOut?: string;
-  guests?: number;
   category?: string;
   minPrice?: number;
   maxPrice?: number;
@@ -68,7 +65,7 @@ export const listingTools = {
         // Fall through to structured browse if vibe returns nothing.
       }
 
-      const browse = await backendRequest<ListingListResponse>(
+      const browse = await backendRequest<ListingBrowseResponse>(
         'GET',
         `/rentals${qs({
           search: filters.query,

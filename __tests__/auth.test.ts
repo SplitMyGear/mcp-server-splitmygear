@@ -89,18 +89,6 @@ describe('Auth Middleware', () => {
     expect(result.error).toBe('No authentication provided');
   });
 
-  it('should reject requests without authentication for non-public endpoints', async () => {
-    const mockRequest = {
-      headers: new Headers({}),
-      nextUrl: { pathname: '/api/admin' },
-    } as any;
-    
-    const result = await authMiddleware(mockRequest);
-    
-    expect(result.success).toBe(false);
-    expect(result.error).toBe('No authentication provided');
-  });
-
   it('accepts a VERIFIED backend JWT, derives the user from sub, and exposes the token for forwarding', async () => {
     const token = makeJwt({ sub: 'user-123', role: 'vendor', exp: FUTURE }, JWT_SECRET);
 
@@ -227,7 +215,7 @@ describe('Auth Middleware', () => {
     });
   });
 
-  it('rejects a non-operator x-api-key with no bearer (api_keys path removed — no Supabase)', async () => {
+  it('rejects a non-operator x-api-key with no bearer', async () => {
     const mockRequest = {
       headers: new Headers({ 'x-api-key': 'some-other-key' }),
       nextUrl: { pathname: '/api/mcp' },

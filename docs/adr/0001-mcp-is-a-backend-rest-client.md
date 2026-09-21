@@ -54,9 +54,10 @@ holds no service-role database client and performs no direct DB writes.**
 - `SUPABASE_SERVICE_ROLE_KEY` and `STRIPE_SECRET_KEY` are no longer used by any
   code and must be removed from the deployment and the service-role key rotated
   (operator).
-- The only remaining Supabase reference is the optional operator `api_keys`
-  lookup in `auth.ts`, which uses the **anon** key. Migrating or removing that is
-  a minor follow-up to drop `@supabase/supabase-js` entirely.
+- The optional operator `api_keys` lookup in `auth.ts` (anon key) was the last
+  Supabase reference; it was dead (the table never existed) and was removed in
+  PR #14 (`265ef1f`, 2026-06-13) together with the `@supabase/supabase-js` and
+  `stripe` dependencies. The service-role key was rotated after removal.
 
 ## Rule for all future surfaces
 

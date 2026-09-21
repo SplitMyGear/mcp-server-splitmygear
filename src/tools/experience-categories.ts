@@ -29,6 +29,4 @@ export const EXPERIENCE_CATEGORIES = [
   'other',
 ] as const;
 
-export type ExperienceCategory = (typeof EXPERIENCE_CATEGORIES)[number];
-
 export const experienceCategorySchema = z.enum(EXPERIENCE_CATEGORIES);

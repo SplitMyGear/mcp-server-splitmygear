@@ -1,7 +1,7 @@
 import { bookingTools } from '../src/tools/bookings';
 
-// Mock the backend REST client (SPLIT-226 / M4): booking tools now forward the
-// caller's JWT to the backend instead of writing to Supabase/Stripe.
+// Mock the backend REST client (SPLIT-226 / M4): booking tools forward the
+// caller's JWT to the backend, which owns auth, pricing and payment.
 const mockBackendRequest = jest.fn();
 jest.mock('../src/lib/backend-client', () => {
   class BackendApiError extends Error {

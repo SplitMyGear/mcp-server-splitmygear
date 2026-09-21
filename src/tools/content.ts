@@ -1,11 +1,11 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
+import type { PostResponse } from '@/lib/api-contract';
 
 /**
- * Content tools are thin clients of the backend AI (SPLIT-277), completing the
- * SPLIT-226 decouple: the MCP no longer calls an LLM provider directly (it held
- * no AI key in prod, so these tools were dead). The backend owns the AI provider,
- * prompts, token budget and fallbacks. A `{ available:false }` body means the
- * backend's AI feature flag is off — surface it rather than pretend success.
+ * Content tools are thin clients of the backend AI (SPLIT-277). The backend owns
+ * the AI provider, prompts, token budget and fallbacks. A `{ available:false }`
+ * body means the backend's AI feature flag is off — surface it rather than
+ * pretend success.
  *
  * SPLIT-635: the backend added `JwtAuthGuard` to every `/ai/*` route (SPLIT-585),
  * so these tools MUST forward the caller's JWT (like every other authenticated
@@ -14,22 +14,10 @@ import { backendRequest, BackendApiError } from '@/lib/backend-client';
  * unchanged input title / a canned string) that masks the broken auth.
  */
 
-// SPLIT-197 §C-MCP contract gap: the backend types the /ai REQUEST bodies
-// (GenerateDescriptionDto, ImproveTitleDto) but declares NO typed RESPONSE
-// schema for /ai/generate-description or /ai/improve-title — openapi-typescript
-// emits a bare `Record<string, never>`, so these can't be derived from the spec.
-// These local interfaces document the real response shape the tools read; a
-// backend `@ApiResponse({ type })` on the /ai routes would let them be generated.
-interface DescriptionResponse {
-  description?: string;
-  available?: boolean;
-  message?: string;
-}
-
-interface TitleResponse {
-  title?: string;
-  available?: boolean;
-}
+// SPLIT-197 §C-MCP: the /ai response bodies are spec-bound (SPLIT-1307,
+// vendored-spec commit b1e2dc8), so both are derived rather than hand-rolled.
+type DescriptionResponse = PostResponse<'/api/v1/ai/generate-description'>;
+type TitleResponse = PostResponse<'/api/v1/ai/improve-title'>;
 
 const AUTH_REQUIRED =
   'Authentication required: call with a user Bearer token (obtained from POST /api/v1/users/login) to use AI content tools.';

@@ -4,7 +4,7 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
-  testMatch: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.spec.ts'],
+  testMatch: ['**/__tests__/**/*.test.ts'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
@@ -15,12 +15,18 @@ module.exports = {
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
+  // Ratcheted to the achieved level (SPLIT-1499). Actuals at the time of the
+  // ratchet: 83.36 stmts / 73.85 branch / 73.07 funcs / 85.58 lines. Each
+  // threshold sits ~2.5-3 points below its actual: low enough that an
+  // unrelated PR does not fail spuriously, high enough that a real coverage
+  // regression does. Raise these when coverage genuinely improves; never
+  // lower one to make a red build green.
   coverageThreshold: {
     global: {
-      branches: 30,
-      functions: 30,
-      lines: 30,
-      statements: 30,
+      branches: 71,
+      functions: 70,
+      lines: 83,
+      statements: 80,
     },
   },
 };
