@@ -4,9 +4,10 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_dispatch:
+# PR-only + manual, matching the BE/FE/CRM consolidation (SPLIT-670): a squash-merge
+# re-running the same CI on `push: main` doubled Actions minutes for no new signal.
 
 permissions:
   contents: read
