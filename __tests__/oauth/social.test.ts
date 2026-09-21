@@ -303,6 +303,35 @@ describe('social sign-in on the hosted page', () => {
       expect(mockBackendRequest).not.toHaveBeenCalled();
     });
 
+    it('renders its fallback forms pointing at POST /oauth/authorize, never back at the GET-only callback', async () => {
+      // The callback route has no POST handler, so a form with action="" (post
+      // back to the rendering URL) submitted from a callback-rendered page 405s.
+      const callbackRoute = await import('../../src/app/oauth/social/callback/route');
+      expect((callbackRoute as Record<string, unknown>).POST).toBeUndefined();
+
+      // Failed round-trip: the password form is back, aimed at the authorize endpoint.
+      const { req } = await signInPage();
+      const { returnTo, cookie } = await start(req);
+      const failed = await socialCallback(callbackRequest(returnTo, { error: 'google_auth_failed' }, cookie));
+      const failedHtml = await failed.text();
+      expect(failedHtml).toContain('<form method="post" action="/oauth/authorize"');
+      expect(failedHtml).not.toContain('action=""');
+
+      // Successful round-trip into 2FA: the one-time-code form is aimed there too.
+      const again = await signInPage();
+      const second = await start(again.req);
+      mockBackendRequest.mockImplementation(async (method: string, path: string) => {
+        if (path === '/auth/oauth/exchange') return { twoFactorRequired: true, challengeToken: 'c'.repeat(64), methods: ['email_otp'], defaultMethod: 'email_otp', maskedEmail: 'r***@x.test', expiresAt: new Date(Date.now() + 600_000).toISOString() };
+        if (path === '/auth/2fa/otp/send') return { success: true, maskedEmail: 'r***@x.test' };
+        throw new Error(`unexpected ${method} ${path}`);
+      });
+      const otp = await socialCallback(callbackRequest(second.returnTo, { code: EXCHANGE_CODE }, second.cookie));
+      expect(otp.status).toBe(200);
+      const otpHtml = await otp.text();
+      expect(otpHtml).toContain('<form method="post" action="/oauth/authorize"');
+      expect(otpHtml).not.toContain('action=""');
+    });
+
     it('requires the browser that started the sign-in: no cookie, a foreign cookie or an unbound request are refused before any backend call', async () => {
       const { req } = await signInPage();
       const { returnTo, cookie } = await start(req);

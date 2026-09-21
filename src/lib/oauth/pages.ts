@@ -25,7 +25,7 @@ export function escapeHtml(value: string): string {
  * password field: `default-src 'none'` does NOT restrict form submission, so
  * without it any injected or rewritten `<form action>` could post the
  * credentials straight to another origin. `base-uri 'none'` already blocks the
- * `<base href>` trick that would repoint this page's `action=""`.
+ * `<base href>` trick that would repoint a relative form action.
  */
 export const PAGE_HEADERS: Record<string, string> = {
   'Content-Type': 'text/html; charset=utf-8',
@@ -36,6 +36,16 @@ export const PAGE_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
 };
+
+/**
+ * Both hosted forms post to the authorize endpoint EXPLICITLY. `action=""`
+ * posts back to whatever URL rendered the page — and the social callback
+ * (GET /oauth/social/callback, GET-only) renders this same sign-in page after
+ * a failed provider round-trip, and the 2FA page after a successful one, so
+ * the password fallback and the one-time code there used to 405. Same origin,
+ * so `form-action 'self'` still holds.
+ */
+export const SIGN_IN_FORM_ACTION = '/oauth/authorize';
 
 const STYLES = `
   :root { color-scheme: light dark; }
@@ -147,7 +157,7 @@ export function renderLoginPage(p: LoginPageProps): string {
 <div class="client">${renderConsent(p)}After sign-in you will be sent to:<br><code>${escapeHtml(p.redirectUri)}</code></div>
 ${p.verified ? '' : '<div class="warn">Splitt has not verified this app. Only continue if you started this sign-in yourself from an app you trust, and check the address above.</div>'}
 ${p.error ? `<div class="error" role="alert">${escapeHtml(p.error)}</div>` : ''}
-<form method="post" action="" autocomplete="on">
+<form method="post" action="${SIGN_IN_FORM_ACTION}" autocomplete="on">
 <input type="hidden" name="step" value="login">
 <input type="hidden" name="req" value="${escapeHtml(p.requestToken)}">
 <label for="email">Email</label>
@@ -173,7 +183,7 @@ export function renderOtpPage(p: OtpPageProps): string {
     `<h1>Check your email</h1>
 <p>We sent a one-time code to <b>${escapeHtml(p.maskedEmail || 'your email')}</b>. Enter it below to finish signing in.</p>
 ${p.error ? `<div class="error" role="alert">${escapeHtml(p.error)}</div>` : ''}
-<form method="post" action="" autocomplete="off">
+<form method="post" action="${SIGN_IN_FORM_ACTION}" autocomplete="off">
 <input type="hidden" name="step" value="otp">
 <input type="hidden" name="chal" value="${escapeHtml(p.challengeToken)}">
 <label for="code">Verification code</label>

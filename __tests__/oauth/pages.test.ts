@@ -9,7 +9,7 @@
  * guarded the escaper before this file existed.
  */
 export {};
-import { escapeHtml, renderConsent, renderLoginPage, renderOtpPage, renderErrorPage, PAGE_HEADERS } from '../../src/lib/oauth/pages';
+import { escapeHtml, renderConsent, renderLoginPage, renderOtpPage, renderErrorPage, PAGE_HEADERS, SIGN_IN_FORM_ACTION } from '../../src/lib/oauth/pages';
 import { TOOL_SCOPES } from '../../src/lib/oauth/scopes';
 
 const XSS = '"><script>alert(1)</script>';
@@ -109,6 +109,16 @@ describe('sign-in page rendering', () => {
 
 describe('sign-in page response headers', () => {
   const csp = PAGE_HEADERS['Content-Security-Policy'];
+
+  it('posts both hosted forms explicitly to /oauth/authorize (never a relative action="")', () => {
+    const login = renderLoginPage({ requestToken: 'smg_rq.x', clientName: 'C', redirectUri: 'https://c.example/cb', verified: true, scopes: ['read'], scopesRequested: true, providers: [] });
+    const otp = renderOtpPage({ challengeToken: 'smg_ch.x', maskedEmail: 'r***@x.test' });
+    for (const html of [login, otp]) {
+      expect(html).toContain(`<form method="post" action="${SIGN_IN_FORM_ACTION}"`);
+      expect(html).not.toContain('action=""');
+    }
+    expect(SIGN_IN_FORM_ACTION).toBe('/oauth/authorize');
+  });
 
   it("sets form-action 'self' so credentials cannot be posted to another origin", () => {
     // default-src does NOT cover form submission: without form-action, an
