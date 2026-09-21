@@ -222,6 +222,10 @@ This server is optimized for Vercel Serverless Functions. Push to the connected 
 git push origin main
 ```
 
+The manual fallback is the Vercel CLI: check out a worktree at the merged SHA
+and run `vercel deploy --prod` as a REMOTE build — never `--prebuilt`, which
+ships a locally-built artifact against a mismatched Node runtime (SPLIT-224).
+
 ---
 
 ## Rate Limits

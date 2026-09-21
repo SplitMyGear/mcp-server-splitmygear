@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ['@supabase/supabase-js', 'stripe'],
   eslint: {
     // Lint is its own gate: `npm run lint` (eslint.config.mjs), which covers
     // every source file in the repo. Next's build-time runner cannot drive a
