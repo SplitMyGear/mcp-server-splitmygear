@@ -1,6 +1,6 @@
 # mcp-server-splitmygear
 
-MCP (Model Context Protocol) server for [SplitMyGear](https://go-splitt.com) — an outdoor gear rental marketplace. Lets AI agents (Claude, Cursor, Windsurf, etc.) search gear, check availability, manage bookings, browse experiences, and more.
+MCP (Model Context Protocol) server for [Splitt](https://go-splitt.com) — an outdoor gear rental marketplace. Lets AI agents (Claude, Cursor, Windsurf, etc.) search gear, check availability, manage bookings, browse experiences, and more.
 
 **18 tools** across search, booking, pricing, content generation, experiences, and messaging.
 
@@ -56,6 +56,7 @@ Install `manifest.json` through Claude Desktop's Extension Manager (Claude Deskt
 ```bash
 curl -X POST https://mcp-server-splitmygear.vercel.app/api/mcp \
   -H "Content-Type: application/json" \
+  -H "x-api-key: $MCP_API_KEY" \
   -d '{
     "jsonrpc": "2.0",
     "id": 1,
@@ -74,11 +75,12 @@ curl -X POST https://mcp-server-splitmygear.vercel.app/api/mcp \
 **All access requires authentication** — the server holds privileged platform
 credentials, so there is no public/anonymous tier. Present either:
 
-- an operator **API key** via the `x-api-key` header (unlocks read/search,
-  pricing, and content tools), or
-- a user **JWT** via `Authorization: Bearer <token>` (additionally unlocks
-  user-scoped tools — booking, messaging, personalized recommendations — which
-  act as the authenticated user; they never accept a caller-supplied user id).
+- an operator **API key** via the `x-api-key` header (unlocks the 8
+  read/search/pricing tools), or
+- a user **JWT** via `Authorization: Bearer <token>` (additionally unlocks the
+  10 user-scoped tools — booking, messaging, personalized recommendations and
+  the AI content/draft tools — which act as the authenticated user; they never
+  accept a caller-supplied user id).
 
 Unauthenticated requests are rejected with `401`. The two tiers below mean
 "works with an API key" (**Auth**) vs "requires a user JWT" (**User**).
@@ -101,7 +103,7 @@ Unauthenticated requests are rejected with `401`. The two tiers below mean
 
 | Tool | Auth | Description |
 |------|------|-------------|
-| `create_booking` | User | Create a rental booking (Stripe payment) |
+| `create_booking` | User | Create a rental booking (payment handled by the backend) |
 | `cancel_booking` | User | Cancel a booking with optional refund |
 | `get_booking_status` | User | Status of YOUR booking (owner-checked) |
 
@@ -116,8 +118,8 @@ Unauthenticated requests are rejected with `401`. The two tiers below mean
 
 | Tool | Auth | Description |
 |------|------|-------------|
-| `generate_listing_description` | Auth | AI description from name + keywords |
-| `improve_listing_title` | Auth | SEO-optimized title suggestions |
+| `generate_listing_description` | User | AI description from name + keywords |
+| `improve_listing_title` | User | SEO-optimized title suggestions |
 
 ### Experiences
 
@@ -133,7 +135,7 @@ Unauthenticated requests are rejected with `401`. The two tiers below mean
 |------|------|-------------|
 | `send_message` | User | Send a message to a renter or vendor |
 | `get_conversations` | User | List your active conversations |
-| `generate_ai_message_draft` | Auth | AI-drafted professional message |
+| `generate_ai_message_draft` | User | AI-drafted professional message |
 
 ---
 
@@ -153,7 +155,7 @@ The `search_listings` `query` parameter accepts plain English. The server parses
 
 | Resource URI | Description |
 |---|---|
-| `splitmygear://categories` | List of all 19 gear categories |
+| `splitmygear://categories` | List of the gear categories the server exposes |
 
 ---
 
@@ -162,8 +164,7 @@ The `search_listings` `query` parameter accepts plain English. The server parses
 ### Prerequisites
 - Node.js 18+
 - An operator `MCP_API_KEY` (and, for user-scoped tools, a backend JWT)
-- Access to the SplitMyGear backend REST API (defaults to production; override with `BACKEND_API_URL`)
-- *(optional)* An AI provider key (OpenCode Zen / OpenRouter / OpenAI) for the two content tools and the AI message draft
+- Access to the Splitt backend REST API (defaults to the **staging** backend; override with `BACKEND_API_URL`)
 
 > This server holds **no** Supabase or Stripe credentials — every action goes
 > through the backend REST API, which is the single authority for auth, data,
@@ -186,19 +187,14 @@ Your local server will be at `http://localhost:3000/api/mcp`.
 
 ```env
 MCP_API_KEY=               # REQUIRED — operator key clients send via x-api-key
-BACKEND_API_URL=           # optional — defaults to the production backend /api/v1
+BACKEND_API_URL=           # optional — defaults to the STAGING backend /api/v1
 MCP_BACKEND_JWT_SECRET=    # RECOMMENDED — the backend's JWT_SECRET; verifies bearer tokens in-process
-# AI provider for the content/draft tools (first key present wins): OPENCODE → OPENROUTER → OPENAI
-OPENCODE_API_KEY=          # https://opencode.ai/zen — free tier
-OPENROUTER_API_KEY=        # https://openrouter.ai — free tier
-AI_CHAT_MODEL=             # optional override
-AI_EMBEDDING_MODEL=        # optional override
-MCP_RATE_LIMIT_TIER=public # internal | beta | public | default
+MCP_RATE_LIMIT_TIER=       # internal | beta | public | default (unset ⇒ default)
 ```
 
-> Without `MCP_API_KEY` the server fails closed (every request 401s). Without an
-> AI provider key the three AI content tools degrade gracefully (they return a
-> "disabled" notice); every other tool is unaffected.
+> Without `MCP_API_KEY` the server fails closed (every request 401s). The AI
+> tools call the backend's `/ai/*` routes and hold no provider key of their own;
+> if the backend's AI feature is off they return its unavailable notice.
 >
 > `MCP_BACKEND_JWT_SECRET` changes the SPEED of bearer auth, never its strength.
 > Set, the HS256 signature is proven in-process. Unset, the MCP asks the backend
@@ -232,11 +228,13 @@ ships a locally-built artifact against a mismatched Node runtime (SPLIT-224).
 
 | Tier | Requests/min | Tool calls/min |
 |------|-------------|----------------|
+| `default` | 10 | 100 |
 | `public` | 20 | 200 |
 | `beta` | 50 | 500 |
 | `internal` | 100 | 1000 |
 
-Set `MCP_RATE_LIMIT_TIER` in your environment to control the limit.
+Set `MCP_RATE_LIMIT_TIER` in your environment to control the limit. When it is
+unset or unrecognised the server uses `default` (10 req/min), not `public`.
 
 ---
 

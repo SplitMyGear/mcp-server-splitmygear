@@ -10,7 +10,7 @@ startCommand:
       apiKey:
         type: string
         description: "Required Splitt API key (x-api-key). Authentication is mandatory — there is no public tier. A user JWT may be supplied instead for user-scoped tools."
-    required: []
+    required: [apiKey]
   configHeadersFunction: |
     (config) => {
       const headers = {};
