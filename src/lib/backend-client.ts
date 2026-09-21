@@ -1,12 +1,9 @@
 /**
  * Thin HTTP client for the SplitMyGear backend REST API (NestJS, /api/v1).
  *
- * SPLIT-226 (M4): user-scoped mutating tools no longer write to Supabase/Stripe
- * directly (which bypassed all backend auth, validation, server-authoritative
- * pricing and the real schema — the MCP's column assumptions diverged from the
- * backend entities). Instead they call the backend REST API forwarding the
- * caller's own JWT, so the backend remains the single authority for
- * authentication, RBAC, ownership, pricing and payments.
+ * Every tool calls the backend REST API, forwarding the caller's own JWT, so the
+ * backend remains the single authority for authentication, RBAC, ownership,
+ * pricing and payments (ADR 0001, SPLIT-226).
  */
 
 const DEFAULT_BASE_URL = 'https://splitmygear-backend.vercel.app/api/v1';

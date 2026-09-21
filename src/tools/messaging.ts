@@ -6,9 +6,8 @@ import { call, compact, qs } from './_shared';
  * `sendMessage` / `getConversations` call the backend REST API forwarding the
  * caller's JWT (SPLIT-226 / M4): the backend derives the sender from the token
  * (never caller-supplied — closes the impersonation vector) and owns the chat
- * schema. `generateAIDraft` now also goes through the backend AI (SPLIT-277) —
- * the MCP holds no LLM provider key of its own. No Supabase, no direct openai:
- * the whole MCP reads/writes through the backend.
+ * schema. `generateAIDraft` goes through the backend AI (SPLIT-277); the MCP
+ * holds no LLM provider key of its own.
  *
  * SPLIT-197 §C-MCP: chat response types are derived from the backend OpenAPI
  * contract (`@/lib/api-contract`). `POST /chat/conversations/{id}/messages` is
@@ -20,13 +19,6 @@ import { call, compact, qs } from './_shared';
 
 /** POST /chat/conversations/{conversationId}/messages → `Message` (spec-bound). */
 type SentMessage = PostResponse<'/api/v1/chat/conversations/{conversationId}/messages'>;
-
-// Defense in depth (M6): the route layer UUID-validates ids, but validating
-// here too avoids a pointless backend round-trip on obviously-bad input.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function isUuid(value: string): boolean {
-  return UUID_RE.test(value);
-}
 
 const AUTH_REQUIRED =
   'Authentication required: call with a user Bearer token (obtained from POST /api/v1/users/login).';
@@ -43,44 +35,20 @@ function isAuthError(error: unknown): error is BackendApiError {
 /**
  * Resolve (or create) the conversation to post into.
  *
- * The backend's `POST /chat/conversations` is NOT idempotent — it 409s
- * ("Conversation with this user already exists") once a conversation between the
- * two users exists. An MCP caller that sent an earlier message and did not
- * retain the conversationId would then be unable to send ANY follow-up (every
- * subsequent send_message to that person failed). On a 409 we fall back to
- * listing the caller's conversations and reusing the existing one with this
- * recipient, so repeat messaging "just works".
+ * The backend's `POST /chat/conversations` is idempotent (SPLIT-418): it returns
+ * a newly created conversation with 201, or the pair's existing one with 200 —
+ * never a 409.
  */
 async function resolveOrCreateConversation(
   recipientId: string,
   token: string,
   context: { listingId?: string; bookingId?: string } = {},
 ): Promise<string | undefined> {
-  try {
-    const created = await backendRequest<Conversation>('POST', '/chat/conversations', {
-      token,
-      body: compact({ participantId: recipientId, ...context }),
-    });
-    return created?.id;
-  } catch (error) {
-    if (error instanceof BackendApiError && error.status === 409) {
-      return findConversationWith(recipientId, token);
-    }
-    throw error;
-  }
-}
-
-/** Find the caller's existing conversation with `recipientId`, if any. */
-async function findConversationWith(
-  recipientId: string,
-  token: string,
-): Promise<string | undefined> {
-  const list = await backendRequest<Conversation[]>('GET', '/chat/conversations', { token });
-  if (!Array.isArray(list)) return undefined;
-  const match = list.find(
-    (c) => c && (c.participant1Id === recipientId || c.participant2Id === recipientId),
-  );
-  return match?.id;
+  const created = await backendRequest<Conversation>('POST', '/chat/conversations', {
+    token,
+    body: compact({ participantId: recipientId, ...context }),
+  });
+  return created?.id;
 }
 
 export const messagingTools = {
@@ -93,18 +61,12 @@ export const messagingTools = {
     token: string;
   }): Promise<{ success: boolean; message?: SentMessage; conversationId?: string; error?: string }> {
     if (!params.token) return { success: false, error: AUTH_REQUIRED };
-    if (!isUuid(params.recipientId)) {
-      return { success: false, error: 'Invalid recipientId: expected a UUID' };
-    }
-    if (params.conversationId && !isUuid(params.conversationId)) {
-      return { success: false, error: 'Invalid conversationId: expected a UUID' };
-    }
     try {
       let convId = params.conversationId;
       if (!convId) {
         // Resolve (or create) the conversation with the recipient. The backend
-        // derives the initiator from the token, and 409s if the pair already has
-        // a conversation — resolveOrCreateConversation reuses it in that case.
+        // derives the initiator from the token and returns the pair's existing
+        // thread when they already have one.
         convId = await resolveOrCreateConversation(params.recipientId, params.token, {
           listingId: params.listingId,
           bookingId: params.bookingId,

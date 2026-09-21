@@ -1,13 +1,11 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
-import type { GetResponse, PostResponse, BookingResponseDto } from '@/lib/api-contract';
+import type { GetResponse, PostResponse, PutResponse } from '@/lib/api-contract';
 import { call, compact, qs, type Result } from './_shared';
 
 /**
  * Booking tools call the SplitMyGear backend REST API (/api/v1) forwarding the
  * caller's JWT (SPLIT-226 / M4). The backend owns auth, RBAC, ownership checks,
- * server-authoritative pricing (SPLIT-157), risk scoring and payment — none of
- * which the previous direct Supabase+Stripe writes honoured (they also targeted
- * a column schema that diverged from the real `booking` entity).
+ * server-authoritative pricing (SPLIT-157), risk scoring and payment.
  *
  * SPLIT-197 §C-MCP: booking response types are now derived from the backend's
  * OpenAPI contract (`@/lib/api-contract`) instead of the old hand-rolled
@@ -19,13 +17,8 @@ import { call, compact, qs, type Result } from './_shared';
 type CreatedBooking = PostResponse<'/api/v1/bookings'>;
 /** GET /bookings/{id} returns a `BookingResponseDto` (spec-bound response). */
 type FetchedBooking = GetResponse<'/api/v1/bookings/{id}'>;
-/**
- * PUT /bookings/{id}/status returns the updated booking, but the backend
- * declares only a bare `object` response for that route (SPLIT-197 contract
- * gap — no `@ApiResponse` schema), so we type it as the known real shape,
- * `BookingResponseDto`, rather than the useless generated `Record<string, never>`.
- */
-type UpdatedBooking = BookingResponseDto;
+/** PUT /bookings/{id}/status returns the updated booking (spec-bound, 200). */
+type UpdatedBooking = PutResponse<'/api/v1/bookings/{id}/status'>;
 
 const AUTH_REQUIRED =
   'Authentication required: call with a user Bearer token (obtained from POST /api/v1/users/login).';

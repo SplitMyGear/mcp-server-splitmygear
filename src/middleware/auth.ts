@@ -62,7 +62,9 @@ export interface AuthResult {
  *     string anyone can type, and it must never unlock even the public tools
  *     or a rate-limit bucket of its own.
  * The backend re-validates every forwarded token; it is the single authority
- * for auth, RBAC and ownership. No Supabase client exists here (SPLIT-226).
+ * for auth, RBAC and ownership. The MCP holds no database, payment or LLM
+ * client of its own; every tool is a thin client of the backend REST API
+ * (SPLIT-226, docs/adr/0001-mcp-is-a-backend-rest-client.md).
  */
 export async function authMiddleware(request: NextRequest): Promise<AuthResult> {
   const authHeader = request.headers.get('authorization');

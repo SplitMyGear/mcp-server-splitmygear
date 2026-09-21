@@ -49,11 +49,6 @@ export function compact<T extends object>(obj: T): Partial<T> {
   return out;
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export function isUuid(value: string): boolean {
-  return UUID_RE.test(value);
-}
-
 /** Validate an ISO date (YYYY-MM-DD or full timestamp); returns a message or null. */
 export function dateError(label: string, value: string): string | null {
   if (Number.isNaN(new Date(value).getTime())) return `Invalid ${label}: "${value}". Use an ISO date such as 2026-07-01.`;

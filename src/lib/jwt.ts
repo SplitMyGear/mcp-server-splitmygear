@@ -170,12 +170,7 @@ function sweepCache(now: number): void {
 function verifyLocally(decoded: DecodedJwt, secret: string): VerifiedIdentity | null {
   if (decoded.header.alg !== REQUIRED_ALG) return null;
   const expected = crypto.createHmac('sha256', secret).update(decoded.signingInput).digest();
-  let actual: Buffer;
-  try {
-    actual = Buffer.from(decoded.signature, 'base64url');
-  } catch {
-    return null;
-  }
+  const actual = Buffer.from(decoded.signature, 'base64url');
   if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) {
     return null;
   }

@@ -42,6 +42,23 @@ What the sign-in page does: your email and password go straight to Splitt's own 
 
 The operator key unlocks the public tools (search, details, availability, calendar, quotes, reviews, market pricing, experiences). It cannot act as a user.
 
+Or over plain HTTP:
+
+```bash
+curl -X POST https://mcp-server-splitmygear.vercel.app/api/mcp \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: $MCP_API_KEY" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "search_listings",
+      "arguments": { "query": "tent for a family camping trip this weekend" }
+    }
+  }'
+```
+
 ### With an existing Splitt session token
 
 A first-party integration that already holds a backend JWT (from `POST /api/v1/users/login`) may send it as `Authorization: Bearer <jwt>`. The token is VERIFIED before it authenticates, never decoded and trusted (SPLIT-1438): in-process against `MCP_BACKEND_JWT_SECRET` (the backend's `JWT_SECRET`) when that is configured, otherwise by asking the backend itself who the caller is (`GET /users/profile`, the same authority every tool forwards to, cached for 60s). Both paths fail closed — a forged, expired or unverifiable JWT is rejected. The secret changes the SPEED of bearer auth, never its strength.
@@ -111,9 +128,9 @@ npm run dev                  # http://localhost:3000/api/mcp
 | `MCP_OAUTH_ALLOWED_REDIRECT_HOSTS` | **for any non-loopback client** | Comma-separated redirect hosts allowed to register (leading dot = subdomains), e.g. `claude.ai,.claude.com,cursor.com`. Loopback is always allowed. **Unset = no https host may register** (fails closed, with an error naming this variable). Re-checked on every use, so narrowing it revokes ids already issued. |
 | `MCP_REQUIRE_SHARED_STORE` | no | `1` to refuse to enable OAuth at all unless a shared store is configured. Default off: the store's absence is logged loudly instead (see Security model). |
 | `MCP_TRUST_PROXY_HEADERS` | off-Vercel only | `1` to trust `x-real-ip` / `x-forwarded-for` behind your own proxy. Automatic on Vercel. |
-| `BACKEND_API_URL` | no | Backend base, default `https://splitmygear-backend.vercel.app/api/v1`. |
+| `BACKEND_API_URL` | no | Backend base. Unset, it defaults to the **staging** backend (`https://splitmygear-backend.vercel.app/api/v1`) — set it explicitly to point at production. |
 | `MCP_BACKEND_JWT_SECRET` | recommended | Backend `JWT_SECRET`. Changes the SPEED of raw-bearer auth, never its strength (SPLIT-1438): set, the HS256 signature is proven in-process; unset, the MCP asks the backend to identify the caller (`GET /users/profile`) and caches the answer for 60s, so bearer auth then depends on backend availability and fails closed when it is unreachable. |
-| `MCP_RATE_LIMIT_TIER` | no | Two budgets per principal per minute (SPLIT-1449), requests / tool calls: `internal` (100 / 1000), `beta` (50 / 500), `public` (20 / 200), default (10 / 100). A JSON-RPC batch is charged per `tools/call` member, all-or-nothing. |
+| `MCP_RATE_LIMIT_TIER` | no | Two budgets per principal per minute (SPLIT-1449), requests / tool calls: `internal` (100 / 1000), `beta` (50 / 500), `public` (20 / 200), `default` (10 / 100). Unset or unrecognised ⇒ `default`, not `public`. A JSON-RPC batch is charged per `tools/call` member, all-or-nothing. |
 | `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` | recommended in prod | Shared store for the distributed rate limit, the sign-in throttle and the code replay cache. Vercel KV names `KV_REST_API_URL` / `KV_REST_API_TOKEN` are accepted as a fallback pair. Unset: every limit is per serverless instance, and each affected path logs a startup warning saying so. |
 
 ### Checks

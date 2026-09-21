@@ -28,7 +28,6 @@ export const searchListings = defineTool({
     category: z.enum(LISTING_CATEGORIES).optional().describe('Canonical Title-Case category (see the splitmygear://categories resource).'),
     checkIn: z.string().optional().describe('Rental start date (ISO); only return gear free for these dates.'),
     checkOut: z.string().optional().describe('Rental end date (ISO).'),
-    guests: z.number().int().min(1).max(200).optional().describe('Party size (for stays / capacity-limited gear).'),
     minPrice: z.number().min(0).optional().describe('Minimum price per day.'),
     maxPrice: z.number().min(0).optional().describe('Maximum price per day.'),
   },

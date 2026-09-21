@@ -29,13 +29,11 @@
  * ── Contract gaps surfaced by this work (backend routes the MCP consumes that
  *    declare NO typed response schema — every field the tool reads off them is
  *    spec-uncovered; worth a backend `@ApiResponse` follow-up) ──
- *   - GET /rentals, /rentals/search/vibe, /rentals/{id}/similar  (result envelope
- *     `{ success?, data: Listing[] }` is untyped)
- *   - GET /rentals/{id}/availability          (`{ isAvailable, conflicts? }`)
- *   - GET /rentals/pricing-stats              (see `PricingStatsResponse` in pricing.ts)
- *   - PUT /bookings/{id}/status               (returns the updated booking as a bare object)
- *   - GET/POST /packages*                     (experiences have NO entity schema at all)
- *   - POST /ai/*                              (only the REQUEST DTOs are typed; responses are bare objects)
+ *   - GET /rentals/{id}                       (bare object)
+ *   - GET/POST /packages*                     (no JSON content, no entity schema)
+ *   - POST /ai/draft-message                  (bare object)
+ *   - GET/POST /chat/conversations            (bare object; the `Conversation`
+ *     entity schema exists and is used as the element type)
  *   Where a tool must read fields off one of these, it models exactly that
  *   envelope with a narrow local type carrying a `// contract gap` note, layered
  *   over a generated entity where one exists.
@@ -44,9 +42,7 @@ import type { paths, components } from '@/generated/api-types.gen';
 
 /* ── Generated entity schemas (element types for the tool layer) ──────────────── */
 export type Listing = components['schemas']['Listing'];
-export type Booking = components['schemas']['Booking'];
 export type BookingResponseDto = components['schemas']['BookingResponseDto'];
-export type Message = components['schemas']['Message'];
 export type Conversation = components['schemas']['Conversation'];
 
 /**
@@ -68,4 +64,12 @@ export type GetResponse<P extends keyof paths> = paths[P] extends { get: infer O
 /** The typed 201 POST body a spec path declares. */
 export type PostResponse<P extends keyof paths> = paths[P] extends { post: infer Op }
   ? JsonBody<Op, 201>
+  : never;
+
+/**
+ * The typed 200 PUT body a spec path declares. Status 200, NOT 201:
+ * `BookingController_updateStatus` binds 200, so a 201 extractor yields `never`.
+ */
+export type PutResponse<P extends keyof paths> = paths[P] extends { put: infer Op }
+  ? JsonBody<Op, 200>
   : never;

@@ -1,8 +1,8 @@
 import { contentTools } from '../src/tools/content';
 import { BackendApiError } from '../src/lib/backend-client';
 
-// Content tools call the backend AI (SPLIT-277) — the MCP no longer holds an LLM
-// provider key, so there is no `openai` mock here.
+// Content tools call the backend AI (SPLIT-277); the MCP holds no LLM provider
+// key of its own, so only the backend client is mocked.
 const mockBackendRequest = jest.fn();
 jest.mock('../src/lib/backend-client', () => {
   class BackendApiError extends Error {
