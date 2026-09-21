@@ -24,15 +24,8 @@ const RECIPIENT = '22222222-2222-4222-8222-222222222222';
 const CONV = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
 describe('Messaging Tools', () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env = { ...originalEnv, OPENAI_API_KEY: 'test-key' };
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
   });
 
   describe('sendMessage (backend REST)', () => {
