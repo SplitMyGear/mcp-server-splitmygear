@@ -8,6 +8,7 @@ import { pricingTools } from '@/tools/pricing';
 import { contentTools } from '@/tools/content';
 import { experienceTools } from '@/tools/experiences';
 import { experienceCategorySchema } from '@/tools/experience-categories';
+import { LISTING_CATEGORIES } from '@/tools/listing-categories';
 import { messagingTools } from '@/tools/messaging';
 import { authMiddleware } from '@/middleware/auth';
 import {
@@ -376,30 +377,10 @@ server.resource(
     return {
       contents: [{
         uri: uri.href,
-        // Mirrors the backend's canonical taxonomy (apps/api/src/listing/
-        // listing-categories.ts) — ids ARE the Title-Case values the API
-        // expects; lowercase variants create non-canonical rows (SPLIT-685).
-        text: JSON.stringify([
-          { id: 'E-Bikes', name: 'E-Bikes', icon: '🚴' },
-          { id: 'Biking', name: 'Biking', icon: '🚵' },
-          { id: 'Camping', name: 'Camping', icon: '🏕️' },
-          { id: 'RV', name: 'RV', icon: '🚐' },
-          { id: 'Hiking', name: 'Hiking', icon: '🥾' },
-          { id: 'Water Sports', name: 'Water Sports', icon: '🚣' },
-          { id: 'Winter Sports', name: 'Winter Sports', icon: '⛷️' },
-          { id: 'Snow Sports', name: 'Snow Sports', icon: '🏂' },
-          { id: 'Climbing', name: 'Climbing', icon: '🧗' },
-          { id: 'Surfing', name: 'Surfing', icon: '🏄' },
-          { id: 'Fishing', name: 'Fishing', icon: '🎣' },
-          { id: 'Golf', name: 'Golf', icon: '⛳' },
-          { id: 'Kayaking', name: 'Kayaking', icon: '🛶' },
-          { id: 'Skiing', name: 'Skiing', icon: '🎿' },
-          { id: 'Tennis', name: 'Tennis', icon: '🎾' },
-          { id: 'Boating', name: 'Boating', icon: '⛵' },
-          { id: 'Photography', name: 'Photography', icon: '📷' },
-          { id: 'Electronics', name: 'Electronics', icon: '🔌' },
-          { id: 'Other', name: 'Other', icon: '🎒' },
-        ], null, 2),
+        // SPLIT-1500: served from the single shared module so the advertised
+        // taxonomy cannot drift from the backend again (it had fallen five
+        // categories behind, hiding ATVs and the whole Stays vertical).
+        text: JSON.stringify(LISTING_CATEGORIES, null, 2),
       }],
     };
   }
