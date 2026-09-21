@@ -14,7 +14,13 @@ jest.mock('../../src/lib/backend-client', () => {
   }
   return { BackendApiError, backendRequest: (...args: unknown[]) => mockBackendRequest(...args), backendBaseUrl: () => 'http://backend.test/api/v1' };
 });
-jest.mock('@/middleware/rate-limit', () => ({ rateLimiter: jest.fn().mockResolvedValue({ success: true, remaining: 5 }) }));
+// Both budgets are stubbed open: this suite is about the OAuth flow, and the
+// tool-call budget has its own suite (tool-call-rate-limit.test.ts).
+jest.mock('@/middleware/rate-limit', () => ({
+  rateLimiter: jest.fn().mockResolvedValue({ success: true, remaining: 5 }),
+  toolCallRateLimiter: jest.fn().mockResolvedValue({ success: true }),
+  countToolCalls: jest.fn().mockReturnValue(0),
+}));
 
 import { POST as register } from '../../src/app/oauth/register/route';
 import { GET as authorizeGet, POST as authorizePost } from '../../src/app/oauth/authorize/route';
@@ -36,7 +42,7 @@ function backendJwt(payload: Record<string, unknown>): string {
   return `${seg({ alg: 'HS256', typ: 'JWT' })}.${seg(payload)}.sig`;
 }
 const FUTURE = Math.floor(Date.now() / 1000) + 900;
-let backendAccess = backendJwt({ sub: 'user-1', email: 'r@x.test', role: 'renter', exp: FUTURE });
+const backendAccess = backendJwt({ sub: 'user-1', email: 'r@x.test', role: 'renter', exp: FUTURE });
 
 function form(body: Record<string, string>, url = `${BASE}/oauth/token`, headers: Record<string, string> = {}): Request {
   return new Request(url, {

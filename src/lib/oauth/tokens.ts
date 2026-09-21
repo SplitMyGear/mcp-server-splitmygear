@@ -23,7 +23,7 @@
  */
 import crypto from 'crypto';
 import { open, seal, nowSeconds } from './envelope';
-import { readBackendJwtClaims } from '@/lib/jwt';
+import { decodeSealedBackendJwtClaims } from '@/lib/jwt';
 import { redeemOnce, sharedStoreEnabled, warnIfNoSharedStore } from '@/lib/shared-store';
 import { coerceScopes, formatScope, type ToolScope } from './scopes';
 import type { BackendUser } from './backend-auth';
@@ -165,8 +165,11 @@ export function issueTokens(params: {
   backendRefreshToken: string;
   scopes: ToolScope[];
 }): OAuthTokenResponse | null {
-  const claims = readBackendJwtClaims(params.backendAccessToken);
-  if (!claims) return null; // signature/expiry rejected → never wrap a token we could not read
+  // The token to wrap came straight from the backend's login/refresh response
+  // over a server-to-server call — that is its provenance, so it is decoded
+  // (shape/type/expiry), not signature-verified (see lib/jwt.ts).
+  const claims = decodeSealedBackendJwtClaims(params.backendAccessToken);
+  if (!claims) return null; // malformed/expired → never wrap a token we could not read
   const iat = nowSeconds();
   const exp = typeof claims.exp === 'number' ? claims.exp : iat + DEFAULT_ACCESS_TTL_S;
   const role = claims.role || params.user.role;
@@ -200,8 +203,10 @@ export function issueTokens(params: {
 export function openAccessToken(token: string): AccessTokenPayload | null {
   const payload = open<AccessTokenPayload>('at', token);
   if (!payload || typeof payload.sub !== 'string' || typeof payload.bt !== 'string') return null;
-  // Defense in depth: the wrapped backend JWT must itself still be valid.
-  const inner = readBackendJwtClaims(payload.bt);
+  // Defense in depth: the wrapped backend JWT must itself still be unexpired
+  // and name the same user. It is decoded, not verified: the envelope's
+  // AES-GCM tag already proves this server sealed it (see lib/jwt.ts).
+  const inner = decodeSealedBackendJwtClaims(payload.bt);
   if (!inner?.sub || inner.sub !== payload.sub) return null;
   return { ...payload, scp: coerceScopes(payload.scp) };
 }

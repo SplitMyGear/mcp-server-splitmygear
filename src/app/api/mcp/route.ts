@@ -2,7 +2,12 @@ import { NextRequest } from 'next/server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { authMiddleware, type AuthResult } from '@/middleware/auth';
-import { rateLimiter } from '@/middleware/rate-limit';
+import {
+  countToolCalls,
+  rateLimiter,
+  toolCallRateLimiter,
+  type RateLimitResult,
+} from '@/middleware/rate-limit';
 import { registerTools, type ToolContext } from '@/tools/registry';
 import { ALL_TOOLS } from '@/tools/defs';
 import { LISTING_CATEGORIES } from '@/tools/defs/common';
@@ -116,17 +121,56 @@ function unauthorized(request: NextRequest, auth: AuthResult): Response {
   return withHeaders(new Response(JSON.stringify({ error: auth.error ?? 'Unauthorized' }), { status: 401, headers }));
 }
 
+// The limiter computes WHICH ceiling was hit (requests vs tool calls); that
+// message used to be discarded for a flat "Rate limit exceeded", leaving the
+// two 429s indistinguishable to the caller and to anyone reading logs.
+function rateLimited(result: RateLimitResult): Response {
+  return withHeaders(
+    new Response(JSON.stringify({ error: result.error ?? 'Rate limit exceeded' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': '60' },
+    }),
+    { 'X-RateLimit-Remaining': String(result.remaining ?? 0) },
+  );
+}
+
 async function handleRequest(request: NextRequest) {
   try {
     const auth = await authMiddleware(request);
     if (!auth.success) return unauthorized(request, auth);
 
     const rateLimit = await rateLimiter(request, auth.userId);
-    if (!rateLimit.success) {
-      return withHeaders(
-        new Response(JSON.stringify({ error: 'Rate limit exceeded' }), { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': '60' } }),
-        { 'X-RateLimit-Remaining': '0' },
-      );
+    if (!rateLimit.success) return rateLimited(rateLimit);
+
+    // SPLIT-1449: the request budget above counts HTTP requests, but one POST
+    // may carry a BATCH of tool calls and the transport dispatches every member
+    // — so N invocations cost 1 unit and the ceiling bounded HTTP traffic, not
+    // the backend work it fans out to. Charging `toolCallsPerMinute` needs the
+    // body, which only exists here, ahead of the transport.
+    //
+    // A Request body is a single-use stream, so reading it here would leave the
+    // transport nothing to parse. That is exactly what the SDK's
+    // HandleRequestOptions.parsedBody exists for ("Pre-parsed request body. If
+    // provided, the transport will use this instead of parsing req.json()") —
+    // parse ONCE, hand the value over, and the stream is read exactly as many
+    // times as before.
+    let parsedBody: unknown;
+    let bodyParsed = false;
+    if (request.method === 'POST') {
+      try {
+        parsedBody = await request.json();
+        bodyParsed = true;
+      } catch {
+        // Unparseable body: charge nothing and pass no `parsedBody`, so the
+        // transport answers with its own canonical -32700 parse error instead
+        // of a second, divergent one from here. (Its `req.json()` retry rejects
+        // on the already-consumed stream and lands in that same branch.)
+      }
+    }
+
+    if (bodyParsed) {
+      const toolCallResult = await toolCallRateLimiter(request, countToolCalls(parsedBody), auth.userId);
+      if (!toolCallResult.success) return rateLimited(toolCallResult);
     }
 
     // Stateless: a brand-new server + transport per request (no session id),
@@ -138,7 +182,7 @@ async function handleRequest(request: NextRequest) {
       enableJsonResponse: true,
     });
     await server.connect(transport);
-    const response = await transport.handleRequest(request);
+    const response = await transport.handleRequest(request, bodyParsed ? { parsedBody } : undefined);
     return withHeaders(response, { 'X-RateLimit-Remaining': String(rateLimit.remaining ?? '') });
   } catch (error) {
     console.error('MCP Server Error:', error instanceof Error ? error.message : error);

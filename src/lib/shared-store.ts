@@ -22,13 +22,15 @@
  *   are never logged: they may embed user ids or IPs.
  *
  * Primitives (all return `null` when the store is unavailable):
- * - `incrementWindow(key, windowSeconds)`: fixed-window counter. INCR plus
- *   EXPIRE-if-no-ttl in one pipeline; returns the count after this hit. INCR is
- *   ATOMIC at the server, which is what lets a caller use "increment, then look
- *   at the number I got back" as a race-free check-and-consume (see
- *   `oauth/throttle`); a GET followed by a later INCR is NOT race-free.
- * - `decrementWindow(key, windowSeconds)`: the inverse, for giving back a slot
- *   claimed by `incrementWindow` that turned out not to count.
+ * - `incrementWindow(key, windowSeconds, amount = 1)`: fixed-window counter.
+ *   INCR (INCRBY for a multi-unit charge, e.g. a batch of tool calls —
+ *   SPLIT-1449) plus EXPIRE-if-no-ttl in one pipeline; returns the count after
+ *   this hit. INCR/INCRBY is ATOMIC at the server, which is what lets a caller
+ *   use "increment, then look at the number I got back" as a race-free
+ *   check-and-consume (see `oauth/throttle`, `middleware/rate-limit`); a GET
+ *   followed by a later INCR is NOT race-free.
+ * - `decrementWindow(key, windowSeconds, amount = 1)`: the inverse, for giving
+ *   back what `incrementWindow` claimed and that turned out not to count.
  * - `setIfAbsent(key, ttlSeconds)`: SET ... EX ttl NX; true when this call
  *   created the key, false when it already existed.
  * - `redeemOnce(key, ttlSeconds)`: `setIfAbsent` under a name that reads well
@@ -227,8 +229,8 @@ function asCount(value: unknown): number | null {
  * plain `EXPIRE` is issued so the key still expires. `null` means the store is
  * unavailable: use the local fallback for this request.
  */
-export function incrementWindow(key: string, windowSeconds: number): Promise<number | null> {
-  return stepWindow('INCR', key, windowSeconds);
+export function incrementWindow(key: string, windowSeconds: number, amount = 1): Promise<number | null> {
+  return stepWindow('INCR', key, windowSeconds, amount);
 }
 
 /**
@@ -242,18 +244,29 @@ export function incrementWindow(key: string, windowSeconds: number): Promise<num
  * along for the pathological case where the window key expired in between:
  * DECR would otherwise resurrect it at -1 with no TTL and leave it there.
  */
-export function decrementWindow(key: string, windowSeconds: number): Promise<number | null> {
-  return stepWindow('DECR', key, windowSeconds);
+export function decrementWindow(key: string, windowSeconds: number, amount = 1): Promise<number | null> {
+  return stepWindow('DECR', key, windowSeconds, amount);
 }
 
-/** INCR/DECR plus EXPIRE-if-no-ttl in one round trip; `null` when the store is unavailable. */
-async function stepWindow(command: 'INCR' | 'DECR', key: string, windowSeconds: number): Promise<number | null> {
+/** A charge is a positive whole number of units; anything else is treated as one. */
+function stepAmount(amount: number): number {
+  return Number.isFinite(amount) && amount > 1 ? Math.floor(amount) : 1;
+}
+
+/**
+ * INCR/DECR (or INCRBY/DECRBY for a multi-unit step) plus EXPIRE-if-no-ttl in
+ * one round trip; `null` when the store is unavailable. The single-unit form
+ * keeps the plain command so a one-unit step is byte-identical to before.
+ */
+async function stepWindow(command: 'INCR' | 'DECR', key: string, windowSeconds: number, amount: number): Promise<number | null> {
   const cfg = storeConfig();
   if (!cfg) return null;
 
   const fullKey = namespacedKey(key);
   const ttl = ttlSeconds(windowSeconds);
-  const replies = await pipeline(cfg, [[command, fullKey], ['EXPIRE', fullKey, ttl, 'NX']], command);
+  const units = stepAmount(amount);
+  const stepCommand: RedisCommand = units === 1 ? [command, fullKey] : [`${command}BY`, fullKey, units];
+  const replies = await pipeline(cfg, [stepCommand, ['EXPIRE', fullKey, ttl, 'NX']], command);
   if (!replies) return null;
 
   const [step, expire] = replies;
@@ -267,11 +280,13 @@ async function stepWindow(command: 'INCR' | 'DECR', key: string, windowSeconds: 
     return null;
   }
 
-  if (expire.error !== undefined && (count === 1 || count <= 0)) {
+  const createdKey = command === 'INCR' ? count === units : count <= 0;
+  if (expire.error !== undefined && createdKey) {
     // The counter exists without a TTL: fall back to a plain EXPIRE so the
-    // window still closes. Only when this call created the key (INCR to 1, or
-    // a DECR that resurrected it), otherwise every request would push the
-    // expiry out again. Its outcome does not change the count.
+    // window still closes. Only when this call created the key (an INCR whose
+    // result is exactly what it added, or a DECR that resurrected it),
+    // otherwise every request would push the expiry out again. Its outcome
+    // does not change the count.
     await execute(cfg, ['EXPIRE', fullKey, ttl], 'EXPIRE');
   }
 

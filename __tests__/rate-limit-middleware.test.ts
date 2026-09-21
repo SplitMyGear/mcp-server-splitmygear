@@ -105,7 +105,8 @@ describe('Rate Limiter Middleware', () => {
       const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(url).toBe(`${STORE_URL}/pipeline`);
       expect((init.headers as Record<string, string>).Authorization).toBe(`Bearer ${STORE_TOKEN}`);
-      const key = `mcp:rl:user:${userId}:${WINDOW_ID}`;
+      // SPLIT-1449: keys carry the budget (`req` here, `tools` for tool calls).
+      const key = `mcp:rl:req:user:${userId}:${WINDOW_ID}`;
       expect(pipelineBody()).toEqual([
         ['INCR', key],
         ['EXPIRE', key, 60, 'NX'],
@@ -140,13 +141,13 @@ describe('Rate Limiter Middleware', () => {
       process.env.MCP_TRUST_PROXY_HEADERS = '1';
       const req = new NextRequest('http://localhost/api/mcp', { headers: { 'x-real-ip': '203.0.113.9' } });
       await rateLimiter(req);
-      expect(pipelineBody()[0]).toEqual(['INCR', `mcp:rl:ip:203.0.113.9:${WINDOW_ID}`]);
+      expect(pipelineBody()[0]).toEqual(['INCR', `mcp:rl:req:ip:203.0.113.9:${WINDOW_ID}`]);
 
       // Untrusted headers (no proxy in front): a spoofable x-real-ip must not mint a fresh bucket.
       delete process.env.MCP_TRUST_PROXY_HEADERS;
       mockFetch.mockClear();
       await rateLimiter(new NextRequest('http://localhost/api/mcp', { headers: { 'x-real-ip': '198.51.100.1' } }));
-      expect(pipelineBody()[0]).toEqual(['INCR', `mcp:rl:operator:${WINDOW_ID}`]);
+      expect(pipelineBody()[0]).toEqual(['INCR', `mcp:rl:req:operator:${WINDOW_ID}`]);
     });
 
     it('falls back to the in-memory limiter for the request when the store is unavailable', async () => {
@@ -178,6 +179,102 @@ describe('Rate Limiter Middleware', () => {
 
       expect((await rateLimiter(req, userId)).success).toBe(true);
       expect((await rateLimiter(req, userId)).success).toBe(false);
+    });
+  });
+
+  /**
+   * The limiter used to key on the WHOLE raw `x-forwarded-for` header, which the
+   * client writes. Rotating it minted a fresh bucket per request, so the limit
+   * bound nobody. Only the last hop — the entry the trusted proxy appends —
+   * may key the bucket.
+   */
+  describe('bucket key cannot be rotated by the caller', () => {
+    const ipRequest = (headers: Record<string, string>) =>
+      new NextRequest('http://localhost/api/mcp', { headers });
+
+    // Proxy headers are only believed where a trusted proxy sets them (Vercel,
+    // or this explicit opt-in); off-proxy every operator-key caller shares one
+    // bucket, which the last case below exercises with the flag off.
+    beforeEach(() => {
+      process.env.MCP_TRUST_PROXY_HEADERS = '1';
+    });
+
+    it('ignores a rotating client-supplied prefix on x-forwarded-for', async () => {
+      process.env.MCP_RATE_LIMIT_TIER = 'public';
+      const limit = RATE_LIMITS.public.requestsPerMinute;
+
+      for (let i = 0; i < limit; i++) {
+        // A different forged prefix every time; the real (appended) hop is constant.
+        const r = await rateLimiter(ipRequest({ 'x-forwarded-for': `10.0.0.${i}, 203.0.113.7` }));
+        expect(r.success).toBe(true);
+      }
+
+      const blocked = await rateLimiter(ipRequest({ 'x-forwarded-for': '10.9.9.9, 203.0.113.7' }));
+      expect(blocked.success).toBe(false);
+      expect(blocked.remaining).toBe(0);
+    });
+
+    it('still separates genuinely different clients', async () => {
+      process.env.MCP_RATE_LIMIT_TIER = 'public';
+      for (let i = 0; i < RATE_LIMITS.public.requestsPerMinute; i++) {
+        await rateLimiter(ipRequest({ 'x-forwarded-for': '198.51.100.1' }));
+      }
+      const other = await rateLimiter(ipRequest({ 'x-forwarded-for': '198.51.100.2' }));
+      expect(other.success).toBe(true);
+    });
+
+    it('prefers the platform-set header over the client-supplied chain', async () => {
+      process.env.MCP_RATE_LIMIT_TIER = 'public';
+      const limit = RATE_LIMITS.public.requestsPerMinute;
+
+      for (let i = 0; i < limit; i++) {
+        const r = await rateLimiter(
+          ipRequest({ 'x-vercel-forwarded-for': '192.0.2.55', 'x-forwarded-for': `10.0.0.${i}` }),
+        );
+        expect(r.success).toBe(true);
+      }
+
+      const blocked = await rateLimiter(
+        ipRequest({ 'x-vercel-forwarded-for': '192.0.2.55', 'x-forwarded-for': '10.0.0.250' }),
+      );
+      expect(blocked.success).toBe(false);
+    });
+
+    it('falls back to x-real-ip when no forwarded chain is present', async () => {
+      process.env.MCP_RATE_LIMIT_TIER = 'public';
+      for (let i = 0; i < RATE_LIMITS.public.requestsPerMinute; i++) {
+        const r = await rateLimiter(ipRequest({ 'x-real-ip': '203.0.113.44' }));
+        expect(r.success).toBe(true);
+      }
+      const blocked = await rateLimiter(ipRequest({ 'x-real-ip': '203.0.113.44' }));
+      expect(blocked.success).toBe(false);
+    });
+
+    it('namespaces the user and ip key spaces so one cannot exhaust the other', async () => {
+      process.env.MCP_RATE_LIMIT_TIER = 'public';
+      const collide = '192.0.2.99';
+      for (let i = 0; i < RATE_LIMITS.public.requestsPerMinute; i++) {
+        await rateLimiter(ipRequest({ 'x-forwarded-for': collide }));
+      }
+      // A user whose id is spelled like that IP gets their own budget.
+      const user = await rateLimiter(ipRequest({ 'x-forwarded-for': collide }), collide);
+      expect(user.success).toBe(true);
+    });
+
+    // Runs last: it exhausts the single shared fallback bucket.
+    it('shares ONE bucket when the request carries no network identity at all', async () => {
+      process.env.MCP_RATE_LIMIT_TIER = 'public';
+      for (let i = 0; i < RATE_LIMITS.public.requestsPerMinute; i++) {
+        const r = await rateLimiter(new NextRequest('http://localhost/api/mcp'));
+        expect(r.success).toBe(true);
+      }
+      const blocked = await rateLimiter(new NextRequest('http://localhost/api/mcp'));
+      expect(blocked.success).toBe(false);
+      // ...and with proxy headers UNTRUSTED a spoofable address lands in that
+      // same exhausted bucket instead of minting a fresh one.
+      delete process.env.MCP_TRUST_PROXY_HEADERS;
+      const spoofed = await rateLimiter(ipRequest({ 'x-forwarded-for': '198.51.100.77', 'x-real-ip': '198.51.100.78' }));
+      expect(spoofed.success).toBe(false);
     });
   });
 });

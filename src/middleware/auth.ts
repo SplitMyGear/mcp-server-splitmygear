@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import crypto from 'crypto';
-import { verifyBackendJwtClaims } from '@/lib/jwt';
+import { verifyBackendJwt } from '@/lib/jwt';
 import { looksLikeAccessEnvelope } from '@/lib/oauth/envelope';
 import { openAccessToken } from '@/lib/oauth/tokens';
 import { oauthEnabled } from '@/lib/oauth/config';
@@ -53,12 +53,14 @@ export interface AuthResult {
  *  2. An OAuth access token issued by THIS server (`smg_at.…`, see
  *     lib/oauth) → decrypted; the wrapped backend JWT is what tools forward.
  *  3. A raw Splitt backend JWT (`Authorization: Bearer …`, issued by
- *     POST /api/v1/users/login) → accepted ONLY when its HS256 signature
- *     verifies against MCP_BACKEND_JWT_SECRET; forwarded as-is. Kept for
- *     first-party integrations that already hold a backend session. Without
- *     the secret this path is closed: an unverified JWT is a base64 string
- *     anyone can type, and it must never unlock even the public tools or a
- *     rate-limit bucket of its own.
+ *     POST /api/v1/users/login) → VERIFIED before it authenticates, never
+ *     decoded and trusted (SPLIT-1438; lib/jwt.ts): in-process HS256 when
+ *     MCP_BACKEND_JWT_SECRET is configured, otherwise against the backend
+ *     itself, with the identity taken from the backend's answer. Fails
+ *     closed either way. Kept for first-party integrations that already hold
+ *     a backend session; forwarded as-is. An unverifiable JWT is a base64
+ *     string anyone can type, and it must never unlock even the public tools
+ *     or a rate-limit bucket of its own.
  * The backend re-validates every forwarded token; it is the single authority
  * for auth, RBAC and ownership. No Supabase client exists here (SPLIT-226).
  */
@@ -84,19 +86,18 @@ export async function authMiddleware(request: NextRequest): Promise<AuthResult> 
       return { success: true, userId: at.sub, role: at.role || 'renter', email: at.email, token: at.bt, kind: 'oauth', scopes: at.scp };
     }
 
-    const claims = verifyBackendJwtClaims(bearer);
-    if (!claims?.sub) {
-      return {
-        success: false,
-        error: process.env.MCP_BACKEND_JWT_SECRET ? 'Invalid token' : 'Invalid token (raw backend JWTs are not accepted; sign in via OAuth)',
-        invalidCredentials: true,
-      };
+    // SPLIT-1438: the principal comes from a VERIFIED identity (local HS256
+    // when the shared secret is configured, otherwise the backend's own
+    // answer), never from the token's base64 payload. An unverifiable bearer
+    // is rejected rather than decoded-and-trusted.
+    const identity = await verifyBackendJwt(bearer);
+    if (!identity) {
+      return { success: false, error: 'Invalid token', invalidCredentials: true };
     }
     return {
       success: true,
-      userId: claims.sub,
-      role: claims.role || 'renter',
-      email: claims.email,
+      userId: identity.userId,
+      role: identity.role,
       token: bearer,
       kind: 'jwt',
       scopes: [...TOOL_SCOPES],

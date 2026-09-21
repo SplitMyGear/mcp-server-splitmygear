@@ -6,6 +6,7 @@ import { pricingTools } from '../pricing';
 import { reviewTools } from '../reviews';
 import { bookingTools } from '../bookings';
 import { experienceTools } from '../experiences';
+import { experienceCategorySchema } from '../experience-categories';
 import { BackendApiError } from '@/lib/backend-client';
 import { dateRangeError } from '../_shared';
 import { uuid, isoDate, READ, LISTING_CATEGORIES, PROTECTION_PLANS, UNTRUSTED_NOTE } from './common';
@@ -188,7 +189,12 @@ export const searchExperiences = defineTool({
   scope: 'read',
   inputSchema: {
     location: z.string().max(200).optional(),
-    category: z.enum(['tours', 'food', 'outdoor', 'arts', 'fitness', 'wellness', 'music', 'sports', 'workshop', 'photography', 'other']).optional(),
+    // SPLIT-1496: the backend's GET /packages validates `category` against its
+    // lowercase ExperienceCategory enum and 400s anything else (Title-Case
+    // included), so the tool enforces the same set from one shared module.
+    category: experienceCategorySchema
+      .optional()
+      .describe('Experience category (lowercase, exactly one of): tours, food, outdoor, arts, fitness, wellness, music, sports, workshop, photography, other'),
   },
   annotations: READ,
   handler: async (args) => {

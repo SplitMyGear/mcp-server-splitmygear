@@ -1,6 +1,6 @@
 /** Vendor tools: listings, calendar, incoming bookings, experiences hosting, finance. Visible to the vendor family only. */
 import { z } from 'zod';
-import { defineTool, ok, fail, fromResult } from '../registry';
+import { defineTool, fail, fromResult } from '../registry';
 import { vendorListingTools } from '../vendor-listings';
 import { vendorBookingTools } from '../vendor-bookings';
 import { vendorFinanceTools } from '../vendor-finance';
