@@ -18,8 +18,6 @@ import {
 } from '@/middleware/rate-limit';
 
 interface AuthContext {
-  userId?: string;
-  role?: string;
   /** Raw backend JWT, forwarded to the REST API by user-scoped tools (M4). */
   token?: string;
 }
@@ -45,8 +43,9 @@ function requiresUser() {
 // previous module-singleton + stateful transport never completed the
 // initialize handshake on serverless ("Server not initialized"), making the
 // server unusable. buildServer() registers all tools on a new instance each
-// time so requests are fully independent and stateless. The authenticated
-// principal (ctx.userId) is closed over by user-scoped tool handlers.
+// time so requests are fully independent and stateless. User-scoped tool
+// handlers close over ctx.token and forward it to the backend, which derives
+// the acting user from it (M3/M4).
 function buildServer(ctx: AuthContext): McpServer {
   const server = new McpServer({
     name: 'splitmygear-mcp',
@@ -60,19 +59,17 @@ function buildServer(ctx: AuthContext): McpServer {
     location: z.string().optional().describe('City or neighborhood to search in'),
     checkIn: z.string().optional().describe('Check-in date (ISO format)'),
     checkOut: z.string().optional().describe('Check-out date (ISO format)'),
-    guests: z.number().min(1).max(20).optional(),
     category: z.string().optional().describe("Canonical listing category, Title-Case (e.g. 'Camping', 'Hiking', 'Water Sports', 'E-Bikes': full list via the splitmygear://categories resource)"),
     minPrice: z.number().optional().describe('Minimum price per day'),
     maxPrice: z.number().optional().describe('Maximum price per day'),
     query: z.string().optional().describe('Natural language search query'),
   },
   { readOnlyHint: true, openWorldHint: true },
-  async ({ location, checkIn, checkOut, guests, category, minPrice, maxPrice, query }) => {
+  async ({ location, checkIn, checkOut, category, minPrice, maxPrice, query }) => {
     const results = await listingTools.searchListings({
       location,
       checkIn,
       checkOut,
-      guests,
       category,
       minPrice,
       maxPrice,
@@ -486,7 +483,7 @@ async function handleRequest(request: NextRequest) {
     // Stateless: a brand-new server + transport per request (no session id),
     // with JSON responses enabled so a single POST completes the
     // initialize/tools-call round-trip without a persistent SSE session.
-    const server = buildServer({ userId: authResult.userId, role: authResult.role, token: authResult.token });
+    const server = buildServer({ token: authResult.token });
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,

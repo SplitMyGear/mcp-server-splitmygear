@@ -1,10 +1,9 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
-import type { Listing } from '@/lib/api-contract';
+import type { GetResponse, Listing } from '@/lib/api-contract';
 
 /**
  * Pricing tools read anonymized market aggregates from the public backend
- * endpoint GET /rentals/pricing-stats (SPLIT-226) instead of querying the
- * listing table directly with the service-role key. The backend is the single
+ * endpoint GET /rentals/pricing-stats (SPLIT-226). The backend is the single
  * source of truth for what counts as an active, visible listing.
  *
  * SPLIT-220 (taxonomy rename): backend paths use the canonical `/rentals`
@@ -13,10 +12,8 @@ import type { Listing } from '@/lib/api-contract';
  * tools' I/O contracts — are unchanged.
  *
  * SPLIT-197 §C-MCP: `ListingRecord` is the generated `Listing` entity from the
- * backend OpenAPI contract. `PricingStatsResponse` stays a local type: the
- * backend declares NO typed response schema for GET /rentals/pricing-stats
- * (contract gap — see `@/lib/api-contract`), so it can't be derived from the
- * spec; this interface documents the real shape the tool reads.
+ * backend OpenAPI contract, and `PricingStatsResponse` is now spec-bound too
+ * (SPLIT-1307, vendored-spec commit b1e2dc8) instead of hand-rolled.
  */
 
 type ListingRecord = Listing;
@@ -31,16 +28,7 @@ interface PricingAnalysis {
   confidence: 'high' | 'medium' | 'low';
 }
 
-interface PricingStatsResponse {
-  category: string;
-  location: string | null;
-  averagePrice: number;
-  medianPrice: number;
-  minPrice: number;
-  maxPrice: number;
-  count: number;
-  suggestedPrice: number;
-}
+type PricingStatsResponse = GetResponse<'/api/v1/rentals/pricing-stats'>;
 
 const EMPTY_ANALYSIS: PricingAnalysis = {
   suggestedPrice: 0,

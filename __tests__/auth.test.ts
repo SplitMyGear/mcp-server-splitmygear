@@ -215,7 +215,7 @@ describe('Auth Middleware', () => {
     });
   });
 
-  it('rejects a non-operator x-api-key with no bearer (api_keys path removed — no Supabase)', async () => {
+  it('rejects a non-operator x-api-key with no bearer', async () => {
     const mockRequest = {
       headers: new Headers({ 'x-api-key': 'some-other-key' }),
       nextUrl: { pathname: '/api/mcp' },

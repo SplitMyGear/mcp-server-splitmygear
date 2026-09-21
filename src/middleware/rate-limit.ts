@@ -8,10 +8,9 @@ import { NextRequest } from 'next/server';
  * true global limit — it is defense-in-depth on top of the mandatory auth
  * (operator API key or backend JWT bearer; see middleware/auth.ts). A true
  * distributed limit needs a shared store (Upstash Redis); tracked as a
- * follow-up. The previous implementation also leaked a module-level
- * setInterval (a dangling timer/handle per cold start) and imported Supabase
- * it never used — both removed here. Stale entries are reclaimed lazily via a
- * bounded inline sweep when the map grows, so there is no timer.
+ * follow-up. Stale entries are reclaimed lazily via a bounded inline sweep when
+ * the map grows, so there is no module-level setInterval and no dangling
+ * timer/handle per cold start.
  */
 
 /**

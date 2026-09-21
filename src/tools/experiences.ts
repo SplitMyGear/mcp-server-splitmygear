@@ -3,10 +3,9 @@ import { backendRequest, BackendApiError } from '@/lib/backend-client';
 /**
  * Experience tools are thin clients of the backend REST API (SPLIT-226). The
  * read tools (search/details) hit the public GET /packages endpoints — the
- * canonical, moderation-filtered source — instead of a direct service-role
- * Supabase read against a schema that diverged from the real entity. The write
- * tool (bookExperience) forwards the caller's JWT (M4): the backend owns auth,
- * capacity, pricing and payment.
+ * canonical, moderation-filtered source. The write tool (bookExperience)
+ * forwards the caller's JWT (M4): the backend owns auth, capacity, pricing and
+ * payment.
  *
  * SPLIT-220 (taxonomy rename): backend paths use the canonical `/packages`
  * family. The backend serves both aliases byte-identically

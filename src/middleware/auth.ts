@@ -35,9 +35,9 @@ export interface AuthResult {
  *     shared secret is configured, otherwise against the backend itself) for the
  *     acting user; user-scoped tools forward it to the backend, the single
  *     authority for auth/RBAC/ownership.
- * No Supabase: the MCP holds no Supabase client (SPLIT-226). The former
- * `api_keys` lookup was dead (the table does not exist) and was the last reason
- * the server depended on @supabase/supabase-js.
+ * The MCP holds no database, payment or LLM client of its own; every tool is a
+ * thin client of the backend REST API
+ * (docs/adr/0001-mcp-is-a-backend-rest-client.md).
  */
 export async function authMiddleware(request: NextRequest): Promise<AuthResult> {
   const authHeader = request.headers.get('authorization');
