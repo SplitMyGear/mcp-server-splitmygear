@@ -3,18 +3,22 @@
  *
  * The version these replace asserted the VULNERABILITY: with no
  * MCP_BACKEND_JWT_SECRET (the deployed configuration) a token signed `'sig'`
- * was "decoded" and trusted. Every case below now proves the opposite — an
- * unverifiable bearer is rejected on both paths.
+ * was "decoded" and trusted. Every raw-bearer case below now proves the
+ * opposite — an unverifiable bearer is rejected on both paths (SPLIT-1438).
+ * The sealed-token decoder keeps its narrower contract and is fenced off from
+ * the request middleware by a source rail at the end.
  */
 import crypto from 'crypto';
-import { verifyBackendJwt } from '../src/lib/jwt';
+import fs from 'fs';
+import path from 'path';
+import { verifyBackendJwt, decodeSealedBackendJwtClaims } from '../src/lib/jwt';
 import { backendBaseUrl } from '../src/lib/backend-client';
 
 function b64url(o: object): string {
   return Buffer.from(JSON.stringify(o)).toString('base64url');
 }
-function makeToken(payload: object, secret?: string): string {
-  const signingInput = `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url(payload)}`;
+function makeToken(payload: object, secret?: string, header: object = { alg: 'HS256', typ: 'JWT' }): string {
+  const signingInput = `${b64url(header)}.${b64url(payload)}`;
   const sig = secret ? crypto.createHmac('sha256', secret).update(signingInput).digest('base64url') : 'sig';
   return `${signingInput}.${sig}`;
 }
@@ -62,6 +66,14 @@ describe('verifyBackendJwt', () => {
       await expect(verifyBackendJwt(expired)).resolves.toBeNull();
       expect(mockFetch).not.toHaveBeenCalled();
     });
+
+    it('rejects a non-access token type on both paths (only access tokens mint a session)', async () => {
+      process.env.MCP_BACKEND_JWT_SECRET = 'shared-secret';
+      await expect(verifyBackendJwt(makeToken({ sub: 'u1', typ: 'handoff', exp: FUTURE }, 'shared-secret'))).resolves.toBeNull();
+      delete process.env.MCP_BACKEND_JWT_SECRET;
+      await expect(verifyBackendJwt(makeToken({ sub: 'u1', typ: 'refresh', exp: FUTURE, jti: 'typ-remote' }))).resolves.toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
   });
 
   describe('local path (MCP_BACKEND_JWT_SECRET set)', () => {
@@ -74,6 +86,11 @@ describe('verifyBackendJwt', () => {
       await expect(verifyBackendJwt(token)).resolves.toEqual({ userId: 'u1', role: 'vendor' });
       // Proven locally: no network hop at all.
       expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('accepts an explicit access-typed token', async () => {
+      const token = makeToken({ sub: 'u1', role: 'renter', typ: 'access', exp: FUTURE }, 'shared-secret');
+      await expect(verifyBackendJwt(token)).resolves.toEqual({ userId: 'u1', role: 'renter' });
     });
 
     it('defaults the role when the verified token carries none', async () => {
@@ -94,6 +111,14 @@ describe('verifyBackendJwt', () => {
 
     it('rejects a correctly signed token with no sub', async () => {
       await expect(verifyBackendJwt(makeToken({ role: 'admin', exp: FUTURE }, 'shared-secret'))).resolves.toBeNull();
+    });
+
+    it('pins alg to HS256: a non-HS256 header is rejected even when the HMAC over it matches (alg confusion)', async () => {
+      const confused = makeToken({ sub: 'u1', exp: FUTURE }, 'shared-secret', { alg: 'none' });
+      await expect(verifyBackendJwt(confused)).resolves.toBeNull();
+      const unparseableHeader = `!!!.${b64url({ sub: 'u1', exp: FUTURE })}.sig`;
+      await expect(verifyBackendJwt(unparseableHeader)).resolves.toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 
@@ -210,5 +235,30 @@ describe('verifyBackendJwt', () => {
       await verifyBackendJwt(makeToken({ sub: 'u-two', exp: FUTURE, jti: 'b' }));
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
+  });
+});
+
+describe('decodeSealedBackendJwtClaims (tokens out of an AES-GCM envelope only)', () => {
+  it('decodes claims WITHOUT a signature check — which is exactly why it is reserved for sealed tokens', () => {
+    const claims = decodeSealedBackendJwtClaims(makeToken({ sub: 'u1', role: 'vendor', email: 'v@x.test', typ: 'access', exp: FUTURE }));
+    expect(claims).toEqual({ sub: 'u1', role: 'vendor', email: 'v@x.test', typ: 'access', exp: FUTURE });
+  });
+
+  it('rejects non-access token types, a missing sub, an expired token and a malformed token', () => {
+    expect(decodeSealedBackendJwtClaims(makeToken({ sub: 'u1', typ: 'handoff', exp: FUTURE }))).toBeNull();
+    expect(decodeSealedBackendJwtClaims(makeToken({ exp: FUTURE }))).toBeNull();
+    expect(decodeSealedBackendJwtClaims(makeToken({ sub: 'u1', exp: Math.floor(Date.now() / 1000) - 1 }))).toBeNull();
+    expect(decodeSealedBackendJwtClaims('not-a-jwt')).toBeNull();
+  });
+
+  it('is never imported by the request middleware — a raw bearer must go through verifyBackendJwt', () => {
+    const dir = path.join(__dirname, '..', 'src', 'middleware');
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith('.ts'));
+    expect(files).toContain('auth.ts');
+    for (const f of files) {
+      const source = fs.readFileSync(path.join(dir, f), 'utf8');
+      expect(source).not.toMatch(/decodeSealedBackendJwtClaims|readBackendJwtClaims|decodeBackendJwtClaims/);
+    }
+    expect(fs.readFileSync(path.join(dir, 'auth.ts'), 'utf8')).toMatch(/verifyBackendJwt\(/);
   });
 });

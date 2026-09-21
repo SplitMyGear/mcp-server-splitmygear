@@ -1,5 +1,6 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
 import type { Conversation, PostResponse } from '@/lib/api-contract';
+import { call, compact, qs } from './_shared';
 
 /**
  * `sendMessage` / `getConversations` call the backend REST API forwarding the
@@ -41,10 +42,11 @@ function isAuthError(error: unknown): error is BackendApiError {
 async function resolveOrCreateConversation(
   recipientId: string,
   token: string,
+  context: { listingId?: string; bookingId?: string } = {},
 ): Promise<string | undefined> {
   const created = await backendRequest<Conversation>('POST', '/chat/conversations', {
     token,
-    body: { participantId: recipientId },
+    body: compact({ participantId: recipientId, ...context }),
   });
   return created?.id;
 }
@@ -54,6 +56,8 @@ export const messagingTools = {
     recipientId: string;
     content: string;
     conversationId?: string;
+    listingId?: string;
+    bookingId?: string;
     token: string;
   }): Promise<{ success: boolean; message?: SentMessage; conversationId?: string; error?: string }> {
     if (!params.token) return { success: false, error: AUTH_REQUIRED };
@@ -63,7 +67,10 @@ export const messagingTools = {
         // Resolve (or create) the conversation with the recipient. The backend
         // derives the initiator from the token and returns the pair's existing
         // thread when they already have one.
-        convId = await resolveOrCreateConversation(params.recipientId, params.token);
+        convId = await resolveOrCreateConversation(params.recipientId, params.token, {
+          listingId: params.listingId,
+          bookingId: params.bookingId,
+        });
         if (!convId) return { success: false, error: 'Failed to resolve conversation' };
       }
 
@@ -76,6 +83,15 @@ export const messagingTools = {
     } catch (error) {
       return { success: false, error: toMessage(error, 'Failed to send message') };
     }
+  },
+
+  /** Messages in one of the caller's conversations (the backend enforces membership). */
+  getMessages(conversationId: string, token: string, since?: string) {
+    return call<unknown[]>('GET', `/chat/conversations/${conversationId}/messages${qs({ since })}`, { token });
+  },
+
+  markConversationRead(conversationId: string, token: string) {
+    return call('POST', `/chat/conversations/${conversationId}/read`, { token, body: {} });
   },
 
   async getConversations(token: string): Promise<Conversation[]> {

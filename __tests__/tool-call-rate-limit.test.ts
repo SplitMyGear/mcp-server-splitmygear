@@ -22,7 +22,13 @@ jest.mock('@/tools/messaging', () => ({ messagingTools: new Proxy({}, { get: () 
 
 import { NextRequest } from 'next/server';
 import { RATE_LIMITS, countToolCalls, toolCallRateLimiter } from '../src/middleware/rate-limit';
+import { _resetSharedStoreForTests } from '../src/lib/shared-store';
 import { POST } from '../src/app/api/mcp/route';
+
+// Buckets are keyed per source address only where proxy headers are trusted
+// (Vercel, or this explicit opt-in); the cases below attribute each request
+// to its own IP, so the flag is on throughout.
+const TRUST_PROXY = { MCP_TRUST_PROXY_HEADERS: '1' } as const;
 
 const TIER = 'default';
 const TOOL_CALL_LIMIT = RATE_LIMITS.default.toolCallsPerMinute; // 100
@@ -102,11 +108,13 @@ describe('toolCallRateLimiter', () => {
     new NextRequest('http://localhost/api/mcp', { headers: { 'x-forwarded-for': ip } });
 
   beforeEach(() => {
-    process.env = { ...originalEnv, MCP_RATE_LIMIT_TIER: TIER };
+    process.env = { ...originalEnv, MCP_RATE_LIMIT_TIER: TIER, ...TRUST_PROXY };
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
     process.env = originalEnv;
+    jest.restoreAllMocks();
   });
 
   it('charges the budget per tool call, not per request', async () => {
@@ -176,11 +184,13 @@ describe('/api/mcp enforces the tool-call budget before dispatch', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    process.env = { ...originalEnv, MCP_RATE_LIMIT_TIER: TIER, MCP_API_KEY: 'test-operator-key' };
+    process.env = { ...originalEnv, MCP_RATE_LIMIT_TIER: TIER, MCP_API_KEY: 'test-operator-key', ...TRUST_PROXY };
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
     process.env = originalEnv;
+    jest.restoreAllMocks();
   });
 
   it('still dispatches a tool call, so the pre-read body reaches the transport', async () => {
@@ -236,5 +246,83 @@ describe('/api/mcp enforces the tool-call budget before dispatch', () => {
     const res = await POST(mcpRequest(undefined, '198.51.100.5', 'this is not json'));
     expect(res.status).toBe(400);
     expect(await res.text()).toContain('-32700');
+  });
+});
+
+/**
+ * The same accounting over the SHARED store: a batch is one INCRBY of its
+ * size, and a refused batch is handed back (DECRBY) so it cannot drain the
+ * window it was refused from — all-or-nothing survives the distributed layer.
+ */
+describe('toolCallRateLimiter over a shared store (Upstash)', () => {
+  const originalEnv = process.env;
+  const STORE_URL = 'https://example-redis.upstash.io';
+  const NOW = 1_700_000_000_000;
+  const WINDOW_ID = Math.floor(NOW / 60_000);
+  let mockFetch: jest.Mock;
+
+  const reply = (count: number) => ({ ok: true, status: 200, text: async () => JSON.stringify([{ result: count }, { result: 1 }]) });
+  const pipelineBody = (index: number): unknown[][] => JSON.parse((mockFetch.mock.calls[index][1] as RequestInit).body as string);
+  const ipRequest = (ip: string) => new NextRequest('http://localhost/api/mcp', { headers: { 'x-forwarded-for': ip } });
+
+  beforeEach(() => {
+    process.env = {
+      ...originalEnv,
+      MCP_RATE_LIMIT_TIER: TIER,
+      ...TRUST_PROXY,
+      UPSTASH_REDIS_REST_URL: STORE_URL,
+      UPSTASH_REDIS_REST_TOKEN: 'test-store-token',
+    };
+    mockFetch = jest.fn();
+    (global as unknown as { fetch: jest.Mock }).fetch = mockFetch;
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    _resetSharedStoreForTests();
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    jest.restoreAllMocks();
+  });
+
+  it('charges a batch as ONE INCRBY of its size, in the tool-call key space', async () => {
+    mockFetch.mockResolvedValue(reply(3 + 25));
+    const result = await toolCallRateLimiter(ipRequest('203.0.113.50'), 25);
+
+    expect(result).toEqual({ success: true, remaining: TOOL_CALL_LIMIT - 28 });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const key = `mcp:rl:tools:ip:203.0.113.50:${WINDOW_ID}`;
+    expect(pipelineBody(0)).toEqual([
+      ['INCRBY', key, 25],
+      ['EXPIRE', key, 60, 'NX'],
+    ]);
+  });
+
+  it('refuses an over-limit batch AND hands the charge back, so the untouched remainder is still spendable', async () => {
+    // 90 already spent this window; a batch of 25 would land at 115 > 100.
+    mockFetch.mockResolvedValueOnce(reply(90 + 25)).mockResolvedValueOnce(reply(90));
+    const refused = await toolCallRateLimiter(ipRequest('203.0.113.51'), 25);
+
+    expect(refused.success).toBe(false);
+    expect(refused.remaining).toBe(10);
+    expect(refused.error).toContain('asked for 25');
+    const key = `mcp:rl:tools:ip:203.0.113.51:${WINDOW_ID}`;
+    expect(pipelineBody(0)[0]).toEqual(['INCRBY', key, 25]);
+    expect(pipelineBody(1)[0]).toEqual(['DECRBY', key, 25]);
+  });
+
+  it('keeps the request budget in its own key space (plain INCR, req prefix)', async () => {
+    mockFetch.mockResolvedValue(reply(1));
+    const { rateLimiter } = await import('../src/middleware/rate-limit');
+    await rateLimiter(ipRequest('203.0.113.52'));
+    expect(pipelineBody(0)[0]).toEqual(['INCR', `mcp:rl:req:ip:203.0.113.52:${WINDOW_ID}`]);
+  });
+
+  it('falls back to the in-memory bucket for the request when the store is unavailable', async () => {
+    mockFetch.mockRejectedValue(new TypeError('fetch failed'));
+    const first = await toolCallRateLimiter(ipRequest('203.0.113.53'), 40);
+    const second = await toolCallRateLimiter(ipRequest('203.0.113.53'), 70);
+    expect(first).toEqual({ success: true, remaining: TOOL_CALL_LIMIT - 40 });
+    expect(second.success).toBe(false); // 40 + 70 > 100, counted locally
   });
 });

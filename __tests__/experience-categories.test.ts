@@ -62,3 +62,30 @@ describe('experienceCategorySchema (SPLIT-1496)', () => {
     expect(experienceCategorySchema.safeParse('spelunking').success).toBe(false);
   });
 });
+
+/**
+ * The registry port: the tool advertised to clients must enforce the SAME
+ * shared schema, not a private copy that could drift from the backend enum.
+ */
+import { searchExperiences } from '../src/tools/defs/discovery';
+
+describe('search_experiences def (registry) uses the shared schema', () => {
+  const category = searchExperiences.inputSchema.category;
+
+  it('is the shared experienceCategorySchema (optional), not a private enum', () => {
+    expect(category.isOptional()).toBe(true);
+    expect(category.safeParse(undefined).success).toBe(true);
+    for (const c of EXPERIENCE_CATEGORIES) expect(category.safeParse(c).success).toBe(true);
+  });
+
+  it('rejects the Title-Case values the tool used to advertise, at the tool boundary', () => {
+    for (const c of ['Outdoor', 'Tours', 'Fitness', 'spelunking']) {
+      expect(category.safeParse(c).success).toBe(false);
+    }
+  });
+
+  it('tells the model the values are lowercase', () => {
+    expect(category.description).toMatch(/lowercase/);
+    for (const c of EXPERIENCE_CATEGORIES) expect(category.description).toContain(c);
+  });
+});
