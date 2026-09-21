@@ -10,7 +10,7 @@ import {
 } from '@/middleware/rate-limit';
 import { registerTools, type ToolContext } from '@/tools/registry';
 import { ALL_TOOLS } from '@/tools/defs';
-import { LISTING_CATEGORIES } from '@/tools/defs/common';
+import { LISTING_CATEGORIES } from '@/tools/listing-categories';
 import { oauthEnabled, publicBaseUrl, MCP_RESOURCE_PATH } from '@/lib/oauth/config';
 
 const SERVER_NAME = 'splitmygear-mcp';
@@ -58,7 +58,7 @@ function buildServer(ctx: ToolContext): McpServer {
     'splitmygear://categories',
     { title: 'Listing categories', description: 'The canonical Title-Case gear categories accepted by search_listings and create_listing.', mimeType: 'application/json' },
     async (uri) => ({
-      contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(LISTING_CATEGORIES.map((id) => ({ id, name: id })), null, 2) }],
+      contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(LISTING_CATEGORIES, null, 2) }],
     }),
   );
 
