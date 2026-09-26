@@ -1,4 +1,4 @@
-import { rateLimiter, RATE_LIMITS } from '../src/middleware/rate-limit';
+import { rateLimiter, toolCallRateLimiter, RATE_LIMITS, _resetRateLimitNotesForTests } from '../src/middleware/rate-limit';
 import { _resetSharedStoreForTests } from '../src/lib/shared-store';
 import { NextRequest } from 'next/server';
 
@@ -179,6 +179,50 @@ describe('Rate Limiter Middleware', () => {
 
       expect((await rateLimiter(req, userId)).success).toBe(true);
       expect((await rateLimiter(req, userId)).success).toBe(false);
+    });
+
+    /**
+     * The store may be a quota-capped database shared with the backend. This
+     * limiter is its one high-volume consumer, so an operator can keep it
+     * per-instance while the sign-in paths keep the store.
+     */
+    describe('MCP_RATE_LIMIT_STORE=memory', () => {
+      beforeEach(() => {
+        process.env.MCP_RATE_LIMIT_STORE = 'memory';
+        _resetRateLimitNotesForTests();
+      });
+
+      it('never spends a store command, and still enforces the tier limit per instance', async () => {
+        const info = jest.spyOn(console, 'info').mockImplementation(() => {});
+        const limit = RATE_LIMITS.public.requestsPerMinute;
+        const req = new NextRequest('http://localhost/api/mcp');
+        const userId = `user-memory-${Math.random()}`;
+
+        for (let i = 0; i < limit; i++) expect((await rateLimiter(req, userId)).success).toBe(true);
+        const refused = await rateLimiter(req, userId);
+
+        expect(refused.success).toBe(false);
+        expect(refused.error).toContain(`Maximum ${limit} requests per minute`);
+        expect(mockFetch).not.toHaveBeenCalled();
+        // Said once per instance, and it is a note, not the missing-store warning.
+        expect(info).toHaveBeenCalledTimes(1);
+        expect(String(info.mock.calls[0][0])).toContain('MCP_RATE_LIMIT_STORE=memory');
+        expect(console.warn).not.toHaveBeenCalled();
+      });
+
+      it('keeps the tool-call budget off the store too', async () => {
+        jest.spyOn(console, 'info').mockImplementation(() => {});
+        const result = await toolCallRateLimiter(new NextRequest('http://localhost/api/mcp'), 3, `user-memory-tools-${Math.random()}`);
+        expect(result.success).toBe(true);
+        expect(mockFetch).not.toHaveBeenCalled();
+      });
+
+      it('any other value keeps the shared window', async () => {
+        process.env.MCP_RATE_LIMIT_STORE = 'shared';
+        mockFetch.mockResolvedValue(pipelineCount(1));
+        await rateLimiter(new NextRequest('http://localhost/api/mcp'), `user-shared-${Math.random()}`);
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+      });
     });
   });
 

@@ -28,7 +28,8 @@ import { decrementWindow, incrementWindow, sharedStoreEnabled, warnIfNoSharedSto
  * TWO LAYERS, same accounting (`consume*` below), same result shape:
  *
  * 1. SHARED STORE (Upstash Redis REST via `@/lib/shared-store`), used whenever
- *    it is configured. Fixed one-minute window keyed on budget + principal:
+ *    it is configured, unless `MCP_RATE_LIMIT_STORE=memory` opts this limiter
+ *    out (see limiterUsesSharedStore). Fixed one-minute window keyed on budget + principal:
  *    `mcp:rl:<budget>:<clientId>:<floor(now / 60s)>`, one INCRBY per charge
  *    with the key expiring after the window. This is the true GLOBAL limit
  *    across every serverless instance.
@@ -177,14 +178,47 @@ async function consumeShared(key: string, limit: number, cost: number, now: numb
   return { success: true, remaining: Math.max(0, limit - count) };
 }
 
-/** One charge against one budget: the shared window when a store is configured and answers, else the local bucket. */
+/**
+ * Whether the per-request limiter may use the shared store.
+ *
+ * `MCP_RATE_LIMIT_STORE=memory` keeps THIS limiter per-instance even when a
+ * store is configured, while the sign-in throttle and the authorization-code
+ * replay cache keep using the store. The limiter is the one high-volume
+ * consumer (a pipeline per request and another per tools/call request), and
+ * the store may be a quota-capped database shared with the backend, whose own
+ * throttles already bound every call this server forwards. Spending that quota
+ * on a defence-in-depth counter could starve the backend's limiter; the
+ * sign-in paths cost a few commands per sign-in and are what the store is for.
+ */
+function limiterUsesSharedStore(): boolean {
+  return sharedStoreEnabled() && process.env.MCP_RATE_LIMIT_STORE !== 'memory';
+}
+
+let memoryByChoiceNoted = false;
+function noteMemoryByChoice(): void {
+  if (memoryByChoiceNoted) return;
+  memoryByChoiceNoted = true;
+  console.info(
+    '[rate-limit] per-instance by configuration (MCP_RATE_LIMIT_STORE=memory); ' +
+      'the shared store still backs the sign-in throttle and the authorization-code replay cache.',
+  );
+}
+
+/** Test hook: forget the one-shot configuration note. */
+export function _resetRateLimitNotesForTests(): void {
+  memoryByChoiceNoted = false;
+}
+
+/** One charge against one budget: the shared window when the limiter may use a store and it answers, else the local bucket. */
 async function charge(budget: Budget, request: NextRequest, userId: string | undefined, limit: number, cost: number): Promise<RateLimitResult> {
-  // Once per cold instance, say out loud that this limiter is per-instance.
-  warnIfNoSharedStore();
+  // Once per cold instance, say out loud that this limiter is per-instance,
+  // and why: no store at all (a warning), or a store deliberately not used here.
+  if (!sharedStoreEnabled()) warnIfNoSharedStore();
+  else if (!limiterUsesSharedStore()) noteMemoryByChoice();
   const key = bucketKey(budget, resolveClientId(request, userId));
   const now = Date.now();
 
-  if (sharedStoreEnabled()) {
+  if (limiterUsesSharedStore()) {
     const shared = await consumeShared(key, limit, cost, now);
     if (shared) return shared;
     // null: store unavailable for this request; degrade to the local window.

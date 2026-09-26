@@ -222,8 +222,9 @@ export const cancelBooking = defineTool({
   name: 'cancel_booking',
   title: 'Cancel booking',
   description:
-    'Cancel a rental booking. Renters get the policy-based refund (see preview_cancellation first and confirm with the user). ' +
-    'Vendors may cancel bookings on their listings; passing reason "severe_weather" records a weather cancellation.',
+    'Cancel a pending or confirmed rental booking. Renters get the policy-based refund (see preview_cancellation first and confirm with the user). ' +
+    'Vendors may cancel bookings on their listings; passing reason "severe_weather" records a weather cancellation. ' +
+    'An unpaid checkout (status "draft") cannot be cancelled: it is released automatically if not paid.',
   access: 'user',
   scope: 'bookings',
   inputSchema: {

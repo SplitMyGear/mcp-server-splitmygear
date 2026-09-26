@@ -33,6 +33,29 @@ function toMessage(error: unknown, fallback: string): string {
 }
 
 /**
+ * SPLIT-1503. A booking made through create_booking starts as a DRAFT: an
+ * unpaid checkout. The backend lets no person move a draft anywhere (its
+ * lifecycle table gives draft → cancelled to the system alone) and releases
+ * unpaid drafts itself after DRAFT_EXPIRY_MINUTES (60 by default). Its refusal
+ * reads "Only the listing vendor can set a booking to 'cancelled'", which is
+ * wrong for a draft (the vendor cannot either) and sent callers looking for a
+ * vendor. Say what is actually true instead.
+ */
+const DRAFT_NOT_CANCELLABLE =
+  'This booking is an unpaid checkout (status "draft"), so there is nothing to cancel: no payment has been taken and ' +
+  'Splitt releases unpaid checkouts automatically, usually within an hour. To keep the booking, pay with get_payment_link instead.';
+
+/** Is this booking a draft? Asked only after a refused cancel; any failure here reads as "no". */
+async function isUnpaidDraft(bookingId: string, token: string): Promise<boolean> {
+  try {
+    const booking = await backendRequest<{ status?: unknown }>('GET', `/bookings/${bookingId}`, { token });
+    return booking?.status === 'draft';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Client-side date hygiene before hitting the backend: ensures both dates parse
  * and that checkOut is strictly after checkIn within a sane window. Returns a
  * human-readable error string when invalid, or null when the dates are usable.
@@ -178,15 +201,19 @@ export const bookingTools = {
   ): Promise<{ success: boolean; booking?: UpdatedBooking; message?: string; error?: string }> {
     if (!token) return { success: false, error: AUTH_REQUIRED };
     try {
-      // The backend enforces that only the renter/vendor may cancel and handles
-      // any refund. Ownership is derived from the forwarded token, not a param.
-      // `reason` is vendor/admin-only on the backend (a renter self-tag → 403).
+      // The backend decides who may cancel and handles any refund: the renter
+      // or the listing's vendor may cancel a PENDING or CONFIRMED booking.
+      // Ownership is derived from the forwarded token, not a param. `reason`
+      // is vendor/admin-only on the backend (a renter self-tag → 403).
       const booking = await backendRequest<UpdatedBooking>('PUT', `/bookings/${bookingId}/status`, {
         token,
         body: compact({ status: 'cancelled', reason }),
       });
       return { success: true, booking, message: 'Booking cancelled successfully' };
     } catch (error) {
+      if (error instanceof BackendApiError && error.status === 403 && (await isUnpaidDraft(bookingId, token))) {
+        return { success: false, error: DRAFT_NOT_CANCELLABLE };
+      }
       return { success: false, error: toMessage(error, 'Failed to cancel booking') };
     }
   },

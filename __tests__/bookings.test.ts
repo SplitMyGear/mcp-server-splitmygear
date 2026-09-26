@@ -152,6 +152,54 @@ describe('Booking Tools (backend REST)', () => {
     );
   });
 
+  describe('cancelling an unpaid draft (SPLIT-1503)', () => {
+    const LIFECYCLE_403 = "Only the listing vendor can set a booking to 'cancelled'";
+
+    it('explains that a draft is an unpaid checkout instead of relaying the lifecycle 403', async () => {
+      const { BackendApiError } = jest.requireMock('../src/lib/backend-client');
+      mockBackendRequest.mockImplementation(async (method: string) => {
+        if (method === 'PUT') throw new BackendApiError(403, LIFECYCLE_403);
+        return { id: 'booking-1', status: 'draft' };
+      });
+      const result = await bookingTools.cancelBooking('booking-1', TOKEN);
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/unpaid checkout/);
+      expect(result.error).toMatch(/get_payment_link/);
+      expect(result.error).not.toContain('Only the listing vendor');
+      expect(mockBackendRequest).toHaveBeenCalledWith('GET', '/bookings/booking-1', { token: TOKEN });
+    });
+
+    it('relays the backend refusal unchanged when the booking is not a draft', async () => {
+      const { BackendApiError } = jest.requireMock('../src/lib/backend-client');
+      mockBackendRequest.mockImplementation(async (method: string) => {
+        if (method === 'PUT') throw new BackendApiError(403, 'You are not authorized to update this booking status');
+        return { id: 'booking-1', status: 'confirmed' };
+      });
+      const result = await bookingTools.cancelBooking('booking-1', TOKEN);
+      expect(result.error).toBe('You are not authorized to update this booking status');
+    });
+
+    it('relays the refusal when the follow-up read fails', async () => {
+      const { BackendApiError } = jest.requireMock('../src/lib/backend-client');
+      mockBackendRequest.mockImplementation(async (method: string) => {
+        if (method === 'PUT') throw new BackendApiError(403, LIFECYCLE_403);
+        throw new BackendApiError(404, 'Booking not found');
+      });
+      const result = await bookingTools.cancelBooking('booking-1', TOKEN);
+      expect(result.error).toBe(LIFECYCLE_403);
+    });
+
+    it('does not look the booking up for failures that are not a 403', async () => {
+      const { BackendApiError } = jest.requireMock('../src/lib/backend-client');
+      mockBackendRequest.mockImplementation(async () => {
+        throw new BackendApiError(409, 'This rental is flagged as not returned. Return the gear or contact support');
+      });
+      const result = await bookingTools.cancelBooking('booking-1', TOKEN);
+      expect(result.error).toMatch(/flagged as not returned/);
+      expect(mockBackendRequest).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('requires a token to cancel a booking', async () => {
     const result = await bookingTools.cancelBooking('booking-1', '');
     expect(result.success).toBe(false);
