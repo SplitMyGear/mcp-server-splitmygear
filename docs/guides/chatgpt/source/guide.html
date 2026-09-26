@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Splitt in ChatGPT</title>
+<meta name="description" content="Vendor guide: connect ChatGPT to your Splitt account through the Splitt MCP server.">
+<meta name="author" content="Splitt">
+<link rel="stylesheet" href="guide.css">
+</head>
+<body>
+<!-- ===================================================== 1. COVER -->
+<section class="page cover">
+  <div class="inner">
+    <img class="logo" src="assets/splitt-logo-white.png" alt="Splitt">
+    <p class="eyebrow">For vendors</p>
+    <h1>Run your Splitt<br>business from ChatGPT.</h1>
+    <p class="lede">How to connect ChatGPT to your Splitt account, what you can ask it to do, and how you stay in control of every change.</p>
+    <span class="pill"><span class="dot"></span>ChatGPT on the web</span>
+    <div class="bottom">
+      <span class="tagline">Just rent. Just go.</span>
+      <div class="meta">Splitt in ChatGPT<br>Vendor guide · September 2026</div>
+    </div>
+  </div>
+  <div class="bar"><span></span><span></span><span></span><span></span></div>
+</section>
+
+<!-- ============================================== 2. SHORT VERSION -->
+<section class="page">
+  <header class="page-head"><img src="assets/splitt-logo-black.png" alt="Splitt"><span class="section">The short version</span></header>
+
+  <p class="eyebrow">Splitt in ChatGPT</p>
+  <h1>Ask in plain words.<br>ChatGPT does it in Splitt.</h1>
+  <p class="lede">Splitt has an MCP server: a secure connection that lets AI assistants such as ChatGPT use Splitt for you. (MCP, the Model Context Protocol, is the open standard ChatGPT uses to connect to other services.) Add Splitt to ChatGPT once, sign in with your Splitt account, and then just ask: update a listing, block out dates, check today’s pickups or reply to a renter.</p>
+
+  <div class="grid c4 mt-xl">
+    <div class="card stat"><div class="big">Your login</div><p>You sign in on Splitt’s own page. ChatGPT never sees your password.</p></div>
+    <div class="card stat"><div class="big">Your access</div><p>ChatGPT can only do what your Splitt account can do. Nothing more.</p></div>
+    <div class="card stat"><div class="big">Your call</div><p>ChatGPT asks you to confirm before it changes anything in Splitt.</p></div>
+    <div class="card stat"><div class="big">No cards</div><p>Payments only happen on Stripe’s checkout page, never in the chat.</p></div>
+  </div>
+
+  <h2 class="mt-xl" style="margin-bottom:11pt">How it works</h2>
+  <div class="steps">
+    <div class="card step">
+      <div class="icon"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="5"/><circle cx="16" cy="12" r="2.5"/></svg></div>
+      <div class="label">Step 1</div>
+      <h3>Turn on developer mode</h3>
+      <p>One switch in ChatGPT’s settings, under Security and login.</p>
+    </div>
+    <div class="card step">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>
+      <div class="label">Step 2</div>
+      <h3>Add Splitt</h3>
+      <p>Paste the Splitt server address into ChatGPT and choose OAuth sign-in.</p>
+    </div>
+    <div class="card step">
+      <div class="icon"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
+      <div class="label">Step 3</div>
+      <h3>Sign in with Splitt</h3>
+      <p>Use your Splitt email and password, or Google or Apple.</p>
+    </div>
+    <div class="card step dark">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z"/></svg></div>
+      <div class="label">Step 4</div>
+      <h3>Ask ChatGPT</h3>
+      <p>Pick Splitt in a chat and say what you need. You confirm each change.</p>
+    </div>
+  </div>
+
+  <div class="grid c2 mt-xl" style="grid-template-columns: 1.05fr 1fr; align-items: start;">
+    <div class="card">
+      <h3 style="margin-bottom:5pt">What ChatGPT can work with</h3>
+      <p class="small" style="color:var(--ink-2)">Your listings, prices and calendar, bookings, pickups and returns, messages, reviews, claims, experiences you host and, for account owners, earnings and payouts. The same things you manage in your Splitt vendor dashboard.</p>
+    </div>
+    <div class="note"><strong>Good to know.</strong> Setup takes about five minutes and you do it once. You need a computer: developer mode is set up on ChatGPT’s website.</div>
+  </div>
+
+  <footer class="page-foot"><span>Splitt · ChatGPT for vendors</span><span class="num"></span></footer>
+</section>
+
+<!-- ============================================= 3. BEFORE YOU START -->
+<section class="page">
+  <header class="page-head"><img src="assets/splitt-logo-black.png" alt="Splitt"><span class="section">Before you start</span></header>
+
+  <p class="eyebrow">What you need</p>
+  <h1>Four things to have ready</h1>
+  <p class="lede">Check these first. Each one takes a minute, and together they cover almost every setup problem vendors run into.</p>
+
+  <div class="grid c2 mt-l">
+    <div class="card numbered"><div class="row"><span class="n">1</span><div>
+      <h4>A ChatGPT plan with developer mode</h4>
+      <p>Plus, Pro, Business, Enterprise or Edu. The free plan does not include it. On a Business, Enterprise or Edu workspace, your ChatGPT admin may need to allow developer mode for you first.</p>
+    </div></div></div>
+    <div class="card numbered"><div class="row"><span class="n">2</span><div>
+      <h4>ChatGPT in a web browser</h4>
+      <p>Set up Splitt at <strong>chatgpt.com</strong> on a computer. Developer mode is only available on the web, and your browser must allow the Splitt sign-in window to open.</p>
+    </div></div></div>
+    <div class="card numbered"><div class="row"><span class="n">3</span><div>
+      <h4>Your Splitt vendor login</h4>
+      <p>The email and password you use on <span class="nw">go-splitt.com</span>, or your Google or Apple sign-in. If two-step verification is on, keep your email open for the code.</p>
+    </div></div></div>
+    <div class="card numbered"><div class="row"><span class="n">4</span><div>
+      <h4>The Splitt server address</h4>
+      <p>You paste this into ChatGPT in step 2. Type it exactly, including <code>/api/mcp</code> at the end.</p>
+    </div></div></div>
+  </div>
+
+  <div class="address mt-l"><span>https://mcp-server-splitmygear.vercel.app/api/mcp</span><span class="tag">Splitt server address</span></div>
+
+  <h2 class="mt-xl" style="margin-bottom:10pt">Sign in with the right account</h2>
+  <div class="grid c3">
+    <div class="card">
+      <span class="pill green"><span class="dot"></span>Account owner</span>
+      <p class="small mt-s" style="color:var(--ink-2)">Everything in this guide, including earnings, payouts and your Stripe payout account.</p>
+    </div>
+    <div class="card">
+      <span class="pill"><span class="dot"></span>Manager or staff</span>
+      <p class="small mt-s" style="color:var(--ink-2)">What your seat allows in the vendor dashboard. Earnings and payouts are owner-only, and staff can’t change pricing rules.</p>
+    </div>
+    <div class="card">
+      <span class="pill orange"><span class="dot"></span>Renter account</span>
+      <p class="small mt-s" style="color:var(--ink-2)">No vendor tools at all. If ChatGPT can’t see your listings, check which account you signed in with.</p>
+    </div>
+  </div>
+
+  <div class="note mt-l"><strong>One connection, one Splitt account.</strong> ChatGPT acts as whoever signed in. If several people on your team use ChatGPT, each person connects with their own Splitt login, so every change is made under their name and within their permissions.</div>
+
+  <footer class="page-foot"><span>Splitt · ChatGPT for vendors</span><span class="num"></span></footer>
+</section>
+
+<!-- =========================================== 4. STEPS 1 AND 2 -->
+<section class="page">
+  <header class="page-head"><img src="assets/splitt-logo-black.png" alt="Splitt"><span class="section">Set up</span></header>
+
+  <p class="eyebrow">Steps 1 and 2 · In ChatGPT</p>
+  <h1>Add Splitt to ChatGPT</h1>
+  <p class="lede">Both steps happen in ChatGPT’s settings on chatgpt.com. You only do them once.</p>
+
+  <div class="grid mt-l" style="grid-template-columns: 1fr 2.55in; gap: 16pt; align-items: start;">
+    <div>
+      <div class="step-head"><span class="n">1</span><h2>Turn on developer mode</h2></div>
+      <ol class="how">
+        <li>Open <strong>chatgpt.com</strong> and sign in.</li>
+        <li>Open your profile menu and choose <span class="ui">Settings</span>.</li>
+        <li>Go to <span class="ui">Security and login</span> and turn on <span class="ui">Developer mode</span>.</li>
+      </ol>
+      <p class="small mt-s">OpenAI calls developer mode powerful, and apps you add yourself are not reviewed by OpenAI. The Splitt server is run by Splitt, and the rest of this guide shows how you stay in control of what ChatGPT does with it.</p>
+    </div>
+    <div class="shot">
+      <div class="bar"><i></i><i></i><i></i><span class="url">chatgpt.com · Settings</span></div>
+      <div class="body form">
+        <div class="lbl" style="font-size:9pt;color:var(--ink);font-weight:700;margin-bottom:8pt">Security and login</div>
+        <div class="setting">
+          <div><div class="s-title">Developer mode</div><div class="s-sub">Add your own apps over MCP</div></div>
+          <span class="toggle on"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid mt-l" style="grid-template-columns: 1fr 2.95in; gap: 16pt; align-items: start;">
+    <div>
+      <div class="step-head"><span class="n">2</span><h2>Create the Splitt connection</h2></div>
+      <ol class="how">
+        <li>Open the <span class="ui">Plugins</span> page (<strong>chatgpt.com/plugins</strong>) and select the <span class="ui">+</span> button.</li>
+        <li>Fill in the form as shown:
+          <table class="t kv mt-s">
+            <tr><td>Name</td><td>Splitt</td></tr>
+            <tr><td>Description</td><td>Manage my Splitt listings, bookings and messages</td></tr>
+            <tr><td>Connection</td><td>The Splitt server address from page 3. Splitt’s server is public, so you don’t need a tunnel.</td></tr>
+            <tr><td>Authentication</td><td><span class="ui">OAuth</span></td></tr>
+          </table>
+        </li>
+        <li>Select <span class="ui">Create</span>. ChatGPT sends you to Splitt to sign in (step 3), then loads the Splitt tools.</li>
+      </ol>
+    </div>
+    <div class="shot">
+      <div class="bar"><i></i><i></i><i></i><span class="url">chatgpt.com/plugins</span></div>
+      <div class="body form">
+        <div class="lbl" style="font-size:9pt;color:var(--ink);font-weight:700;margin-bottom:9pt">New connection</div>
+        <div class="field"><div class="lbl">Name</div><div class="inp">Splitt</div></div>
+        <div class="field"><div class="lbl">Description</div><div class="inp">Manage my Splitt listings, bookings and messages</div></div>
+        <div class="field"><div class="lbl">MCP server URL</div><div class="inp mono url">https://mcp-server-splitmygear.vercel.app<wbr>/api/mcp</div></div>
+        <div class="field"><div class="lbl">Authentication</div><div class="inp select">OAuth</div></div>
+        <div class="btns"><span class="btn">Cancel</span><span class="btn solid">Create</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note mt-l"><strong>Your screen may look a little different.</strong> These drawings show which field gets what; they are not screenshots. ChatGPT renames its menus from time to time: older versions call plugins <em>Apps</em> or <em>Connectors</em>, and the developer mode switch used to sit under Apps, then Advanced settings. If ChatGPT asks you to confirm that you trust the server, read the notice and continue.</div>
+
+  <footer class="page-foot"><span>Splitt · ChatGPT for vendors</span><span class="num"></span></footer>
+</section>
+
+<!-- ================================================= 5. STEP 3 SIGN IN -->
+<section class="page">
+  <header class="page-head"><img src="assets/splitt-logo-black.png" alt="Splitt"><span class="section">Sign in</span></header>
+
+  <p class="eyebrow">Step 3 · On Splitt</p>
+  <h1>Sign in on Splitt’s own page</h1>
+  <p class="lede">ChatGPT opens Splitt’s sign-in page in a new window. The page belongs to Splitt, not ChatGPT: your password goes straight to Splitt and ChatGPT never sees it.</p>
+
+  <div class="grid mt-m" style="grid-template-columns: 2.05in 1fr; gap: 22pt; align-items: start;">
+    <figure class="signin">
+      <div class="shot">
+        <div class="bar"><i></i><i></i><i></i><span class="url sans">mcp-server-splitmygear.vercel.app</span></div>
+        <div class="imgwrap">
+          <img src="assets/login-requested.png" alt="The Splitt sign-in page as ChatGPT opens it">
+          <span class="n mark" style="top: 10.2%">1</span>
+          <span class="n mark" style="top: 65.3%">2</span>
+          <span class="n mark" style="top: 72.2%">3</span>
+          <span class="n mark" style="top: 92.2%">4</span>
+        </div>
+      </div>
+      <figcaption class="caption">The Splitt sign-in page, from Splitt’s own code.</figcaption>
+    </figure>
+
+    <div>
+      <div class="numbered">
+        <div class="row"><span class="n">1</span><div>
+          <h4>What ChatGPT will be able to do</h4>
+          <p>Each line is one kind of access. It covers everything a Splitt account can do; your role still decides what actually works, so a manager’s seat never gains owner powers. If ChatGPT didn’t narrow its request, the card says it is asking for full access to your account. That is the same list.</p>
+        </div></div>
+        <div class="row"><span class="n">2</span><div>
+          <h4>Where you go next</h4>
+          <p>The address must start with <code>https://chatgpt.com/</code>. If it shows anything else, close the window and don’t sign in.</p>
+        </div></div>
+        <div class="row"><span class="n">3</span><div>
+          <h4>Your Splitt login</h4>
+          <p>Enter the email and password you use on <span class="nw">go-splitt.com</span> and select <span class="ui">Continue</span>.</p>
+        </div></div>
+        <div class="row"><span class="n">4</span><div>
+          <h4>Google or Apple</h4>
+          <p>If you signed up with Google or Apple, use <span class="ui">Continue with Google</span> or <span class="ui">Continue with Apple</span> instead.</p>
+        </div></div>
+      </div>
+
+      <div class="card mt-m otp">
+        <h3 style="margin-bottom:4pt">Two-step verification</h3>
+        <p class="small" style="color:var(--ink-2)">If it’s on for your account, Splitt emails you a one-time code. Enter it and select <span class="ui">Verify</span>. It applies to Google and Apple sign-in too.</p>
+        <img class="mt-s" src="assets/otp.png" alt="The Check your email step with the Verification code field">
+      </div>
+
+      <div class="note mt-m"><strong>Done.</strong> Splitt sends you back to ChatGPT and the connection is ready. You won’t need to sign in again each time: ChatGPT renews its access in the background using your Splitt session.</div>
+    </div>
+  </div>
+
+  <footer class="page-foot"><span>Splitt · ChatGPT for vendors</span><span class="num"></span></footer>
+</section>
+<!-- ================================================= 6. STEP 4 IN A CHAT -->
+<section class="page">
+  <header class="page-head"><img src="assets/splitt-logo-black.png" alt="Splitt"><span class="section">In a chat</span></header>
+
+  <p class="eyebrow">Step 4 · In ChatGPT</p>
+  <h1>Ask in plain words</h1>
+  <p class="lede">Turn Splitt on in a chat and ask for what you need, the way you’d ask someone on your team. ChatGPT looks things up straight away and asks you before it changes anything.</p>
+
+  <div class="grid mt-m" style="grid-template-columns: 1fr 2.6in; gap: 18pt; align-items: start;">
+    <figure>
+      <div class="shot">
+        <div class="bar"><i></i><i></i><i></i><span class="url">chatgpt.com</span></div>
+        <div class="body chat">
+          <span class="toolchip on"><b>Splitt</b> is on for this chat</span>
+          <div class="bubble you">Which of my rentals start this weekend?</div>
+          <span class="toolchip">Used <b>Splitt</b> · Bookings on my listings</span>
+          <div class="bubble ai">You have two pickups on Saturday, October 3: the <strong>Tandem Kayak</strong> (Jordan, 9:00 AM) and the <strong>Paddle Board</strong> (Sam, 10:30 AM). Both are confirmed.</div>
+          <div class="bubble you">Block the paddle board on October 10 and 11. It’s going in for repairs.</div>
+          <div class="confirm">
+            <div class="c-head"><span class="c-title">Confirm action</span><span class="c-app">Splitt · Block dates</span></div>
+            <div class="c-rows">
+              <div><span>Listing</span><b>Paddle Board</b></div>
+              <div><span>Dates</span><b>October 10 to 11</b></div>
+              <div><span>Note</span><b>Repairs</b></div>
+            </div>
+            <div class="btns"><span class="btn">Deny</span><span class="btn solid">Confirm</span></div>
+          </div>
+          <div class="bubble ai">Done. The Paddle Board can’t be booked on October 10 or 11. Bookings you already had weren’t changed.</div>
+        </div>
+      </div>
+      <figcaption class="caption">An example chat, drawn to show the flow. ChatGPT’s own screens look different.</figcaption>
+    </figure>
+
+    <div class="numbered">
+      <div class="card numbered">
+        <div class="row"><span class="n">1</span><div>
+          <h4>Turn Splitt on</h4>
+          <p>In a new chat, select <span class="ui">+</span> next to the message box, then <span class="ui">Developer mode</span> (in some versions <span class="ui">More</span>), and switch on Splitt. In some versions you can also type <strong>@</strong> and pick Splitt.</p>
+        </div></div>
+      </div>
+      <div class="card numbered">
+        <div class="row"><span class="n">2</span><div>
+          <h4>Looking things up is instant</h4>
+          <p>Bookings, calendars, messages and numbers are read straight away. Reading never changes anything in Splitt.</p>
+        </div></div>
+      </div>
+      <div class="card numbered">
+        <div class="row"><span class="n">3</span><div>
+          <h4>Changes wait for you</h4>
+          <p>Anything that creates, changes, sends or deletes shows what it’s about to do and waits for your <span class="ui">Confirm</span>. Nothing happens if you deny it.</p>
+        </div></div>
+      </div>
+      <div class="card numbered">
+        <div class="row"><span class="n">4</span><div>
+          <h4>Use names, not codes</h4>
+          <p>Say “the Tandem Kayak” or “Jordan’s booking”. ChatGPT finds your listings, bookings and conversations itself, so you never need an ID or a link.</p>
+        </div></div>
+      </div>
+      <div class="note"><strong>Check what matters.</strong> ChatGPT can make mistakes. For prices, cancellations and money, look at the result in your Splitt vendor dashboard too.</div>
+    </div>
+  </div>
+
+  <footer class="page-foot"><span>Splitt · ChatGPT for vendors</span><span class="num"></span></footer>
+</section>
+
+<!-- =================================================== 7. WHAT YOU CAN ASK -->
+<section class="page">
+  <header class="page-head"><img src="assets/splitt-logo-black.png" alt="Splitt"><span class="section">Ideas</span></header>
+
+  <p class="eyebrow">What you can ask</p>
+  <h1>Things vendors ask Splitt to do</h1>
+  <p class="lede">Splitt gives ChatGPT more than 200 actions, from listings to payouts. These are starting points: ask in your own words.</p>
+
+  <div class="grid c2 mt-m prompts">
+    <div class="prompt">
+      <h3>Listings</h3>
+      <ul>
+        <li>Draft a listing for a 2-person inflatable kayak with pump and paddles. Keep it unpublished so I can check it.</li>
+        <li>Copy my Tandem Kayak listing into a new draft for the blue one.</li>
+        <li>Which of my listings got the most views and bookings since June?</li>
+      </ul>
+    </div>
+    <div class="prompt">
+      <h3>Calendar</h3>
+      <ul>
+        <li>Block the RV from November 2 to 6 for servicing.</li>
+        <li>What dates have I blocked on the Lake Cabin?</li>
+        <li>Connect my Airbnb calendar to the Lake Cabin. Here’s the iCal link: …</li>
+      </ul>
+    </div>
+    <div class="prompt">
+      <h3>Pricing</h3>
+      <ul>
+        <li>What’s a good starting price for my new e-bike listing?</li>
+        <li>Charge 20% more for the Lake Cabin from June 15 to August 31. <span class="chip inline">Owner, manager</span></li>
+        <li>What would dynamic pricing charge for the kayak next weekend? Don’t change anything.</li>
+      </ul>
+    </div>
+    <div class="prompt">
+      <h3>Bookings</h3>
+      <ul>
+        <li>Which pickups and returns do I have this week?</li>
+        <li>Is the new RV booking risky? Check it for me.</li>
+        <li>Sam hasn’t returned the paddle board. Mark the booking overdue.</li>
+      </ul>
+    </div>
+    <div class="prompt">
+      <h3>Messages and reviews</h3>
+      <ul>
+        <li>Do I have unread messages? Summarize them.</li>
+        <li>Draft a friendly reply to Jordan about the 9 AM pickup. Show me before you send it.</li>
+        <li>Thank the reviewer on my kayak’s latest review.</li>
+      </ul>
+    </div>
+    <div class="prompt">
+      <h3>Experiences and services</h3>
+      <ul>
+        <li>Add a Saturday 8 AM slot with 6 spots to my sunrise paddle tour.</li>
+        <li>Who’s booked on my tours this week?</li>
+        <li>Create a draft service: a one-hour e-bike lesson for $45.</li>
+      </ul>
+    </div>
+    <div class="prompt">
+      <h3>Fleet and gear care</h3>
+      <ul>
+        <li>How many of my e-bikes are available, rented or in maintenance?</li>
+        <li>Put e-bike #3 into maintenance.</li>
+        <li>Log a tune-up for e-bike #3 and put it back in service.</li>
+      </ul>
+    </div>
+    <div class="prompt">
+      <h3>Money and reports</h3>
+      <ul>
+        <li>How did I do this quarter? Bookings, revenue and occupancy.</li>
+        <li>Show my 2026 tax summary as a CSV.</li>
+        <li>What’s my available balance? Pay it out. <span class="chip inline">Owner</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note mt-m"><strong>Also in Splitt for ChatGPT:</strong> damage claims and extra charges, waivers and insurance policies, routes and GPX tracks, paid promotions, message templates, auto-approve and your report emails.</div>
+
+  <footer class="page-foot"><span>Splitt · ChatGPT for vendors</span><span class="num"></span></footer>
+</section>
+
+<!-- ==================================================== 8. WHO CAN DO WHAT -->
+<section class="page">
+  <header class="page-head"><img src="assets/splitt-logo-black.png" alt="Splitt"><span class="section">Access</span></header>
+
+  <p class="eyebrow">Who can do what</p>
+  <h1>ChatGPT gets your access.<br>Nothing more.</h1>
+  <p class="lede">ChatGPT works through your own Splitt seat. Splitt checks every request against the same permissions as your vendor dashboard, every time.</p>
+
+  <div class="card mt-m">
+    <table class="t roles">
+      <thead><tr><th>In ChatGPT</th><th>Owner</th><th>Manager</th><th>Staff</th></tr></thead>
+      <tbody>
+        <tr><td>Earnings, payouts and your Stripe payout account</td><td><span class="yes"></span></td><td><span class="no"></span></td><td><span class="no"></span></td></tr>
+        <tr><td>Seasonal rates and dynamic pricing</td><td><span class="yes"></span></td><td><span class="yes"></span></td><td><span class="no"></span></td></tr>
+        <tr><td>Auto-approve, report emails and the tax summary</td><td><span class="yes"></span></td><td><span class="yes"></span></td><td><span class="yes"></span></td></tr>
+        <tr><td>Everything else: listings, calendar, bookings, messages, reviews, claims, experiences, fleet</td><td colspan="3" class="same">Same as your seat in the vendor dashboard</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="caption">Renter accounts get no vendor actions at all. Your role also decides what works when ChatGPT tries: if your seat can’t do something, Splitt says “Not allowed for this account” and nothing changes.</p>
+
+  <h2 class="mt-l" style="margin-bottom:4pt">What you agree to at sign-in</h2>
+  <p class="small" style="margin-bottom:9pt">The Splitt sign-in page lists twelve kinds of access, in these words. ChatGPT receives all twelve; your role still decides what actually works.</p>
+  <div class="card scopelist">
+    <ol>
+      <li>Search and read public listings, experiences, availability, prices and reviews.</li>
+      <li>See and update your account profile, settings, notifications, trust score and personalised recommendations.</li>
+      <li>See, create, change and cancel bookings you are part of as renter or as the gear owner (rentals, experiences, services), pay through Stripe links, sign waivers and complete pickup and return checks.</li>
+      <li>See and manage your saved listings, searches and trips.</li>
+      <li>Read your conversations and send messages on your behalf.</li>
+      <li>Write, edit and delete your reviews and, for vendors, respond to reviews of your listings.</li>
+      <li>Create and manage your listings, pricing, availability and vendor catalogue.</li>
+      <li>Vendor-only booking operations on your listings: incoming bookings, overdue and return status, reschedule proposals, private notes, auto-approve and booking risk.</li>
+      <li>Create and manage the experiences and schedules you host.</li>
+      <li>See your payment and transaction history and, for vendors, earnings, payouts, promotions, tax and financial reports.</li>
+      <li>File and manage claims, disputes and incidental charges.</li>
+      <li>Upload photos and documents for you.</li>
+    </ol>
+  </div>
+
+  <div class="note mt-m"><strong>Role changed?</strong> Splitt applies your new permissions within about 15 minutes. If ChatGPT still doesn’t offer a new action, open the Splitt connection on the Plugins page and select <span class="ui">Refresh</span>.</div>
+
+  <footer class="page-foot"><span>Splitt · ChatGPT for vendors</span><span class="num"></span></footer>
+</section>
+<!-- ================================================ 9. STAYING IN CONTROL -->
+<section class="page">
+  <header class="page-head"><img src="assets/splitt-logo-black.png" alt="Splitt"><span class="section">Staying in control</span></header>
+
+  <p class="eyebrow">Safety</p>
+  <h1>You decide what changes</h1>
+  <p class="lede">ChatGPT is fast, and it can misread a request. These habits keep your listings, bookings and money exactly the way you want them.</p>
+
+  <div class="grid c2 mt-l">
+    <div class="card">
+      <h3>Read the request before you confirm</h3>
+      <p class="small mt-s" style="color:var(--ink-2)">When ChatGPT asks to confirm a change, check the listing, the dates and any amount. If it isn’t what you meant, deny it and say what you want instead. ChatGPT can remember your answer for that action for the rest of the chat, so only allow that for actions you’re happy to repeat.</p>
+    </div>
+    <div class="card">
+      <h3>Cancelling costs more than it looks</h3>
+      <p class="small mt-s" style="color:var(--ink-2)">Cancel a renter’s booking and Splitt refunds them in full, whatever your policy says. The same happens if they decline new dates you proposed. A host cancellation can count toward your cancellation rate, unless you tell ChatGPT the reason is severe weather.</p>
+    </div>
+    <div class="card">
+      <h3>Messages from renters are only messages</h3>
+      <p class="small mt-s" style="color:var(--ink-2)">Splitt tells ChatGPT that text written by other people, like a renter’s message or a review, is information, not instructions. If a message asks for something (“refund me”, “change the price”), that is not your request. Never confirm an action you didn’t ask for.</p>
+    </div>
+    <div class="card">
+      <h3>Money stays on Splitt and Stripe</h3>
+      <p class="small mt-s" style="color:var(--ink-2)">Splitt never asks for a card number in the chat: a paid promotion opens Stripe’s checkout page instead. Damage claims, extra charges and payouts move real money, so ChatGPT asks you first. Payouts only go to your connected Stripe account.</p>
+    </div>
+  </div>
+
+  <div class="panel mt-l">
+    <div class="title">Key facts</div>
+    <ul>
+      <li>ChatGPT never sees your Splitt password. You type it on Splitt’s page.</li>
+      <li>Every action runs as you, with the same permission checks as the Splitt vendor dashboard.</li>
+      <li>Splitt checks every request again, on every call, even after you have signed in.</li>
+    </ul>
+    <ul>
+      <li>Access renews quietly in the background. After a few weeks without using Splitt in ChatGPT, you may be asked to sign in again.</li>
+      <li>If your role changes, ChatGPT picks it up the next time its access renews.</li>
+      <li>You can disconnect at any time (below).</li>
+    </ul>
+  </div>
+
+  <h2 class="mt-l" style="margin-bottom:9pt">Disconnect Splitt from ChatGPT</h2>
+  <div class="grid c2" style="grid-template-columns: 1fr 1fr;">
+    <div class="card numbered">
+      <div class="row"><span class="n">1</span><div><h4>In ChatGPT</h4><p>Open the <span class="ui">Plugins</span> page, open the Splitt connection and disconnect or delete it. Once it’s removed, ChatGPT can no longer use Splitt.</p></div></div>
+    </div>
+    <div class="card numbered">
+      <div class="row"><span class="n">2</span><div><h4>If you think someone else has access</h4><p>Reset your Splitt password with <span class="ui">Forgot password</span> on the Splitt sign-in page. That signs you out everywhere, and ChatGPT loses access within about 15 minutes. Then write to <strong class="nw">security@go-splitt.com</strong>.</p></div></div>
+    </div>
+  </div>
+
+  <footer class="page-foot"><span>Splitt · ChatGPT for vendors</span><span class="num"></span></footer>
+</section>
+
+<!-- ================================================== 10. HELP + REFERENCE -->
+<section class="page">
+  <header class="page-head"><img src="assets/splitt-logo-black.png" alt="Splitt"><span class="section">Help</span></header>
+
+  <p class="eyebrow">Troubleshooting</p>
+  <h1>If something doesn’t work</h1>
+  <p class="lede">Most problems come from the ChatGPT plan, the account you signed in with, or a browser blocking the sign-in window.</p>
+
+  <table class="t help mt-m">
+    <thead><tr><th style="width:2.35in">What you see</th><th>What to do</th></tr></thead>
+    <tbody>
+      <tr><td>No Developer mode switch in Settings</td><td>Check your ChatGPT plan (Plus, Pro, Business, Enterprise or Edu). On a workspace, ask your ChatGPT admin to allow it. Developer mode can’t be on while Lockdown Mode is on.</td></tr>
+      <tr><td>The Splitt sign-in window doesn’t open</td><td>Allow pop-ups for chatgpt.com, then open the Splitt connection on the Plugins page and connect again.</td></tr>
+      <tr><td>“Invalid email or password.”</td><td>Use the email and password you use on <span class="nw">go-splitt.com</span>. Splitt shows the same message for a wrong email and a wrong password, on purpose.</td></tr>
+      <tr><td>No Google or Apple button</td><td>Set a password for your Splitt account first, then sign in with your email and that password.</td></tr>
+      <tr><td>“Too many sign-in attempts from your network.”</td><td>Splitt pauses sign-in after 10 failed attempts in 10 minutes. Wait a few minutes and try again.</td></tr>
+      <tr><td>“This sign-in page has expired.”</td><td>The sign-in page stays open for 10 minutes. Go back to ChatGPT and connect again.</td></tr>
+      <tr><td>ChatGPT can’t see your listings or bookings</td><td>You may have signed in with a renter account, or your vendor account was approved after you connected (approval signs you out everywhere). Disconnect, then connect again with your vendor login.</td></tr>
+      <tr><td>“Not allowed for this account”</td><td>Your seat can’t do that. Only the owner sees earnings or requests payouts, and staff can’t change pricing rules.</td></tr>
+      <tr><td>“Splitt rejected the session”</td><td>Your Splitt session ended, for example after a password reset. Connect Splitt again in ChatGPT.</td></tr>
+      <tr><td>ChatGPT says it hit a limit</td><td>Splitt limits how many requests arrive each minute. Wait a minute and ask again, or ask for fewer things at once.</td></tr>
+      <tr><td>“You can only message a user you have booked with”</td><td>You can only message renters you already have a booking or a conversation with. Ask ChatGPT to reply in the existing conversation.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="panel ref mt-m">
+    <div class="title">Quick reference</div>
+    <div class="refgrid">
+      <div class="wide"><span class="k">Server address</span><span class="v mono">https://mcp-server-splitmygear.vercel.app/api/mcp</span></div>
+      <div><span class="k">Turn on</span><span class="v">Settings › Security and login › Developer mode</span></div>
+      <div><span class="k">Add Splitt</span><span class="v">chatgpt.com/plugins › + › Authentication: OAuth</span></div>
+      <div><span class="k">Sign in with</span><span class="v">Your Splitt vendor login, or Google or Apple</span></div>
+      <div><span class="k">Help</span><span class="v">support@go-splitt.com</span></div>
+    </div>
+  </div>
+
+  <footer class="page-foot"><span>Splitt · ChatGPT for vendors</span><span class="num"></span></footer>
+</section>
+</body>
+</html>
