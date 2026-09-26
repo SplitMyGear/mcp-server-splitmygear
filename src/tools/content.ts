@@ -1,4 +1,5 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
+import { AI_GENERATION_TIMEOUT_MS } from '@/lib/timeouts';
 import type { PostResponse } from '@/lib/api-contract';
 
 /**
@@ -40,6 +41,7 @@ export const contentTools = {
         '/ai/generate-description',
         {
           token,
+          timeoutMs: AI_GENERATION_TIMEOUT_MS,
           body: {
             category,
             name,
@@ -65,6 +67,7 @@ export const contentTools = {
     try {
       const result = await backendRequest<TitleResponse>('POST', '/ai/improve-title', {
         token,
+        timeoutMs: AI_GENERATION_TIMEOUT_MS,
         body: { currentTitle },
       });
       // On the disabled flag or any empty result, return the input unchanged.

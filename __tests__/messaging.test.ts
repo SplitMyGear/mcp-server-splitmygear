@@ -1,5 +1,6 @@
 import { messagingTools } from '../src/tools/messaging';
 import { BackendApiError } from '../src/lib/backend-client';
+import { AI_GENERATION_TIMEOUT_MS } from '../src/lib/timeouts';
 
 // sendMessage + getConversations forward the caller's JWT to the backend
 // (SPLIT-226); the backend derives the sender from the token.
@@ -111,6 +112,7 @@ describe('Messaging Tools', () => {
       expect(draft).toBe('Hi! Yes, the kayak is available.');
       expect(mockBackendRequest).toHaveBeenCalledWith('POST', '/ai/draft-message', {
         token: TOKEN,
+        timeoutMs: AI_GENERATION_TIMEOUT_MS,
         body: { context: 'is the kayak available', userRole: 'renter', tone: 'professional' },
       });
     });
@@ -120,6 +122,7 @@ describe('Messaging Tools', () => {
       await messagingTools.generateAIDraft('quick hello', 'vendor', 'casual', TOKEN);
       expect(mockBackendRequest).toHaveBeenCalledWith('POST', '/ai/draft-message', {
         token: TOKEN,
+        timeoutMs: AI_GENERATION_TIMEOUT_MS,
         body: { context: 'quick hello', userRole: 'vendor', tone: 'casual' },
       });
     });

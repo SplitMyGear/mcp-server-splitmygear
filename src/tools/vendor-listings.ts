@@ -4,6 +4,7 @@
  * Only fields from `CreateListingDto` are ever sent (the backend's global
  * ValidationPipe rejects undeclared fields with a 400).
  */
+import { AI_GENERATION_TIMEOUT_MS } from '@/lib/timeouts';
 import { call, compact, qs } from './_shared';
 
 export interface ListingInput {
@@ -72,7 +73,7 @@ export const vendorListingTools = {
     token: string,
     input: { gearType: string; brand?: string; model?: string; year?: number; location?: string; features?: string[]; vendorNotes?: string },
   ) {
-    return call('POST', '/ai/generate-listing', { token, body: compact(input) });
+    return call('POST', '/ai/generate-listing', { token, body: compact(input), timeoutMs: AI_GENERATION_TIMEOUT_MS });
   },
 
   getListingPerformance(token: string, startDate?: string, endDate?: string) {

@@ -1,4 +1,5 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
+import { AI_GENERATION_TIMEOUT_MS } from '@/lib/timeouts';
 import type { Conversation, PostResponse } from '@/lib/api-contract';
 import { call, compact, qs } from './_shared';
 
@@ -117,7 +118,7 @@ export const messagingTools = {
       const result = await backendRequest<{ draft?: string; available?: boolean; message?: string }>(
         'POST',
         '/ai/draft-message',
-        { token, body: { context, userRole, tone } },
+        { token, body: { context, userRole, tone }, timeoutMs: AI_GENERATION_TIMEOUT_MS },
       );
       if (result?.available === false) {
         return result.message || 'AI drafting is currently unavailable.';

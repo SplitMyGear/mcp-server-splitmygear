@@ -11,6 +11,7 @@
  * built with `compact()`. `null` is preserved on purpose: it is how a PATCH
  * clears a nullable rate-rule field.
  */
+import { AI_GENERATION_TIMEOUT_MS } from '@/lib/timeouts';
 import { call, compact, qs } from './_shared';
 
 export interface RateRuleInput {
@@ -107,7 +108,7 @@ export const pricingRulesApi = {
 
   /** Generate (and store) fresh per-day recommendations for the next `days` days (1..90, default 30). */
   generateRecommendations(token: string, listingId: string, days?: number) {
-    return call('POST', `/dynamic-pricing/recommendations/${listingId}`, { token, body: compact({ days }) });
+    return call('POST', `/dynamic-pricing/recommendations/${listingId}`, { token, body: compact({ days }), timeoutMs: AI_GENERATION_TIMEOUT_MS });
   },
 
   /** Overwrite the listing's live base price with the suggestion for `date` (default today). */

@@ -6,6 +6,7 @@
  * rejects undeclared fields with a 400), and every user-scoped call forwards
  * the signed-in user's own JWT.
  */
+import { AI_GENERATION_TIMEOUT_MS } from '@/lib/timeouts';
 import { call, compact, qs } from './_shared';
 
 export const SEARCH_ALERT_FREQUENCIES = ['instant', 'daily', 'weekly'] as const;
@@ -151,7 +152,7 @@ export const discoveryExtrasTools = {
 
   /** AI-written gear checklist, pro tips and budget for a trip (public, may report `available: false`). */
   generateAiTripPlan(input: AiTripPlanInput) {
-    return call('POST', '/ai/plan-trip', { body: compact(input), timeoutMs: 25_000 });
+    return call('POST', '/ai/plan-trip', { body: compact(input), timeoutMs: AI_GENERATION_TIMEOUT_MS });
   },
 
   // ── Destinations (public) ────────────────────────────────────────────────
