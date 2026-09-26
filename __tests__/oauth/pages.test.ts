@@ -9,7 +9,7 @@
  * guarded the escaper before this file existed.
  */
 export {};
-import { escapeHtml, renderConsent, renderLoginPage, renderOtpPage, renderErrorPage, PAGE_HEADERS, SIGN_IN_FORM_ACTION } from '../../src/lib/oauth/pages';
+import { escapeHtml, renderConsent, renderLoginPage, renderOtpPage, renderErrorPage, PAGE_HEADERS, pageHeaders, SIGN_IN_FORM_ACTION } from '../../src/lib/oauth/pages';
 import { TOOL_SCOPES } from '../../src/lib/oauth/scopes';
 
 const XSS = '"><script>alert(1)</script>';
@@ -135,7 +135,34 @@ describe('sign-in page response headers', () => {
     expect(csp).not.toContain('script-src'); // no scripts are served at all
     expect(PAGE_HEADERS['X-Frame-Options']).toBe('DENY');
     expect(PAGE_HEADERS['X-Content-Type-Options']).toBe('nosniff');
-    expect(PAGE_HEADERS['Referrer-Policy']).toBe('no-referrer');
+    // same-origin, not no-referrer: under no-referrer the browser sends `Origin: null`
+    // on the page's own form POST and the same-origin check refused every sign-in.
+    expect(PAGE_HEADERS['Referrer-Policy']).toBe('same-origin');
     expect(PAGE_HEADERS['Cache-Control']).toBe('no-store');
+  });
+});
+
+describe('per-request form-action (the redirect after a form POST)', () => {
+  const formAction = (h: Record<string, string>) => h['Content-Security-Policy'].split(';').map((d) => d.trim()).find((d) => d.startsWith('form-action'));
+
+  it("adds exactly the validated redirect origin, so the browser may follow the 302 back to the client", () => {
+    expect(formAction(pageHeaders('https://chatgpt.com/connector_platform_oauth_redirect?x=1'))).toBe("form-action 'self' https://chatgpt.com");
+    expect(formAction(pageHeaders('http://127.0.0.1:33418/callback'))).toBe("form-action 'self' http://127.0.0.1:33418");
+    expect(formAction(pageHeaders('http://[::1]:8080/cb'))).toBe("form-action 'self' http://[::1]:8080");
+  });
+
+  it("adds nothing for pages without a request, or for anything that is not a plain http(s) origin", () => {
+    expect(formAction(pageHeaders())).toBe("form-action 'self'");
+    expect(formAction(PAGE_HEADERS)).toBe("form-action 'self'");
+    for (const bad of ['javascript:alert(1)', 'data:text/html,x', 'myapp://cb', 'not a url', '']) {
+      expect(formAction(pageHeaders(bad))).toBe("form-action 'self'");
+    }
+  });
+
+  it('keeps the rest of the policy identical whatever the redirect', () => {
+    const withRedirect = pageHeaders('https://chatgpt.com/cb')['Content-Security-Policy'];
+    expect(withRedirect.replace(' https://chatgpt.com', '')).toBe(PAGE_HEADERS['Content-Security-Policy']);
+    expect(withRedirect).not.toContain('script-src');
+    expect(pageHeaders('https://chatgpt.com/cb')['Referrer-Policy']).toBe('same-origin');
   });
 });

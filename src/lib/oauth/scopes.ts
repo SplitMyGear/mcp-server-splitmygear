@@ -48,13 +48,26 @@ function canonical(scopes: Iterable<ToolScope>): ToolScope[] {
 }
 
 /**
+ * Standard scopes that generic OAuth/OpenID clients add on their own and that
+ * mean nothing here: `offline_access` (a refresh token is always issued) and
+ * the OpenID Connect identity scopes (this server is not an OpenID provider and
+ * issues no ID token). RFC 6749 §3.3 lets the server issue a different scope
+ * than requested, and the token response always states the real grant, so they
+ * are dropped instead of failing the whole sign-in with `invalid_scope`.
+ * (`profile` is NOT here: it is a Splitt scope.)
+ */
+const IGNORED_STANDARD_SCOPES: ReadonlySet<string> = new Set(['openid', 'offline_access', 'email']);
+
+/**
  * Parse an RFC 6749 §3.3 `scope` parameter: space-separated, case-sensitive
  * tokens. Absent or blank means "everything" with `requested: false` so the
- * caller can tell the user the app asked for full access. Any unknown value
- * is an error (the OAuth `invalid_scope` case), never silently dropped.
+ * caller can tell the user the app asked for full access; so does a request
+ * made up only of ignored standard scopes, since it names no Splitt scope.
+ * Any other unknown value is an error (the OAuth `invalid_scope` case), never
+ * silently dropped.
  */
 export function parseScopeParam(raw: string | undefined): ParsedScopeParam {
-  const tokens = (raw ?? '').split(/\s+/).filter(Boolean);
+  const tokens = (raw ?? '').split(/\s+/).filter((t) => t && !IGNORED_STANDARD_SCOPES.has(t));
   if (tokens.length === 0) return { ok: true, scopes: [...TOOL_SCOPES], requested: false };
   const unknown = tokens.filter((t) => !isToolScope(t));
   if (unknown.length) {

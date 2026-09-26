@@ -43,7 +43,7 @@ import {
   type LoginOutcome,
   type SocialProvider,
 } from './backend-auth';
-import { renderErrorPage, renderLoginPage, renderOtpPage, PAGE_HEADERS } from './pages';
+import { pageHeaders, renderErrorPage, renderLoginPage, renderOtpPage } from './pages';
 import { coerceScopes, parseScopeParam, type ToolScope } from './scopes';
 import { claimAttempt, refundAttempt } from './throttle';
 import { clientIp, isSameOriginPost, readParams, type OAuthErrorCode } from './http';
@@ -91,8 +91,13 @@ interface ChallengePayload {
   iat: number;
 }
 
-function html(body: string, status = 200): Response {
-  return new Response(body, { status, headers: PAGE_HEADERS });
+/**
+ * A hosted page. `redirectUri` is the validated client redirect of the sign-in
+ * request: pages whose form can end in a redirect there must allow that origin
+ * in `form-action` (see `pageHeaders`). Error pages pass nothing.
+ */
+function html(body: string, status = 200, redirectUri?: string): Response {
+  return new Response(body, { status, headers: pageHeaders(redirectUri) });
 }
 
 function redirectTo(base: string, params: Record<string, string | undefined>): Response {
@@ -128,13 +133,14 @@ function loginPage(rq: AuthorizeRequest, opts: { email?: string; error?: string 
       error: opts.error,
     }),
     status,
+    rq.ru,
   );
 }
 
 function otpPage(rq: AuthorizeRequest, challengeToken: string, maskedEmail: string, error?: string, email?: string): Response {
   const iat = nowSeconds();
   const chal = seal<ChallengePayload>('chal', { ct: challengeToken, me: maskedEmail, em: email, rq, iat, exp: iat + REQUEST_TTL_S });
-  return html(renderOtpPage({ challengeToken: chal, maskedEmail, error }));
+  return html(renderOtpPage({ challengeToken: chal, maskedEmail, error }), 200, rq.ru);
 }
 
 function successRedirect(rq: AuthorizeRequest, session: BackendSession): Response {

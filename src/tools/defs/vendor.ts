@@ -306,7 +306,7 @@ export const getVendorDashboard = defineTool({
 export const getVendorEarnings = defineTool({
   name: 'get_vendor_earnings',
   title: 'Earnings',
-  description: 'Lifetime and pending earnings, fees and available balance for the vendor (owner/manager seats).',
+  description: 'Lifetime and pending earnings, fees and available balance for the vendor. Vendor owner seat only (the backend grants the payouts permission to the owner).',
   access: 'vendor_finance',
   scope: 'finance',
   inputSchema: {},
@@ -317,7 +317,7 @@ export const getVendorEarnings = defineTool({
 export const getVendorPayouts = defineTool({
   name: 'get_vendor_payouts',
   title: 'Payouts',
-  description: 'Payout history (amount, fee, net, status, dates) and upcoming scheduled payouts for the vendor (owner/manager seats).',
+  description: 'Payout history (amount, fee, net, status, dates) and upcoming scheduled payouts for the vendor. Vendor owner seat only (the backend grants the payouts permission to the owner).',
   access: 'vendor_finance',
   scope: 'finance',
   inputSchema: {},

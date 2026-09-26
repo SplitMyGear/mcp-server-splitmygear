@@ -21,21 +21,66 @@ export function escapeHtml(value: string): string {
 }
 
 /**
- * `form-action 'self'` is the one that matters most on a page that carries a
+ * `form-action` is the directive that matters most on a page that carries a
  * password field: `default-src 'none'` does NOT restrict form submission, so
  * without it any injected or rewritten `<form action>` could post the
  * credentials straight to another origin. `base-uri 'none'` already blocks the
  * `<base href>` trick that would repoint a relative form action.
+ *
+ * Browsers also apply `form-action` to the REDIRECTS that follow a form
+ * submission (Chromium enforces it; CSP3 §6.3.1). A successful sign-in, the
+ * two-step code and Cancel all answer the form POST with a 302 to the
+ * client's redirect URI, so a bare `form-action 'self'` makes the browser
+ * abort that hop: the user is left on the filled-in form and the
+ * authorization code is lost, for every OAuth client. The pages that carry a
+ * form therefore allow exactly one more origin: the one of the redirect URI
+ * this request was already validated against (registered by the client,
+ * https on an allow-listed host or loopback). Nothing else is added, so a
+ * rewritten form still cannot post the password to an arbitrary origin.
  */
-export const PAGE_HEADERS: Record<string, string> = {
-  'Content-Type': 'text/html; charset=utf-8',
-  'Cache-Control': 'no-store',
-  'Content-Security-Policy':
-    "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
-  'X-Frame-Options': 'DENY',
-  'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'no-referrer',
-};
+const BASE_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; frame-ancestors 'none'";
+
+/** The serialized origin of a validated redirect URI, or undefined when it is not a plain http(s) origin. */
+function redirectOrigin(redirectUri: string | undefined): string | undefined {
+  if (!redirectUri) return undefined;
+  let origin: string;
+  try {
+    const url = new URL(redirectUri);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return undefined;
+    origin = url.origin;
+  } catch {
+    return undefined;
+  }
+  // A URL origin can never carry CSP separators, but a header is not the place to trust that.
+  return /^https?:\/\/[A-Za-z0-9.\-[\]:]+$/.test(origin) ? origin : undefined;
+}
+
+/**
+ * Headers for a hosted page. Pass the (already validated) redirect URI of the
+ * sign-in request for any page that contains a form whose submission can end
+ * in a redirect to the client.
+ *
+ * `Referrer-Policy: same-origin`, not `no-referrer`: under `no-referrer` the
+ * Fetch standard serialises the Origin of the page's own form POST as `null`,
+ * which the same-origin check on /oauth/authorize (`isSameOriginPost`) then
+ * refused, so no password sign-in could complete. `same-origin` sends the real
+ * Origin to this server and still sends nothing to any other origin, including
+ * the client the browser is redirected to afterwards.
+ */
+export function pageHeaders(redirectUri?: string): Record<string, string> {
+  const extra = redirectOrigin(redirectUri);
+  return {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Content-Security-Policy': `${BASE_CSP}; form-action 'self'${extra ? ` ${extra}` : ''}`,
+    'X-Frame-Options': 'DENY',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'same-origin',
+  };
+}
+
+/** Headers for pages without a sign-in request (error pages): form-action 'self' only. */
+export const PAGE_HEADERS: Record<string, string> = pageHeaders();
 
 /**
  * Both hosted forms post to the authorize endpoint EXPLICITLY. `action=""`
@@ -43,7 +88,7 @@ export const PAGE_HEADERS: Record<string, string> = {
  * (GET /oauth/social/callback, GET-only) renders this same sign-in page after
  * a failed provider round-trip, and the 2FA page after a successful one, so
  * the password fallback and the one-time code there used to 405. Same origin,
- * so `form-action 'self'` still holds.
+ * so `form-action 'self'` covers the form itself.
  */
 export const SIGN_IN_FORM_ACTION = '/oauth/authorize';
 

@@ -8,7 +8,7 @@
  * "insurance"); this module only stores the returned URL.
  */
 import { z } from 'zod';
-import { defineTool, fail, fromResult } from '../registry';
+import { defineTool, fail, fromResult, ok } from '../registry';
 import { complianceApi, INSURANCE_COVERAGE_TYPES, WAIVER_KINDS } from '../compliance';
 import { dateError } from '../_shared';
 import { uuid, isoDate, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, UNTRUSTED_NOTE, token } from './common';
@@ -126,22 +126,40 @@ export const deleteInsurancePolicy = defineTool({
   handler: async ({ policyId }, ctx) => fromResult(await complianceApi.deleteInsurancePolicy(token(ctx), policyId), () => ({ deleted: true, policyId })),
 });
 
+/**
+ * Where a vendor views an attached policy document. SPLIT-1475 (wave 3) removed
+ * the backend's signed-link route on purpose: a signed URL is a bearer
+ * credential anyone holding it can open for its whole lifetime, so the only
+ * way to read the document is the authenticated byte stream behind the vendor
+ * dashboard. This tool therefore confirms the policy and its document and
+ * points the vendor there; it never mints or relays a link to the file itself.
+ */
+const INSURANCE_PAGE_URL = 'https://go-splitt.com/vendor/insurance';
+
 export const getInsuranceDocumentLink = defineTool({
   name: 'get_insurance_document_link',
-  title: 'Insurance document link',
+  title: 'Where to view an insurance document',
   description:
-    'Get a short-lived signed URL to view the document attached to one of the signed-in vendor\'s insurance policies (declaration page / certificate of insurance). ' +
-    'Give the URL to the user to open in a browser; it expires after a short time, so request a fresh one when needed. Fails with Not found when the policy has no document.',
+    'Check that one of the signed-in vendor\'s insurance policies has a document attached (declaration page / certificate of insurance) and return where to view it: ' +
+    'the Insurance page of the Splitt vendor dashboard, where the vendor opens it while signed in. For security Splitt no longer issues shareable links to policy documents, ' +
+    'so never promise a direct file link. Fails with Not found when the policy does not exist or has no document.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: { policyId: uuid('insurance policy') },
   annotations: READ,
-  handler: async ({ policyId }, ctx) =>
-    fromResult(await complianceApi.getInsuranceDocumentUrl(token(ctx), policyId), (d) => ({
+  handler: async ({ policyId }, ctx) => {
+    const result = await complianceApi.listMyInsurancePolicies(token(ctx));
+    if (!result.ok) return fromResult(result);
+    const policy = (Array.isArray(result.data) ? result.data : []).find((p) => p?.id === policyId);
+    if (!policy) return fail('Not found: no insurance policy with that id on this vendor account (see list_my_insurance_policies).');
+    const hasDocument = typeof policy.hasDocument === 'boolean' ? policy.hasDocument : Boolean(policy.documentUrl);
+    if (!hasDocument) return fail('Not found: this policy has no document attached. Upload one with upload_file (folder "insurance") and update_insurance_policy.');
+    return ok({
       policyId,
-      url: d?.url ?? d,
-      note: 'This link is short-lived; request a fresh one if it has expired.',
-    })),
+      viewAt: INSURANCE_PAGE_URL,
+      note: 'Open the Insurance page of the Splitt vendor dashboard while signed in and select this policy to view its document. Splitt does not issue shareable links to policy documents.',
+    });
+  },
 });
 
 // ── Vendor waivers ───────────────────────────────────────────────────────────

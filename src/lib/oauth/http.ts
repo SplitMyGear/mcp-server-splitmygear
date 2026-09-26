@@ -102,12 +102,23 @@ export function clientIp(request: Request): string | undefined {
  * with its visitors' browsers (distributed credential guessing, login CSRF).
  * Requests without either header (non-browser clients) are allowed through;
  * they are covered by the throttles instead.
+ *
+ * `Origin: null` is what a browser sends for its OWN same-origin form POST
+ * when the page's referrer policy is `no-referrer` (Fetch standard, "append a
+ * request Origin header"). The hosted pages now send `same-origin` so the real
+ * Origin arrives, but a cached page, an intermediary that rewrites the policy,
+ * or a privacy extension can still produce `null`. It is accepted only when
+ * the browser itself vouches for the request with `Sec-Fetch-Site:
+ * same-origin`; an opaque origin from anywhere else (sandboxed frame, data:
+ * URL, cross-site page) arrives as `cross-site` or without that header and is
+ * still refused.
  */
 export function isSameOriginPost(request: Request): boolean {
   const fetchSite = request.headers.get('sec-fetch-site');
   if (fetchSite && fetchSite !== 'same-origin' && fetchSite !== 'none') return false;
   const origin = request.headers.get('origin');
   if (origin) {
+    if (origin === 'null') return fetchSite === 'same-origin';
     let requestOrigin: string;
     try {
       requestOrigin = new URL(request.url).origin;

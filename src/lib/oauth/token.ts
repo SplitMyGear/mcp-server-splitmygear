@@ -11,6 +11,20 @@ import { oauthEnabled, resourceUrl } from './config';
 import { formatScope, isSubset, parseScopeParam, type ToolScope } from './scopes';
 import { backendRefresh, AuthBridgeError, type ClientContext } from './backend-auth';
 import { json, oauthError, readParams, clientIp } from './http';
+import { resolveClient } from './client';
+
+/**
+ * The client must still be acceptable under the CURRENT redirect-host policy
+ * on every token request, not only at /oauth/authorize. Without this, narrowing
+ * `MCP_OAUTH_ALLOWED_REDIRECT_HOSTS` blocked new sign-ins but let every
+ * connection already issued to that client keep refreshing for as long as its
+ * refresh token lived, which is not the revocation lever the operator was told
+ * it is (see resolveClient).
+ */
+function clientRevoked(clientId: string): Response | null {
+  if (resolveClient(clientId)) return null;
+  return oauthError('invalid_client', 'This application is no longer allowed to connect to Splitt; connect it again', 401);
+}
 
 export async function handleTokenPost(request: Request): Promise<Response> {
   if (!oauthEnabled()) return oauthError('temporarily_unavailable', 'OAuth is not enabled on this server', 503);
@@ -43,6 +57,8 @@ async function authorizationCodeGrant(p: Record<string, string>, request: Reques
   if (p.resource !== undefined && p.resource !== (code.res ?? resourceUrl(request))) {
     return oauthError('invalid_target', 'resource does not match the authorization request');
   }
+  const revoked = clientRevoked(code.cid);
+  if (revoked) return revoked;
   if (!(await markCodeRedeemed(code.jti, code.exp))) return oauthError('invalid_grant', 'Authorization code has already been used');
 
   const tokens = issueTokens({
@@ -77,6 +93,8 @@ async function refreshTokenGrant(p: Record<string, string>, ctx: ClientContext):
   const rt = openRefreshToken(p.refresh_token);
   if (!rt) return oauthError('invalid_grant', 'Refresh token is invalid or expired');
   if (p.client_id !== rt.cid) return oauthError('invalid_grant', 'Refresh token was issued to a different client');
+  const revoked = clientRevoked(rt.cid);
+  if (revoked) return revoked;
   const scopes = narrowedScopes(p.scope, rt.scp);
   if (scopes instanceof Response) return scopes;
   try {

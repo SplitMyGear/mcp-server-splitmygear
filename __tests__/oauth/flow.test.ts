@@ -323,6 +323,99 @@ describe('OAuth 2.1 flow', () => {
     expect(loc.searchParams.get('state')).toBe('s9');
   });
 
+  it('ignores the standard offline_access / openid / email scopes instead of failing the sign-in', async () => {
+    const clientId = await registerClient();
+    const { challenge } = pkce();
+    const get = (scope: string) => authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, state: 's', code_challenge: challenge, code_challenge_method: 'S256', scope })));
+    // Mixed with Splitt scopes: only the Splitt ones are shown and granted.
+    const mixed = await get('read offline_access messaging openid');
+    expect(mixed.status).toBe(200);
+    const mixedHtml = await mixed.text();
+    expect(mixedHtml).toContain(SCOPE_DESCRIPTIONS.read);
+    expect(mixedHtml).toContain(SCOPE_DESCRIPTIONS.messaging);
+    expect(mixedHtml).not.toContain(SCOPE_DESCRIPTIONS.finance);
+    // Only standard scopes: no Splitt scope was named, so it is the full-access consent.
+    const onlyStandard = await (await get('openid offline_access email')).text();
+    expect(onlyStandard).toContain('asking for full access');
+    // Anything else unknown is still invalid_scope.
+    const bad = await get('read offline_access superuser');
+    expect(bad.status).toBe(302);
+    expect(new URL(bad.headers.get('location')!).searchParams.get('error')).toBe('invalid_scope');
+  });
+
+  it("sends a form-action that lets the browser follow the redirect back to the client, and same-origin referrers", async () => {
+    const clientId = await registerClient();
+    const { challenge } = pkce();
+    const res = await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' })));
+    expect(res.headers.get('content-security-policy')).toContain("form-action 'self' https://client.example");
+    expect(res.headers.get('referrer-policy')).toBe('same-origin');
+    const req = hidden(await res.text(), 'req');
+    // A wrong password re-renders the form: it must keep the same form-action.
+    mockBackendRequest.mockImplementation(async (_m: string, path: string) => {
+      if (path === '/users/login') { const e: any = new Error('Invalid email or password'); e.status = 401; throw e; }
+      throw new Error(`unexpected ${path}`);
+    });
+    const again = await authorizePost(form({ step: 'login', req, email: 'r@x.test', password: 'bad' }, `${BASE}/oauth/authorize`));
+    expect(again.headers.get('content-security-policy')).toContain("form-action 'self' https://client.example");
+    // Error pages carry no request and stay at form-action 'self'.
+    const unknown = await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: 'nope', redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' })));
+    expect(unknown.headers.get('content-security-policy')).toMatch(/form-action 'self'(;|$)/);
+  });
+
+  it('completes a sign-in whose form POST arrives with Origin: null from the browser itself', async () => {
+    const clientId = await registerClient();
+    const { challenge } = pkce();
+    const html = await (await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, state: 'st', code_challenge: challenge, code_challenge_method: 'S256' })))).text();
+    const req = hidden(html, 'req');
+    mockBackendRequest.mockImplementation(async (_m: string, path: string) => {
+      if (path === '/users/login') return { accessToken: backendAccess, refreshToken: 'brt-1', user: { id: 'user-1', email: 'r@x.test', role: 'renter' } };
+      throw new Error(`unexpected ${path}`);
+    });
+    const res = await authorizePost(form({ step: 'login', req, email: 'r@x.test', password: 'pw' }, `${BASE}/oauth/authorize`, { origin: 'null', 'sec-fetch-site': 'same-origin' }));
+    expect(res.status).toBe(302);
+    const loc = new URL(res.headers.get('location')!);
+    expect(loc.origin + loc.pathname).toBe(REDIRECT);
+    expect(loc.searchParams.get('code')).toBeTruthy();
+    expect(loc.searchParams.get('state')).toBe('st');
+    // Without the browser's same-origin assertion, an opaque origin is refused before the backend is asked.
+    mockBackendRequest.mockClear();
+    const opaque = await authorizePost(form({ step: 'login', req, email: 'r@x.test', password: 'pw' }, `${BASE}/oauth/authorize`, { origin: 'null', 'sec-fetch-site': 'cross-site' }));
+    expect(opaque.status).toBe(403);
+    expect(mockBackendRequest).not.toHaveBeenCalled();
+  });
+
+  it('stops issuing and refreshing tokens for a client whose redirect host is no longer allow-listed', async () => {
+    const clientId = await registerClient();
+    const { verifier, challenge } = pkce();
+    const html = await (await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' })))).text();
+    mockBackendRequest.mockImplementation(async (_m: string, path: string) => {
+      if (path === '/users/login') return { accessToken: backendAccess, refreshToken: 'brt-1', user: { id: 'user-1', email: 'r@x.test', role: 'renter' } };
+      if (path === '/auth/refresh') return { accessToken: backendAccess, refreshToken: 'brt-2', expiresIn: 900 };
+      throw new Error(`unexpected ${path}`);
+    });
+    const login = await authorizePost(form({ step: 'login', req: hidden(html, 'req'), email: 'r@x.test', password: 'pw' }, `${BASE}/oauth/authorize`));
+    const code = new URL(login.headers.get('location')!).searchParams.get('code')!;
+    const exchange = () => tokenPost(form({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT, client_id: clientId }));
+
+    // Operator narrows the allow-list between sign-in and code exchange: refused, and the code is not burned.
+    process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS = 'other.example';
+    const refused = await exchange();
+    expect(refused.status).toBe(401);
+    expect((await refused.json()).error).toBe('invalid_client');
+
+    process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS = 'client.example';
+    const tokens = await (await exchange()).json();
+    expect(tokens.refresh_token).toBeTruthy();
+
+    // ...and an existing connection stops refreshing once the host is removed, before the backend is asked.
+    process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS = 'other.example';
+    mockBackendRequest.mockClear();
+    const refresh = await tokenPost(form({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: clientId }));
+    expect(refresh.status).toBe(401);
+    expect((await refresh.json()).error).toBe('invalid_client');
+    expect(mockBackendRequest).not.toHaveBeenCalled();
+  });
+
   it('gives the operator key the read scope only (public discovery tools)', async () => {
     const res = await mcp({ 'x-api-key': 'operator' }, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} });
     expect(res.status).toBe(200);

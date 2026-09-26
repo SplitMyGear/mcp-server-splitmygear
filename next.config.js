@@ -23,10 +23,18 @@ const nextConfig = {
         headers: [
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
-          { key: 'Referrer-Policy', value: 'no-referrer' },
           { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
           { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
         ],
+      },
+      {
+        // Everything except the hosted sign-in pages. Those send
+        // `Referrer-Policy: same-origin` themselves (src/lib/oauth/pages.ts):
+        // under `no-referrer` a browser serialises the Origin of the sign-in
+        // form's own POST as `null`, and a baseline header here could override
+        // the page's value depending on the platform's header precedence.
+        source: '/((?!oauth/).*)',
+        headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
       },
     ];
   },

@@ -791,7 +791,7 @@
     },
     {
       "name": "get_insurance_document_link",
-      "description": "Insurance document link"
+      "description": "Where to view an insurance document"
     },
     {
       "name": "list_my_waivers",

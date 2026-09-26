@@ -77,8 +77,8 @@ describe('complianceApi: insurance policies', () => {
     await complianceApi.deleteInsurancePolicy(T, POLICY);
     expect(lastCall()).toMatchObject({ method: 'DELETE', path: `/insurance-policies/${POLICY}`, opts: { token: T } });
 
-    await complianceApi.getInsuranceDocumentUrl(T, POLICY);
-    expect(lastCall()).toMatchObject({ method: 'GET', path: `/insurance-policies/${POLICY}/document-url`, opts: { token: T } });
+    // SPLIT-1475 removed GET /insurance-policies/:id/document-url; nothing may call it.
+    expect(complianceApi).not.toHaveProperty('getInsuranceDocumentUrl');
   });
 
   it('returns a structured error Result instead of throwing', async () => {
@@ -218,9 +218,23 @@ describe('complianceTools defs', () => {
     const deleted = await tool('delete_insurance_policy').handler({ policyId: POLICY }, vendorCtx);
     expect(JSON.parse(text(deleted))).toEqual({ deleted: true, policyId: POLICY });
 
-    mockBackendRequest.mockResolvedValueOnce({ url: 'https://signed.example/doc.pdf?sig=1' });
+    // SPLIT-1475: no signed link exists any more; the tool confirms the document and points at the dashboard.
+    mockBackendRequest.mockResolvedValueOnce([{ id: POLICY, hasDocument: true, documentUrl: 'https://x.private.blob.vercel-storage.com/insurance/a.pdf' }]);
     const link = await tool('get_insurance_document_link').handler({ policyId: POLICY }, vendorCtx);
-    expect(JSON.parse(text(link))).toMatchObject({ policyId: POLICY, url: 'https://signed.example/doc.pdf?sig=1' });
+    expect(lastCall()).toMatchObject({ method: 'GET', path: '/insurance-policies/mine', opts: { token: T } });
+    const linkBody = JSON.parse(text(link));
+    expect(linkBody).toMatchObject({ policyId: POLICY, viewAt: 'https://go-splitt.com/vendor/insurance' });
+    expect(text(link)).not.toContain('blob.vercel-storage.com'); // the stored file location is never relayed
+
+    mockBackendRequest.mockResolvedValueOnce([{ id: POLICY, hasDocument: false }]);
+    const noDoc = await tool('get_insurance_document_link').handler({ policyId: POLICY }, vendorCtx);
+    expect(noDoc.isError).toBe(true);
+    expect(text(noDoc)).toMatch(/no document attached/);
+
+    mockBackendRequest.mockResolvedValueOnce([{ id: 'another-policy', hasDocument: true }]);
+    const missing = await tool('get_insurance_document_link').handler({ policyId: POLICY }, vendorCtx);
+    expect(missing.isError).toBe(true);
+    expect(text(missing)).toMatch(/^Not found/);
   });
 
   it('waiver management handlers forward DTO bodies and handle void deletes', async () => {

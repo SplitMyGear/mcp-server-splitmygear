@@ -52,11 +52,19 @@ export interface SignWaiverInput {
 /** GET /waivers/required returns a bare array; GET /waivers/listing/:id wraps it with the booking gate. */
 export type RequiredWaiversResponse = unknown[] | { hasRequiredWaivers: boolean; waivers: unknown[] };
 
+/** The fields of a vendor's own policy that the document tool reads (GET /insurance-policies/mine). */
+export interface InsurancePolicySummary {
+  id: string;
+  hasDocument?: boolean;
+  documentUrl?: string | null;
+  [key: string]: unknown;
+}
+
 export const complianceApi = {
   // ── Insurance policies (vendor family; /insurance-policies) ───────────────
 
   listMyInsurancePolicies(token: string) {
-    return call('GET', '/insurance-policies/mine', { token });
+    return call<InsurancePolicySummary[]>('GET', '/insurance-policies/mine', { token });
   },
 
   addInsurancePolicy(token: string, input: InsurancePolicyInput) {
@@ -74,10 +82,6 @@ export const complianceApi = {
   },
 
   /** Short-lived signed read URL for the policy document (404 when none is attached). */
-  getInsuranceDocumentUrl(token: string, policyId: string) {
-    return call<{ url: string }>('GET', `/insurance-policies/${policyId}/document-url`, { token });
-  },
-
   // ── Vendor waivers (vendor family; /vendors/waivers) ──────────────────────
 
   listMyWaivers(token: string) {
