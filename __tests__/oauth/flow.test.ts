@@ -205,7 +205,7 @@ describe('OAuth 2.1 flow', () => {
     const callRes = await mcp({ authorization: `Bearer ${tokens.access_token}` }, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'get_my_profile', arguments: {} } });
     const callBody = await callRes.json();
     expect(callBody.result.isError).toBeFalsy();
-    expect(callBody.result.content[0].text).toContain('"authenticatedVia": "oauth"');
+    expect(JSON.parse(callBody.result.content[0].text).principal.authenticatedVia).toBe('oauth');
 
     // Refresh rotates via the backend and re-wraps.
     const rotatedAccess = backendJwt({ sub: 'user-1', email: 'r@x.test', role: 'renter', exp: FUTURE + 60 });

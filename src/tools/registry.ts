@@ -28,6 +28,7 @@ import type { CallToolResult, ToolAnnotations } from '@modelcontextprotocol/sdk/
 import type { ZodRawShape, ZodTypeAny, objectOutputType } from 'zod';
 import type { PrincipalKind } from '@/middleware/auth';
 import { canActAsVendor, canBookRentals, canManageVendorPayouts, canViewVendorFinance } from '@/lib/roles';
+import { toResultText } from './result-budget';
 
 export type ToolAccess = 'public' | 'user' | 'renter' | 'vendor' | 'vendor_finance' | 'vendor_owner';
 
@@ -126,13 +127,14 @@ const ACCESS_DENIED: Record<Exclude<ToolAccess, 'public'>, string> = {
   vendor_owner: 'Only the vendor owner seat can manage Stripe Connect and payouts.',
 };
 
+/** A successful tool result: compact JSON (or the string as is), within the result budget (see result-budget). */
 export function ok(data: unknown): CallToolResult {
-  return { content: [{ type: 'text', text: typeof data === 'string' ? data : JSON.stringify(data, null, 2) }] };
+  return { content: [{ type: 'text', text: toResultText(data) }] };
 }
 
 export function fail(message: string, details?: unknown): CallToolResult {
-  const text = details === undefined ? message : `${message}\n${JSON.stringify(details, null, 2)}`;
-  return { isError: true, content: [{ type: 'text', text }] };
+  const text = details === undefined ? message : `${message}\n${toResultText(details)}`;
+  return { isError: true, content: [{ type: 'text', text: toResultText(text) }] };
 }
 
 /** Map a `Result` from the shared backend wrapper to a tool result. */
