@@ -36,7 +36,11 @@ const listingFields = {
   minRentalDays: z.number().int().min(1).optional(),
   maxRentalDays: z.number().int().min(1).optional(),
   minAge: z.number().int().min(0).optional(),
-  estimatedValue: z.number().min(0).optional().describe('Replacement value (drives protection pricing).'),
+  estimatedValue: z
+    .number()
+    .min(0)
+    .optional()
+    .describe('Replacement value in USD (drives protection pricing). Required for motorized categories: E-Bikes, Boating, Water Sports, RV and ATVs.'),
   weeklyDiscountPct: z.number().min(0).max(100).optional(),
   monthlyDiscountPct: z.number().min(0).max(100).optional(),
   quantity: z.number().int().min(1).max(100).optional().describe('How many identical units you have.'),
@@ -60,7 +64,7 @@ export const createListing = defineTool({
   title: 'Create a listing',
   description:
     'Create a new gear listing for the signed-in vendor. It starts UNPUBLISHED; review it, then call set_listing_published. ' +
-    'Required: name, description, category and a price (per day or per hour). Use suggest_listing_price and generate_listing_description to draft good content. ' +
+    'Required: name, description, category and a price (per day or per hour); motorized categories (E-Bikes, Boating, Water Sports, RV, ATVs) also need estimatedValue. Use suggest_listing_price and generate_listing_description to draft good content. ' +
     'Vendor onboarding must be complete (see get_vendor_onboarding_status).',
   access: 'vendor',
   scope: 'listings',
