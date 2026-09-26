@@ -198,7 +198,7 @@ let memoryByChoiceNoted = false;
 function noteMemoryByChoice(): void {
   if (memoryByChoiceNoted) return;
   memoryByChoiceNoted = true;
-  console.info(
+  console.warn(
     '[rate-limit] per-instance by configuration (MCP_RATE_LIMIT_STORE=memory); ' +
       'the shared store still backs the sign-in throttle and the authorization-code replay cache.',
   );

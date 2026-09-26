@@ -193,7 +193,7 @@ describe('Rate Limiter Middleware', () => {
       });
 
       it('never spends a store command, and still enforces the tier limit per instance', async () => {
-        const info = jest.spyOn(console, 'info').mockImplementation(() => {});
+        const warn = console.warn as jest.Mock;
         const limit = RATE_LIMITS.public.requestsPerMinute;
         const req = new NextRequest('http://localhost/api/mcp');
         const userId = `user-memory-${Math.random()}`;
@@ -204,14 +204,13 @@ describe('Rate Limiter Middleware', () => {
         expect(refused.success).toBe(false);
         expect(refused.error).toContain(`Maximum ${limit} requests per minute`);
         expect(mockFetch).not.toHaveBeenCalled();
-        // Said once per instance, and it is a note, not the missing-store warning.
-        expect(info).toHaveBeenCalledTimes(1);
-        expect(String(info.mock.calls[0][0])).toContain('MCP_RATE_LIMIT_STORE=memory');
-        expect(console.warn).not.toHaveBeenCalled();
+        // Said once per instance, and it names the setting, not a missing store.
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(String(warn.mock.calls[0][0])).toContain('MCP_RATE_LIMIT_STORE=memory');
+        expect(String(warn.mock.calls[0][0])).not.toMatch(/no shared store/i);
       });
 
       it('keeps the tool-call budget off the store too', async () => {
-        jest.spyOn(console, 'info').mockImplementation(() => {});
         const result = await toolCallRateLimiter(new NextRequest('http://localhost/api/mcp'), 3, `user-memory-tools-${Math.random()}`);
         expect(result.success).toBe(true);
         expect(mockFetch).not.toHaveBeenCalled();

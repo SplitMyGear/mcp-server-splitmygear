@@ -294,11 +294,6 @@ async function stepWindow(command: 'INCR' | 'DECR', key: string, windowSeconds: 
 }
 
 /**
- * Create `key` with a TTL only if it does not exist (`SET key 1 EX ttl NX`).
- * Returns true when this call created the key, false when it already existed,
- * `null` when the store is unavailable (use the local fallback).
- */
-/**
  * Read a counter without touching it (`GET key`). Returns 0 for a missing key,
  * `null` when the store is unavailable. Lets callers separate "check" from
  * "record" so a throttle can count failures only.
@@ -321,6 +316,11 @@ export async function getCount(key: string): Promise<number | null> {
   return count;
 }
 
+/**
+ * Create `key` with a TTL only if it does not exist (`SET key 1 EX ttl NX`).
+ * Returns true when this call created the key, false when it already existed,
+ * `null` when the store is unavailable (use the local fallback).
+ */
 export async function setIfAbsent(key: string, ttlSecondsWanted: number): Promise<boolean | null> {
   const cfg = storeConfig();
   if (!cfg) return null;
@@ -342,6 +342,42 @@ export async function setIfAbsent(key: string, ttlSecondsWanted: number): Promis
  */
 export function redeemOnce(key: string, ttlSecondsWanted: number): Promise<boolean | null> {
   return setIfAbsent(key, ttlSecondsWanted);
+}
+
+/**
+ * Keep a short-lived opaque value (`SET key value EX ttl`): true when stored,
+ * `null` when the store is unavailable. The store sees the value in the clear,
+ * so a caller holding anything sensitive encrypts it first (the refresh grace
+ * cache stores only ciphertext that the presented token itself unlocks).
+ */
+export async function putValue(key: string, value: string, ttlSecondsWanted: number): Promise<boolean | null> {
+  const cfg = storeConfig();
+  if (!cfg) return null;
+  const reply = await execute(cfg, ['SET', namespacedKey(key), value, 'EX', ttlSeconds(ttlSecondsWanted)], 'SET');
+  if (!reply) return null;
+  if (reply.error !== undefined) {
+    warnUnavailable('SET', reply.error);
+    return null;
+  }
+  return reply.result === 'OK';
+}
+
+/** Read a value kept by `putValue`: the string, `undefined` when absent or expired, `null` when the store is unavailable. */
+export async function getValue(key: string): Promise<string | undefined | null> {
+  const cfg = storeConfig();
+  if (!cfg) return null;
+  const reply = await execute(cfg, ['GET', namespacedKey(key)], 'GET');
+  if (!reply) return null;
+  if (reply.error !== undefined) {
+    warnUnavailable('GET', reply.error);
+    return null;
+  }
+  if (reply.result === null || reply.result === undefined) return undefined;
+  if (typeof reply.result !== 'string') {
+    warnUnavailable('GET', 'non-string reply');
+    return null;
+  }
+  return reply.result;
 }
 
 /** Test hook: forget both warn throttles so each test observes the first warning. */

@@ -174,9 +174,49 @@ export function resolveClient(clientId: unknown): RegisteredClient | null {
   };
 }
 
-/** Exact-match check of a redirect_uri against the registered list (RFC 6749 §3.1.2.3). */
+/**
+ * Does the client's registration cover this redirect_uri? Exact string match
+ * (RFC 6749 §3.1.2.3), with one exception: for a LOOPBACK redirect the port
+ * may differ. RFC 8252 §7.3 makes that a MUST for loopback IP redirects,
+ * because a native app binds an ephemeral port on every sign-in. Claude Code
+ * is the case that matters: it redirects to http://localhost:<port>/callback
+ * with a port that changes per session, and its client metadata document
+ * declares the portless http://localhost/callback and http://127.0.0.1/callback.
+ * Anthropic asks for the same port-agnostic match on `localhost`, which
+ * RFC 8252 §8.3 merely discourages. Scheme, host, path and query must still
+ * match exactly, so only the port is free.
+ */
 export function clientAllowsRedirect(client: RegisteredClient, redirectUri: string): boolean {
-  return client.redirect_uris.includes(redirectUri);
+  if (client.redirect_uris.includes(redirectUri)) return true;
+  const requested = loopbackRedirect(redirectUri);
+  if (!requested) return false;
+  return client.redirect_uris.some((uri) => {
+    const registered = loopbackRedirect(uri);
+    return (
+      registered !== null &&
+      registered.hostname === requested.hostname &&
+      registered.pathname === requested.pathname &&
+      registered.search === requested.search
+    );
+  });
+}
+
+/** An http:// loopback redirect URI (no credentials, no fragment), parsed; null for anything else. */
+function loopbackRedirect(value: string): URL | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'http:' || !isLoopbackHost(url.hostname)) return null;
+  if (url.hash || url.username || url.password) return null;
+  return url;
+}
+
+/** True when a redirect URI goes back to the user's own machine (the consent page warns about it). */
+export function isLoopbackRedirectUri(value: string): boolean {
+  return loopbackRedirect(value) !== null;
 }
 
 function sign(body: string): string {

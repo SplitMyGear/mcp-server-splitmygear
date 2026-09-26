@@ -102,6 +102,9 @@ const STYLES = `
   .client { background: #eef5ef; border-radius: 8px; padding: 10px 12px; margin-bottom: 18px; font-size: 14px; }
   .client b { color: #17211b; }
   .client ul { margin: 6px 0 10px; padding-left: 18px; }
+  .client summary { cursor: pointer; font-weight: 600; color: #1d5c3b; }
+  .client[open] summary { margin-bottom: 6px; }
+  .lede b { color: #17211b; }
   .client li { margin: 2px 0; }
   .full { display: block; font-weight: 600; margin-bottom: 4px; }
   label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 6px; }
@@ -123,7 +126,7 @@ const STYLES = `
     main { background: #171d19; border-color: #2a332d; }
     p, .hint, .or { color: #a8b3ab; }
     .or::before, .or::after { border-color: #2a332d; }
-    .client { background: #1f2a22; } .client b { color: #e8ede9; }
+    .client { background: #1f2a22; } .client b, .lede b { color: #e8ede9; } .client summary { color: #8fd1ad; }
     input { background: #0f1411; border-color: #3a463e; }
     .social { background: #0f1411; border-color: #3a463e; color: #e8ede9; }
     .social:hover { background: #1f2a22; }
@@ -156,6 +159,13 @@ export interface LoginPageProps {
   redirectUri: string;
   /** Loopback or operator allow-listed redirect host. */
   verified: boolean;
+  /**
+   * The redirect goes back to the user's own machine (http://localhost…):
+   * a desktop app or CLI. The MCP authorization spec asks for an extra
+   * warning here, because any local program can listen on a port and claim
+   * to be the app.
+   */
+  loopback?: boolean;
   /** Scopes the app will be granted (listed one per line on the consent card). */
   scopes: readonly ToolScope[];
   /** false when the app sent no `scope` at all, i.e. it is asking for full access. */
@@ -194,13 +204,39 @@ export function renderConsent(p: Pick<LoginPageProps, 'clientName' | 'verified' 
   return `${app} will be able to:<ul>${items}</ul>`;
 }
 
+/** Where the browser goes after sign-in, as a person reads it: the host, or "this computer" for loopback. */
+function returnPlace(redirectUri: string, loopback: boolean): string {
+  let url: URL;
+  try {
+    url = new URL(redirectUri);
+  } catch {
+    return escapeHtml(redirectUri);
+  }
+  if (loopback) return `an app on this computer (<b>${escapeHtml(url.host)}</b>)`;
+  return `<b>${escapeHtml(url.hostname)}</b>`;
+}
+
+/**
+ * The sign-in page doubles as the consent screen. Layout, top to bottom: who
+ * is asking and where the browser goes afterwards (always visible: the MCP
+ * authorization spec wants the redirect host shown clearly), any warning, the
+ * form, the social sign-in links, and the full list of what the app will be
+ * able to do, one click away so the form stays above the fold on a phone.
+ */
 export function renderLoginPage(p: LoginPageProps): string {
+  const app = `<b>${escapeHtml(p.clientName)}</b>${p.verified ? '' : ' <span class="tag">unverified app</span>'}`;
+  const warnings = [
+    p.verified ? '' : '<div class="warn">Splitt has not verified this app. Only continue if you started this sign-in yourself from an app you trust, and check the address below.</div>',
+    p.loopback
+      ? '<div class="warn">This app runs on your own computer. Only continue if you started this sign-in from an app on this device yourself.</div>'
+      : '',
+  ].join('');
   return shell(
     'Sign in',
     `<h1>Sign in to Splitt</h1>
-<p>Connect your Splitt account so this assistant can act as you.</p>
-<div class="client">${renderConsent(p)}After sign-in you will be sent to:<br><code>${escapeHtml(p.redirectUri)}</code></div>
-${p.verified ? '' : '<div class="warn">Splitt has not verified this app. Only continue if you started this sign-in yourself from an app you trust, and check the address above.</div>'}
+<p class="lede">${app} wants to use your Splitt account. After you sign in you go back to ${returnPlace(p.redirectUri, p.loopback === true)}.</p>
+${warnings}
+<details class="client"><summary>What ${escapeHtml(p.clientName)} will be able to do</summary>${renderConsent(p)}After sign-in you will be sent to:<br><code>${escapeHtml(p.redirectUri)}</code></details>
 ${p.error ? `<div class="error" role="alert">${escapeHtml(p.error)}</div>` : ''}
 <form method="post" action="${SIGN_IN_FORM_ACTION}" autocomplete="on">
 <input type="hidden" name="step" value="login">

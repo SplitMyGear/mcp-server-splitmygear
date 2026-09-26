@@ -30,6 +30,11 @@ export function authorizationServerMetadata(base: string) {
     revocation_endpoint: `${base}/oauth/revoke`,
     response_types_supported: ['code'],
     response_modes_supported: ['query'],
+    // RFC 9207: every redirect from /oauth/authorize, success or error, carries
+    // `iss` = this issuer, which lets a client that talks to several
+    // authorization servers detect a mix-up attack. ChatGPT also uses its
+    // stable redirect URI only for servers that make this promise.
+    authorization_response_iss_parameter_supported: true,
     grant_types_supported: ['authorization_code', 'refresh_token'],
     code_challenge_methods_supported: ['S256'],
     scopes_supported: [...TOOL_SCOPES],

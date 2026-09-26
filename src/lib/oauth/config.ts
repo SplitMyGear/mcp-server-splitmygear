@@ -125,6 +125,31 @@ export function resourceUrl(request?: Request): string {
 }
 
 /**
+ * Is `value` an RFC 8707 resource indicator for THIS server? The canonical
+ * value is the MCP endpoint (`resourceUrl`, what the protected-resource
+ * metadata advertises and what Claude sends). ChatGPT's documentation shows it
+ * sending the server's bare origin instead, and clients differ on a trailing
+ * slash, so both the endpoint and the origin are accepted, with or without
+ * one. This authorization server protects exactly one resource, so every form
+ * names the same audience; what must still fail is a DIFFERENT resource (a
+ * token requested for another server), a fragment, or a value that is not a URL.
+ * Host case is normalised by URL parsing; the path is compared exactly.
+ */
+export function isOwnResource(value: string, request?: Request): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.hash || url.username || url.password) return false;
+  const own = new URL(resourceUrl(request));
+  if (url.origin !== own.origin) return false;
+  const path = url.pathname.replace(/\/+$/, '');
+  return path === '' || path === own.pathname.replace(/\/+$/, '');
+}
+
+/**
  * Whether `x-real-ip` / `x-forwarded-for` may be believed. Vercel's edge
  * overwrites them with the real peer address; anywhere else they are
  * attacker-controlled unless an operator explicitly fronts the server with a

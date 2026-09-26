@@ -25,11 +25,11 @@
  */
 import crypto from 'crypto';
 import { backendBaseUrl } from '@/lib/backend-client';
-import { resolveClient, clientAllowsRedirect, isVerifiedRedirectUri } from './client';
+import { resolveClient, clientAllowsRedirect, isLoopbackRedirectUri, isVerifiedRedirectUri } from './client';
 import { isValidCodeChallenge } from './pkce';
 import { open, seal, nowSeconds } from './envelope';
 import { issueAuthorizationCode } from './tokens';
-import { resourceUrl, oauthEnabled, publicBaseUrl } from './config';
+import { isOwnResource, resourceUrl, oauthEnabled, publicBaseUrl } from './config';
 import {
   AuthBridgeError,
   backendExchangeSocialCode,
@@ -100,14 +100,22 @@ function html(body: string, status = 200, redirectUri?: string): Response {
   return new Response(body, { status, headers: pageHeaders(redirectUri) });
 }
 
-function redirectTo(base: string, params: Record<string, string | undefined>): Response {
+/**
+ * Every redirect back to the client (a code or an error) carries `iss`, this
+ * server's issuer, per RFC 9207 (advertised as
+ * `authorization_response_iss_parameter_supported`). A client that talks to
+ * several authorization servers compares it with the issuer it started with
+ * and so cannot be tricked into sending this server's code to another one.
+ */
+function redirectTo(base: string, iss: string, params: Record<string, string | undefined>): Response {
   const url = new URL(base);
   for (const [k, v] of Object.entries(params)) if (v !== undefined) url.searchParams.set(k, v);
+  url.searchParams.set('iss', iss);
   return new Response(null, { status: 302, headers: { Location: url.toString(), 'Cache-Control': 'no-store' } });
 }
 
-function redirectError(ru: string, error: OAuthErrorCode, description: string, state?: string): Response {
-  return redirectTo(ru, { error, error_description: description, state });
+function redirectError(ru: string, iss: string, error: OAuthErrorCode, description: string, state?: string): Response {
+  return redirectTo(ru, iss, { error, error_description: description, state });
 }
 
 function sealRequest(rq: AuthorizeRequest): string {
@@ -126,6 +134,7 @@ function loginPage(rq: AuthorizeRequest, opts: { email?: string; error?: string 
       clientName: rq.cn,
       redirectUri: rq.ru,
       verified: isVerifiedRedirectUri(rq.ru),
+      loopback: isLoopbackRedirectUri(rq.ru),
       scopes: coerceScopes(rq.sc),
       scopesRequested: rq.sr === true,
       providers: offeredProviders(rq),
@@ -143,7 +152,7 @@ function otpPage(rq: AuthorizeRequest, challengeToken: string, maskedEmail: stri
   return html(renderOtpPage({ challengeToken: chal, maskedEmail, error }), 200, rq.ru);
 }
 
-function successRedirect(rq: AuthorizeRequest, session: BackendSession): Response {
+function successRedirect(rq: AuthorizeRequest, session: BackendSession, iss: string): Response {
   const code = issueAuthorizationCode({
     clientId: rq.cid,
     redirectUri: rq.ru,
@@ -154,7 +163,7 @@ function successRedirect(rq: AuthorizeRequest, session: BackendSession): Respons
     backendRefreshToken: session.refreshToken,
     scopes: coerceScopes(rq.sc),
   });
-  return redirectTo(rq.ru, { code, state: rq.st });
+  return redirectTo(rq.ru, iss, { code, state: rq.st });
 }
 
 /**
@@ -162,8 +171,8 @@ function successRedirect(rq: AuthorizeRequest, session: BackendSession): Respons
  * redirect; a 2FA challenge triggers the email code (a cooldown error just
  * means one is already in flight) and renders the OTP step.
  */
-async function completeLogin(rq: AuthorizeRequest, outcome: LoginOutcome, ctx: ClientContext, email?: string): Promise<Response> {
-  if (outcome.kind === 'session') return successRedirect(rq, outcome.session);
+async function completeLogin(rq: AuthorizeRequest, outcome: LoginOutcome, ctx: ClientContext, iss: string, email?: string): Promise<Response> {
+  if (outcome.kind === 'session') return successRedirect(rq, outcome.session, iss);
   let masked = outcome.challenge.maskedEmail;
   try {
     const sent = await backendSendOtp(outcome.challenge.challengeToken, ctx);
@@ -204,21 +213,22 @@ export async function handleAuthorizeGet(request: Request): Promise<Response> {
   if (!redirectUri || !clientAllowsRedirect(client, redirectUri)) {
     return html(renderErrorPage('Invalid redirect', 'The application supplied a redirect address it did not register.'), 400);
   }
+  const iss = publicBaseUrl(request);
   const state = q('state');
   if (state !== undefined && state.length > MAX_STATE_LENGTH) {
     // Not echoed back: the whole point is that it is too long to carry around.
-    return redirectError(redirectUri, 'invalid_request', `state must be at most ${MAX_STATE_LENGTH} characters`);
+    return redirectError(redirectUri, iss, 'invalid_request', `state must be at most ${MAX_STATE_LENGTH} characters`);
   }
-  if (q('response_type') !== 'code') return redirectError(redirectUri, 'unsupported_response_type', 'response_type must be "code"', state);
+  if (q('response_type') !== 'code') return redirectError(redirectUri, iss, 'unsupported_response_type', 'response_type must be "code"', state);
   const codeChallenge = q('code_challenge');
-  if (!isValidCodeChallenge(codeChallenge)) return redirectError(redirectUri, 'invalid_request', 'A PKCE code_challenge is required', state);
-  if (q('code_challenge_method') !== 'S256') return redirectError(redirectUri, 'invalid_request', 'code_challenge_method must be S256', state);
+  if (!isValidCodeChallenge(codeChallenge)) return redirectError(redirectUri, iss, 'invalid_request', 'A PKCE code_challenge is required', state);
+  if (q('code_challenge_method') !== 'S256') return redirectError(redirectUri, iss, 'invalid_request', 'code_challenge_method must be S256', state);
   const resource = q('resource');
-  if (resource !== undefined && resource !== resourceUrl(request)) {
-    return redirectError(redirectUri, 'invalid_target', `resource must be ${resourceUrl(request)}`, state);
+  if (resource !== undefined && !isOwnResource(resource, request)) {
+    return redirectError(redirectUri, iss, 'invalid_target', `resource must be ${resourceUrl(request)}`, state);
   }
   const scope = parseScopeParam(q('scope'));
-  if (!scope.ok) return redirectError(redirectUri, 'invalid_scope', scope.error, state);
+  if (!scope.ok) return redirectError(redirectUri, iss, 'invalid_scope', scope.error, state);
 
   // Which "Continue with ..." buttons to offer: asked once per sign-in and
   // carried in the sealed request, so re-renders after a failed attempt cost
@@ -326,12 +336,13 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
   }
   const params = await readParams(request);
   const ctx = clientContext(request);
+  const iss = publicBaseUrl(request);
   const step = params.step;
 
   if (step === 'login' || step === 'cancel') {
     const rq = open<AuthorizeRequestPayload>('req', params.req);
     if (!rq) return html(renderErrorPage('Sign-in expired', EXPIRED_MESSAGE), 400);
-    if (step === 'cancel') return redirectError(rq.ru, 'access_denied', 'The user cancelled sign-in', rq.st);
+    if (step === 'cancel') return redirectError(rq.ru, iss, 'access_denied', 'The user cancelled sign-in', rq.st);
 
     const email = (params.email || '').trim();
     const password = params.password || '';
@@ -345,7 +356,7 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
       // The credentials were accepted (session or 2FA challenge): give the
       // slots back so a real sign-in never spends the failure budget.
       await attempt.refund();
-      return await completeLogin(rq, outcome, ctx, email.toLowerCase());
+      return await completeLogin(rq, outcome, ctx, iss, email.toLowerCase());
     } catch (error) {
       // A rejected attempt keeps its claims: they ARE the failure record. Only
       // now does the targeted account's budget apply (see throttleKeys).
@@ -381,7 +392,7 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
     try {
       const session = await backendVerifyOtp(chal.ct, code, ctx);
       await attempt.refund();
-      return successRedirect(chal.rq, session);
+      return successRedirect(chal.rq, session, iss);
     } catch (error) {
       if (error instanceof AuthBridgeError && error.status === 401) {
         // Challenge consumed/expired → start over with the original request intact.
@@ -604,7 +615,7 @@ export async function handleSocialCallbackGet(request: Request): Promise<Respons
   try {
     const outcome = await backendExchangeSocialCode(code, ctx);
     await attempt.refund();
-    return done(await completeLogin(rq, outcome, ctx));
+    return done(await completeLogin(rq, outcome, ctx, publicBaseUrl(request)));
   } catch (err) {
     return done(loginPage(rq, { error: bridgeErrorMessage(err, 'Sign-in failed. Please try again.') }, pageStatusFor(err)));
   }
