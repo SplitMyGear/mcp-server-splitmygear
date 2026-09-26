@@ -1,0 +1,15 @@
+{
+  "name": "splitt-chatgpt-vendor-guide",
+  "private": true,
+  "description": "Builds docs/guides/chatgpt/splitt-chatgpt-vendor-guide.pdf from guide.html with headless Chromium.",
+  "type": "module",
+  "scripts": {
+    "build": "node render.mjs guide.html ../splitt-chatgpt-vendor-guide.pdf"
+  },
+  "devDependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/manrope": "^5.3.0",
+    "playwright": "1.56.1"
+  }
+}
