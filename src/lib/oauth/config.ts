@@ -170,9 +170,11 @@ export function validIp(value: string | null | undefined): string | undefined {
 }
 
 /**
- * REQUIRED allow-list of redirect hosts for dynamic client registration
- * (`MCP_OAUTH_ALLOWED_REDIRECT_HOSTS`, comma-separated; a leading dot allows
- * subdomains, e.g. `claude.ai,.claude.com`). Loopback is always allowed.
+ * REQUIRED allow-list of redirect targets for dynamic client registration
+ * (`MCP_OAUTH_ALLOWED_REDIRECT_HOSTS`, comma-separated). An entry is a host
+ * (`claude.ai`), a host and its subdomains (`.claude.com`), or either of those
+ * followed by a path prefix (`claude.ai/api/mcp/auth_callback`), which pins
+ * registrations to that path. Loopback is always allowed.
  *
  * EMPTY MEANS DENY (SPLIT-1420). It used to mean "allow any https host", which
  * let anyone register a client called "Claude" whose redirect_uri points at
@@ -181,7 +183,39 @@ export function validIp(value: string | null | undefined): string | undefined {
  * An unset environment variable must not be what stands between a deployment
  * and an open redirector, so the default is now the safe one and an operator
  * opts IN to each host they trust.
+ *
+ * PIN THE PATH in production (RFC 9700 §4.1). Registration is open to anyone,
+ * so a host-only entry lets a stranger register ANY path on that host; if the
+ * host ever serves an open redirect, or a page whose URL other parties can
+ * read, a sign-in the stranger started would deliver the victim's code there.
+ * A path entry limits registrations to the one callback the client documents.
  */
+export interface RedirectAllowEntry {
+  /** Lowercase host, without the leading dot. */
+  host: string;
+  /** Leading dot: the host itself and any subdomain. */
+  subdomains: boolean;
+  /** Path prefix the redirect must sit under (segment boundary), or null for any path. */
+  path: string | null;
+}
+
+export function allowedRedirectEntries(): RedirectAllowEntry[] {
+  return (process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS || '')
+    .split(',')
+    // An operator may paste a full callback URL; the scheme is implied (https).
+    .map((raw) => raw.trim().replace(/^https?:\/\//i, ''))
+    .filter(Boolean)
+    .map((raw) => {
+      const slash = raw.indexOf('/');
+      const hostPart = (slash === -1 ? raw : raw.slice(0, slash)).toLowerCase();
+      const pathPart = slash === -1 ? '' : raw.slice(slash).replace(/\/+$/, '');
+      const subdomains = hostPart.startsWith('.');
+      return { host: subdomains ? hostPart.slice(1) : hostPart, subdomains, path: pathPart || null };
+    })
+    .filter((entry) => entry.host.length > 0);
+}
+
+/** The configured entries as written (for error messages and docs). */
 export function allowedRedirectHosts(): string[] {
   return (process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS || '')
     .split(',')
@@ -193,12 +227,22 @@ export function isLoopbackHost(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 }
 
-/** Is this redirect host on the operator's allow-list? (false when no list is set) */
-export function isAllowListedHost(hostname: string): boolean {
-  const host = hostname.toLowerCase();
-  return allowedRedirectHosts().some((allowed) =>
-    allowed.startsWith('.') ? host === allowed.slice(1) || host.endsWith(allowed) : host === allowed,
-  );
+/**
+ * Is this redirect on the operator's allow-list? (false when no list is set)
+ * Host rules match exactly, or as a real subdomain for a leading-dot entry;
+ * a path entry also requires the redirect's path to equal the prefix or sit
+ * below it on a segment boundary (`/connector/oauth` admits
+ * `/connector/oauth/abc`, never `/connector/oauthx`). Paths are compared as
+ * the URL parser normalises them, case-sensitively.
+ */
+export function isAllowListedRedirect(url: URL): boolean {
+  const host = url.hostname.toLowerCase();
+  return allowedRedirectEntries().some((entry) => {
+    const hostOk = host === entry.host || (entry.subdomains && host.endsWith(`.${entry.host}`));
+    if (!hostOk) return false;
+    if (entry.path === null) return true;
+    return url.pathname === entry.path || url.pathname.startsWith(`${entry.path}/`);
+  });
 }
 
 function stripTrailingSlash(value: string): string {

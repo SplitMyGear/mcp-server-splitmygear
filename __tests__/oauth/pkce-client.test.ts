@@ -80,6 +80,39 @@ describe('stateless client registration', () => {
     delete process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS;
   });
 
+  it('pins registrations to a path when an entry carries one (RFC 9700 §4.1)', () => {
+    // The production shape: the exact callbacks ChatGPT and Claude document.
+    process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS =
+      'chatgpt.com/connector_platform_oauth_redirect, chatgpt.com/connector/oauth, https://claude.ai/api/mcp/auth_callback/';
+    expect(isAllowedRedirectUri('https://chatgpt.com/connector_platform_oauth_redirect')).toBe(true);
+    expect(isAllowedRedirectUri('https://chatgpt.com/connector/oauth/abc123')).toBe(true);
+    expect(isAllowedRedirectUri('https://claude.ai/api/mcp/auth_callback')).toBe(true);
+    // Anything else on the same hosts is refused: a stranger cannot register
+    // a page that might forward the code (an open redirect, a readable URL).
+    expect(isAllowedRedirectUri('https://chatgpt.com/')).toBe(false);
+    expect(isAllowedRedirectUri('https://chatgpt.com/share/some-page')).toBe(false);
+    expect(isAllowedRedirectUri('https://chatgpt.com/connector_platform_oauth_redirect2')).toBe(false);
+    expect(isAllowedRedirectUri('https://chatgpt.com/connector/oauthx/abc')).toBe(false);
+    expect(isAllowedRedirectUri('https://claude.ai/api/mcp/other')).toBe(false);
+    // The URL parser resolves dot segments before the check, and an encoded
+    // slash is not a path separator, so neither walks out of the prefix.
+    expect(isAllowedRedirectUri('https://chatgpt.com/connector/oauth/../../share/x')).toBe(false);
+    expect(isAllowedRedirectUri('https://chatgpt.com/connector/oauth%2F..%2Fshare')).toBe(false);
+    // Paths are case-sensitive; hosts are not.
+    expect(isAllowedRedirectUri('https://CLAUDE.ai/api/mcp/auth_callback')).toBe(true);
+    expect(isAllowedRedirectUri('https://claude.ai/API/mcp/auth_callback')).toBe(false);
+    // Registration and every later use follow the same rule.
+    expect(registerClient({ client_name: 'Claude', redirect_uris: ['https://claude.ai/somewhere-else'] })).toMatchObject({ error: 'invalid_redirect_uri' });
+    const ok = registerClient({ client_name: 'Claude', redirect_uris: ['https://claude.ai/api/mcp/auth_callback'] });
+    expect('error' in ok).toBe(false);
+    // A leading dot still means "and subdomains", with or without a path.
+    process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS = '.claude.com/api/mcp';
+    expect(isAllowedRedirectUri('https://app.claude.com/api/mcp/auth_callback')).toBe(true);
+    expect(isAllowedRedirectUri('https://claude.com/api/mcp/auth_callback')).toBe(true);
+    expect(isAllowedRedirectUri('https://app.claude.com/other')).toBe(false);
+    expect(isAllowedRedirectUri('https://evilclaude.com/api/mcp/auth_callback')).toBe(false);
+  });
+
   it('DENIES every https host when no allow-list is set, and says which variable to set', () => {
     // The regression this pins: an unset MCP_OAUTH_ALLOWED_REDIRECT_HOSTS used
     // to mean "any https host may register", which let anyone register a
