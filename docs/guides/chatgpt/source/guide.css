@@ -452,7 +452,7 @@ figure { margin: 0; }
 .nw { white-space: nowrap; }
 .form .inp.mono.url { font-size: 6.6pt; letter-spacing: -0.01em; word-break: normal; overflow-wrap: normal; }
 .shot .bar .url.sans { font-family: 'Inter', sans-serif; font-size: 6.4pt; white-space: nowrap; margin-left: 5pt; }
-.otp img { width: 48%; }
+.otp img { width: 56%; }
 
 /* ---------------------------------------------------- help + reference */
 

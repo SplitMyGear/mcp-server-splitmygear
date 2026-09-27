@@ -1,6 +1,6 @@
 # Splitt in ChatGPT: vendor guide
 
-`splitt-chatgpt-vendor-guide.pdf` is a 10-page guide for Splitt vendors: how to connect ChatGPT to their Splitt account through this MCP server, what they can ask it to do, who on a team can do what, how they stay in control, and what to do when something goes wrong. It follows the house style of the Google Things to do guide (SPLIT-1581, `splitmygear-frontend/content/vendor-resources/google-things-to-do/`).
+`splitt-chatgpt-vendor-guide.pdf` is an 11-page guide for Splitt vendors: how to connect ChatGPT (and, on page 10, Claude) to their Splitt account through this MCP server, what they can ask it to do, who on a team can do what, how they stay in control, and what to do when something goes wrong. It follows the house style of the Google Things to do guide (SPLIT-1581, `splitmygear-frontend/content/vendor-resources/google-things-to-do/`).
 
 ## Status: MCP 2.0 is live; three items before this guide goes to vendors
 
@@ -13,7 +13,7 @@ MCP 2.0 (OAuth sign-in and role-aware vendor tools) has been live at `https://mc
 1. **Done (2026-09-27): MCP 2.0 shipped with its production settings.** Signing key, public URL, relay key and the shared store are set, and the sign-in fixes from #43 shipped with it (see [Sign-in blockers](#sign-in-blockers-found-before-launch-fixed-and-shipped-in-20)).
 2. **Done: ChatGPT's and Claude's redirects are allowed, and nothing else.** The allow-list pins the documented callbacks: `chatgpt.com/connector_platform_oauth_redirect`, `chatgpt.com/connector/oauth/{id}` and `claude.ai/api/mcp/auth_callback`. Claude Code signs in through a loopback address on any port.
 3. **Done: the MCP serves production** (SPLIT-1502). go-splitt.com accounts sign in, and a token from any other backend is refused.
-4. **Done: Continue with Google.** The production backend accepts the MCP sign-in page as a Google return address. Apple sign-in is not configured on the backend, so the page shows no Apple button, which the guide already reflects.
+4. **Done: Continue with Google.** The production backend accepts the MCP sign-in page as a Google return address. Apple sign-in is not configured on the backend: on 2026-09-27 `GET /api/v1/auth/providers` returned `{"google":true,"apple":false}` and the live sign-in page rendered one social button, Google. The guide shows Google only.
 5. **Done: rate limit tier `beta`.** That is 50 requests and 500 tool calls a minute per account, well above a normal ChatGPT or Claude session.
 6. **Open: connect a real vendor account from ChatGPT and from Claude**, and walk the guide page by page:
    - create the connection;
@@ -85,7 +85,7 @@ python3 check_pdf.py            # embedded fonts, no soft masks, page images in 
 
 `guide.html` is the whole document; `guide.css` holds the print design. Pages are fixed Letter-size sections, so after any copy change, look at every page image for overflow into the footer. The CSS has **no blurred shadows, filters or masks**: Skia writes a blurred `box-shadow` as a luminosity soft mask, and Apple PDFKit (Preview, iOS Files) paints its bounding box grey (frontend #844). `check_pdf.py` fails if one appears. The cover's darkening is baked into `assets/cover.jpg`, which is the go-splitt.com hero photo `public/hero/camping.jpg` cropped to Letter.
 
-The two sign-in screenshots (`assets/login-requested.png`, `assets/otp.png`) are the server's own `renderLoginPage`/`renderOtpPage` output, captured with Chromium. To refresh them after a sign-in page change, run this from a checkout of `main` with `npm install --no-save tsx`:
+The two sign-in screenshots (`assets/signin.png`, `assets/otp.png`) are the server's own `renderLoginPage`/`renderOtpPage` output, captured with Chromium. To refresh them after a sign-in page change, run this from a checkout of `main` with `npm install --no-save tsx`:
 
 ```ts
 // .render/render-pages.ts   (npx tsx --tsconfig tsconfig.json .render/render-pages.ts)
@@ -93,10 +93,10 @@ import { writeFileSync } from 'node:fs';
 import { renderLoginPage, renderOtpPage } from '@/lib/oauth/pages';
 import { TOOL_SCOPES } from '@/lib/oauth/scopes';
 
-writeFileSync('.render/login-requested.html', renderLoginPage({
-  requestToken: 'preview', clientName: 'ChatGPT', verified: true,
+writeFileSync('.render/signin.html', renderLoginPage({
+  requestToken: 'preview', clientName: 'ChatGPT', verified: true, loopback: false,
   redirectUri: 'https://chatgpt.com/connector_platform_oauth_redirect',
-  scopes: [...TOOL_SCOPES], scopesRequested: true, providers: ['google', 'apple'],
+  scopes: [...TOOL_SCOPES], scopesRequested: true, providers: ['google'],
 }));
 writeFileSync('.render/otp.html', renderOtpPage({ challengeToken: 'preview', maskedEmail: 'l***@lakesideride.co' }));
 ```
