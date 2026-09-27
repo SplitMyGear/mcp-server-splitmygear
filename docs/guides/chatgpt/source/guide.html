@@ -58,7 +58,7 @@
       <div class="icon"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
       <div class="label">Step 3</div>
       <h3>Sign in with Splitt</h3>
-      <p>Use your Splitt email and password, or Google or Apple.</p>
+      <p>Use your Splitt email and password, or Google.</p>
     </div>
     <div class="card step dark">
       <div class="icon"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z"/></svg></div>
@@ -98,7 +98,7 @@
     </div></div></div>
     <div class="card numbered"><div class="row"><span class="n">3</span><div>
       <h4>Your Splitt vendor login</h4>
-      <p>The email and password you use on <span class="nw">go-splitt.com</span>, or your Google or Apple sign-in. If two-step verification is on, keep your email open for the code.</p>
+      <p>The email and password you use on <span class="nw">go-splitt.com</span>, or your Google sign-in. If two-step verification is on, keep your email open for the code.</p>
     </div></div></div>
     <div class="card numbered"><div class="row"><span class="n">4</span><div>
       <h4>The Splitt server address</h4>
@@ -207,10 +207,10 @@
         <div class="bar"><i></i><i></i><i></i><span class="url sans">mcp-server-splitmygear.vercel.app</span></div>
         <div class="imgwrap">
           <img src="assets/login-requested.png" alt="The Splitt sign-in page as ChatGPT opens it">
-          <span class="n mark" style="top: 10.2%">1</span>
-          <span class="n mark" style="top: 65.3%">2</span>
-          <span class="n mark" style="top: 72.2%">3</span>
-          <span class="n mark" style="top: 92.2%">4</span>
+          <span class="n mark" style="top: 16.5%">1</span>
+          <span class="n mark" style="top: 27%">2</span>
+          <span class="n mark" style="top: 41%">3</span>
+          <span class="n mark" style="top: 90.6%">4</span>
         </div>
       </div>
       <figcaption class="caption">The Splitt sign-in page, from Splitt’s own code.</figcaption>
@@ -219,26 +219,26 @@
     <div>
       <div class="numbered">
         <div class="row"><span class="n">1</span><div>
-          <h4>What ChatGPT will be able to do</h4>
-          <p>Each line is one kind of access. It covers everything a Splitt account can do; your role still decides what actually works, so a manager’s seat never gains owner powers. If ChatGPT didn’t narrow its request, the card says it is asking for full access to your account. That is the same list.</p>
+          <h4>Who is asking, and where you go next</h4>
+          <p>The first line names the app and the site Splitt sends you back to. It must say <strong>chatgpt.com</strong>. If it names anything else, close the window and don’t sign in.</p>
         </div></div>
         <div class="row"><span class="n">2</span><div>
-          <h4>Where you go next</h4>
-          <p>The address must start with <code>https://chatgpt.com/</code>. If it shows anything else, close the window and don’t sign in.</p>
+          <h4>What ChatGPT will be able to do</h4>
+          <p>Open this line to see each kind of access. It covers everything a Splitt account can do; your role still decides what actually works, so a manager’s seat never gains owner powers.</p>
         </div></div>
         <div class="row"><span class="n">3</span><div>
           <h4>Your Splitt login</h4>
           <p>Enter the email and password you use on <span class="nw">go-splitt.com</span> and select <span class="ui">Continue</span>.</p>
         </div></div>
         <div class="row"><span class="n">4</span><div>
-          <h4>Google or Apple</h4>
-          <p>If you signed up with Google or Apple, use <span class="ui">Continue with Google</span> or <span class="ui">Continue with Apple</span> instead.</p>
+          <h4>Google</h4>
+          <p>If you signed up with Google, use <span class="ui">Continue with Google</span> instead.</p>
         </div></div>
       </div>
 
       <div class="card mt-m otp">
         <h3 style="margin-bottom:4pt">Two-step verification</h3>
-        <p class="small" style="color:var(--ink-2)">If it’s on for your account, Splitt emails you a one-time code. Enter it and select <span class="ui">Verify</span>. It applies to Google and Apple sign-in too.</p>
+        <p class="small" style="color:var(--ink-2)">If it’s on for your account, Splitt emails you a one-time code. Enter it and select <span class="ui">Verify</span>. It applies to Google sign-in too.</p>
         <img class="mt-s" src="assets/otp.png" alt="The Check your email step with the Verification code field">
       </div>
 
@@ -491,6 +491,67 @@
   <footer class="page-foot"><span>Splitt · ChatGPT for vendors</span><span class="num"></span></footer>
 </section>
 
+<!-- ============================================= 9b. CLAUDE -->
+<section class="page">
+  <header class="page-head"><img src="assets/splitt-logo-black.png" alt="Splitt"><span class="section">Also in Claude</span></header>
+
+  <p class="eyebrow">Prefer Claude?</p>
+  <h1>Splitt works in Claude too</h1>
+  <p class="lede">Claude connects to the same Splitt server and uses the same Splitt sign-in page, so everything in this guide about your access, confirming changes and staying safe applies there as well. It works on claude.ai, in the Claude desktop and mobile apps, and in Claude Code.</p>
+
+  <div class="grid mt-l" style="grid-template-columns: 1fr 2.95in; gap: 16pt; align-items: start;">
+    <div>
+      <div class="step-head"><span class="n">1</span><h2>Add the Splitt connector</h2></div>
+      <ol class="how">
+        <li>On <strong>claude.ai</strong>, open <span class="ui">Customize</span> and then <span class="ui">Connectors</span>.</li>
+        <li>Select <span class="ui">+</span>, then <span class="ui">Add custom connector</span>.</li>
+        <li>Name it <strong>Splitt</strong>, paste the Splitt server address from page 3 exactly, and select <span class="ui">Add</span>. Leave <span class="ui">Advanced settings</span> empty: Claude registers itself.</li>
+      </ol>
+      <p class="small mt-s">On a Team or Enterprise plan, an owner adds it once under <span class="ui">Organization settings</span> › <span class="ui">Connectors</span> › <span class="ui">Add</span> › <span class="ui">Custom</span> › <span class="ui">Web</span>, and each person then connects their own account. On the free plan you can add one custom connector.</p>
+    </div>
+    <div class="shot">
+      <div class="bar"><i></i><i></i><i></i><span class="url">claude.ai · Connectors</span></div>
+      <div class="body form">
+        <div class="lbl" style="font-size:9pt;color:var(--ink);font-weight:700;margin-bottom:9pt">Add custom connector</div>
+        <div class="field"><div class="lbl">Name</div><div class="inp">Splitt</div></div>
+        <div class="field"><div class="lbl">Remote MCP server URL</div><div class="inp mono url">https://mcp-server-splitmygear.vercel.app<wbr>/api/mcp</div></div>
+        <div class="field"><div class="lbl">Advanced settings</div><div class="inp">Leave empty</div></div>
+        <div class="btns"><span class="btn">Cancel</span><span class="btn solid">Add</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid mt-l" style="grid-template-columns: 1fr 1fr; gap: 16pt; align-items: start;">
+    <div>
+      <div class="step-head"><span class="n">2</span><h2>Connect and sign in</h2></div>
+      <ol class="how">
+        <li>Next to Splitt in <span class="ui">Connectors</span>, select <span class="ui">Connect</span>.</li>
+        <li>The Splitt sign-in page from page 5 opens. Check that it says you go back to <strong>claude.ai</strong>, then sign in with your Splitt email and password, or with Google.</li>
+      </ol>
+    </div>
+    <div>
+      <div class="step-head"><span class="n">3</span><h2>Turn it on in a chat</h2></div>
+      <ol class="how">
+        <li>In a chat, select <span class="ui">+</span>, then <span class="ui">Connectors</span>, and switch on <strong>Splitt</strong>.</li>
+        <li>Ask in plain words, the same way as in ChatGPT. Claude asks before it uses an action that changes something.</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="grid c2 mt-l" style="align-items: start;">
+    <div class="card">
+      <h3 style="margin-bottom:5pt">Choose what Claude may do</h3>
+      <p class="small" style="color:var(--ink-2)">In the Splitt connector’s settings you can switch individual actions off, or keep Claude asking before it uses them. Actions that only read are marked as such; cancelling, deleting and payouts always ask.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:5pt">Claude Code</h3>
+      <p class="small" style="color:var(--ink-2)">Run <code>claude mcp add --transport http splitt https://mcp-server-splitmygear.vercel.app/api/mcp</code>, then <code>/mcp</code> and choose Authenticate. The Splitt page warns you that the app runs on your own computer: that is expected here.</p>
+    </div>
+  </div>
+
+  <footer class="page-foot"><span>Splitt · ChatGPT for vendors</span><span class="num"></span></footer>
+</section>
+
 <!-- ================================================== 10. HELP + REFERENCE -->
 <section class="page">
   <header class="page-head"><img src="assets/splitt-logo-black.png" alt="Splitt"><span class="section">Help</span></header>
@@ -505,7 +566,7 @@
       <tr><td>No Developer mode switch in Settings</td><td>Check your ChatGPT plan (Plus, Pro, Business, Enterprise or Edu). On a workspace, ask your ChatGPT admin to allow it. Developer mode can’t be on while Lockdown Mode is on.</td></tr>
       <tr><td>The Splitt sign-in window doesn’t open</td><td>Allow pop-ups for chatgpt.com, then open the Splitt connection on the Plugins page and connect again.</td></tr>
       <tr><td>“Invalid email or password.”</td><td>Use the email and password you use on <span class="nw">go-splitt.com</span>. Splitt shows the same message for a wrong email and a wrong password, on purpose.</td></tr>
-      <tr><td>No Google or Apple button</td><td>Set a password for your Splitt account first, then sign in with your email and that password.</td></tr>
+      <tr><td>No Google button</td><td>Set a password for your Splitt account first, then sign in with your email and that password.</td></tr>
       <tr><td>“Too many sign-in attempts from your network.”</td><td>Splitt pauses sign-in after 10 failed attempts in 10 minutes. Wait a few minutes and try again.</td></tr>
       <tr><td>“This sign-in page has expired.”</td><td>The sign-in page stays open for 10 minutes. Go back to ChatGPT and connect again.</td></tr>
       <tr><td>ChatGPT can’t see your listings or bookings</td><td>You may have signed in with a renter account, or your vendor account was approved after you connected (approval signs you out everywhere). Disconnect, then connect again with your vendor login.</td></tr>
@@ -522,7 +583,7 @@
       <div class="wide"><span class="k">Server address</span><span class="v mono">https://mcp-server-splitmygear.vercel.app/api/mcp</span></div>
       <div><span class="k">Turn on</span><span class="v">Settings › Security and login › Developer mode</span></div>
       <div><span class="k">Add Splitt</span><span class="v">chatgpt.com/plugins › + › Authentication: OAuth</span></div>
-      <div><span class="k">Sign in with</span><span class="v">Your Splitt vendor login, or Google or Apple</span></div>
+      <div><span class="k">Sign in with</span><span class="v">Your Splitt vendor login, or Google</span></div>
       <div><span class="k">Help</span><span class="v">support@go-splitt.com</span></div>
     </div>
   </div>
