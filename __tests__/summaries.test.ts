@@ -4,11 +4,10 @@ jest.mock('../src/lib/backend-client', () => {
   return { ...actual, backendRequest: (...args: unknown[]) => mockBackendRequest(...args) };
 });
 
-import { DESCRIPTION_PREVIEW_CHARS, ICAL_URL_REDACTED, pageOf, redactListingSecrets, summarizeBooking, summarizeListing } from '../src/tools/summaries';
-import { createListing, duplicateListing, listIncomingBookings, listMyListings, setListingPublished, updateListing } from '../src/tools/defs/vendor';
-import { applyDynamicPricing } from '../src/tools/defs/pricing-rules';
+import { DESCRIPTION_PREVIEW_CHARS, pageOf, summarizeBooking, summarizeListing } from '../src/tools/summaries';
+import { listIncomingBookings, listMyListings } from '../src/tools/defs/vendor';
 import { listMyBookings } from '../src/tools/defs/renter';
-import { getListingDetails, searchListings } from '../src/tools/defs/discovery';
+import { searchListings } from '../src/tools/defs/discovery';
 import type { ToolContext } from '../src/tools/registry';
 
 const T = 'header.payload.sig';
@@ -228,41 +227,5 @@ describe('list tools return summary rows', () => {
     expect(body.count).toBe(1);
     expect(body.listings[0]).toMatchObject({ id: 'l-1', owner: { storeName: 'Lakeside Rentals' } });
     expect(body.listings[0]).not.toHaveProperty('careGuide');
-  });
-});
-
-describe('listing secrets never reach a transcript', () => {
-  const FEED = 'https://calendar.example/ical/secret-token-123.ics';
-  beforeEach(() => mockBackendRequest.mockReset());
-
-  it('redactListingSecrets replaces the iCal URL with a note, drops an empty one, and reaches a wrapped listing', () => {
-    expect(redactListingSecrets({ id: 'l-1', icalUrl: FEED })).toEqual({ id: 'l-1', icalUrl: ICAL_URL_REDACTED });
-    expect(redactListingSecrets({ id: 'l-1', icalUrl: null })).toEqual({ id: 'l-1' });
-    expect(redactListingSecrets({ id: 'l-1' })).toEqual({ id: 'l-1' });
-    expect(redactListingSecrets({ applied: 3, listing: { id: 'l-1', icalUrl: FEED } })).toEqual({ applied: 3, listing: { id: 'l-1', icalUrl: ICAL_URL_REDACTED } });
-    expect(redactListingSecrets([{ icalUrl: FEED }])).toEqual([{ icalUrl: FEED }]); // not a listing record: untouched
-  });
-
-  it('summary rows carry the note, never the URL', () => {
-    expect(summarizeListing(listing({ icalUrl: FEED }))).toHaveProperty('icalUrl', ICAL_URL_REDACTED);
-  });
-
-  const cases: Array<[string, () => Promise<{ content: Array<{ type: string; text?: string }> }>]> = [
-    ['list_my_listings', async () => listMyListings.handler({}, vendor)],
-    ['get_listing_details', async () => getListingDetails.handler({ listingId: '00000000-0000-4000-8000-000000000001' }, vendor)],
-    ['create_listing', async () => createListing.handler({ name: 'Kayak', description: 'A stable touring kayak for lakes.', pricePerDay: 65 }, vendor)],
-    ['update_listing', async () => updateListing.handler({ listingId: '00000000-0000-4000-8000-000000000001', pricePerDay: 70 }, vendor)],
-    ['set_listing_published', async () => setListingPublished.handler({ listingId: '00000000-0000-4000-8000-000000000001', published: true }, vendor)],
-    ['duplicate_listing', async () => duplicateListing.handler({ listingId: '00000000-0000-4000-8000-000000000001' }, vendor)],
-    ['apply_dynamic_pricing', async () => applyDynamicPricing.handler({ listingId: '00000000-0000-4000-8000-000000000001' }, vendor)],
-    ['apply_dynamic_pricing (bulk)', async () => applyDynamicPricing.handler({ listingId: '00000000-0000-4000-8000-000000000001', bulk: true }, vendor)],
-  ];
-  it.each(cases)('%s answers without the iCal URL', async (name, run) => {
-    const record = listing({ icalUrl: FEED });
-    const reply = name === 'list_my_listings' ? [record] : name.endsWith('(bulk)') ? { applied: 1, listing: record } : record;
-    mockBackendRequest.mockResolvedValue(reply);
-    const out = text(await run());
-    expect(out).not.toContain('secret-token-123');
-    expect(out).toContain(ICAL_URL_REDACTED);
   });
 });

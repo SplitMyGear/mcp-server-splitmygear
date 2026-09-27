@@ -1,7 +1,7 @@
 /** Vendor tools: listings, calendar, incoming bookings, experiences hosting, finance. Visible to the vendor family only. */
 import { z } from 'zod';
 import { defineTool, fail, fromAiResult, fromResult } from '../registry';
-import { pageOf, redactListingSecrets, summarizeBooking, summarizeListing } from '../summaries';
+import { pageOf, summarizeBooking, summarizeListing } from '../summaries';
 import { vendorListingTools } from '../vendor-listings';
 import { vendorBookingTools } from '../vendor-bookings';
 import { vendorFinanceTools } from '../vendor-finance';
@@ -83,7 +83,7 @@ export const createListing = defineTool({
   annotations: WRITE,
   handler: async (args, ctx) => {
     if (args.pricePerDay === undefined && args.pricePerHour === undefined) return fail('Provide pricePerDay (daily gear) or pricePerHour (hourly gear).');
-    return fromResult(await vendorListingTools.createListing(token(ctx), args), redactListingSecrets);
+    return fromResult(await vendorListingTools.createListing(token(ctx), args));
   },
 });
 
@@ -102,7 +102,7 @@ export const updateListing = defineTool({
   annotations: WRITE_IDEMPOTENT,
   handler: async ({ listingId, ...rest }, ctx) => {
     if (Object.values(rest).every((v) => v === undefined)) return fail('Pass at least one field to update.');
-    return fromResult(await vendorListingTools.updateListing(listingId, token(ctx), rest), redactListingSecrets);
+    return fromResult(await vendorListingTools.updateListing(listingId, token(ctx), rest));
   },
 });
 
@@ -114,7 +114,7 @@ export const setListingPublished = defineTool({
   scope: 'listings',
   inputSchema: { listingId: uuid('listing'), published: z.boolean() },
   annotations: WRITE_IDEMPOTENT,
-  handler: async ({ listingId, published }, ctx) => fromResult(await vendorListingTools.setPublished(listingId, published, token(ctx)), redactListingSecrets),
+  handler: async ({ listingId, published }, ctx) => fromResult(await vendorListingTools.setPublished(listingId, published, token(ctx))),
 });
 
 export const deleteListing = defineTool({
@@ -136,7 +136,7 @@ export const duplicateListing = defineTool({
   scope: 'listings',
   inputSchema: { listingId: uuid('listing') },
   annotations: WRITE,
-  handler: async ({ listingId }, ctx) => fromResult(await vendorListingTools.duplicateListing(listingId, token(ctx)), redactListingSecrets),
+  handler: async ({ listingId }, ctx) => fromResult(await vendorListingTools.duplicateListing(listingId, token(ctx))),
 });
 
 export const generateListingDraft = defineTool({

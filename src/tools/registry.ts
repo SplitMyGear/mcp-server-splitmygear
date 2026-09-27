@@ -30,6 +30,7 @@ import type { PrincipalKind } from '@/middleware/auth';
 import { canActAsVendor, canBookRentals, canManageVendorPayouts, canViewVendorFinance } from '@/lib/roles';
 import { aiUnavailableMessage, isAiUnavailable, type AiText, type Result } from './_shared';
 import { toResultText } from './result-budget';
+import { scrubSecrets } from './secrets';
 
 export type ToolAccess = 'public' | 'user' | 'renter' | 'vendor' | 'vendor_finance' | 'vendor_owner';
 
@@ -128,13 +129,16 @@ const ACCESS_DENIED: Record<Exclude<ToolAccess, 'public'>, string> = {
   vendor_owner: 'Only the vendor owner seat can manage Stripe Connect and payouts.',
 };
 
-/** A successful tool result: compact JSON (or the string as is), within the result budget (see result-budget). */
+/**
+ * A successful tool result: compact JSON (or the string as is), within the result budget
+ * (see result-budget), with bearer secrets replaced by a note (see secrets).
+ */
 export function ok(data: unknown): CallToolResult {
-  return { content: [{ type: 'text', text: toResultText(data) }] };
+  return { content: [{ type: 'text', text: toResultText(scrubSecrets(data)) }] };
 }
 
 export function fail(message: string, details?: unknown): CallToolResult {
-  const text = details === undefined ? message : `${message}\n${toResultText(details)}`;
+  const text = details === undefined ? message : `${message}\n${toResultText(scrubSecrets(details))}`;
   return { isError: true, content: [{ type: 'text', text: toResultText(text) }] };
 }
 

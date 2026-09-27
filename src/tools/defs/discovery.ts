@@ -1,7 +1,7 @@
 /** Public discovery tools: search, details, availability, pricing, reviews. Available to every principal. */
 import { z } from 'zod';
 import { defineTool, ok, fail, fromResult } from '../registry';
-import { redactListingSecrets, summarizeListing } from '../summaries';
+import { summarizeListing } from '../summaries';
 import { listingTools } from '../listings';
 import { pricingTools } from '../pricing';
 import { reviewTools } from '../reviews';
@@ -56,8 +56,8 @@ export const getListingDetails = defineTool({
   handler: async ({ listingId }, ctx) => {
     const listing = await listingTools.getListingDetails(listingId, ctx.token);
     if (!listing) return fail(`Listing ${listingId} was not found (it may be unpublished).`);
-    // An owner's iCal subscription URL is a bearer secret: keep it out of transcripts.
-    return ok(redactListingSecrets(listing));
+    // An owner's iCal URL is a bearer secret; ok() replaces it with a note (see secrets.ts).
+    return ok(listing);
   },
 });
 

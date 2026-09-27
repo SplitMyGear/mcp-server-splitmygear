@@ -8,7 +8,6 @@
 import { z } from 'zod';
 import { defineTool, fail, fromResult } from '../registry';
 import { pricingRulesApi } from '../pricing-rules';
-import { redactListingSecrets } from '../summaries';
 import { dateError, dateRangeError } from '../_shared';
 import { uuid, isoDate, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, LISTING_CATEGORIES, token } from './common';
 
@@ -309,13 +308,13 @@ export const applyDynamicPricing = defineTool({
   handler: async ({ listingId, bulk, date }, ctx) => {
     if (bulk) {
       if (date !== undefined) return fail('date applies to single-date apply only; drop it or set bulk=false.');
-      return fromResult(await pricingRulesApi.applySuggestedPricesBulk(token(ctx), listingId), redactListingSecrets);
+      return fromResult(await pricingRulesApi.applySuggestedPricesBulk(token(ctx), listingId));
     }
     if (date !== undefined) {
       const err = dateError('date', date);
       if (err) return fail(err);
     }
-    return fromResult(await pricingRulesApi.applySuggestedPrice(token(ctx), listingId, date), redactListingSecrets);
+    return fromResult(await pricingRulesApi.applySuggestedPrice(token(ctx), listingId, date));
   },
 });
 

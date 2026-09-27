@@ -69,34 +69,13 @@ export function summarizeBooking(booking: unknown): unknown {
   return out;
 }
 
-/** Shown instead of a listing's iCal URL, a bearer secret: anyone holding it can read the calendar. */
-export const ICAL_URL_REDACTED = '[redacted: manage calendar feeds in the Splitt dashboard]';
-
-/**
- * A listing, or a `{ listing }` wrapper such as the bulk pricing answer, with its bearer
- * secrets replaced by a note. Every tool that returns a listing record goes through this.
- * The backend rightly gives an owner their own iCal URL, but a tool result lands in an
- * LLM transcript, and a bearer URL does not belong there. get_listing_details redacted
- * it already; the list, create, update, publish, duplicate and pricing tools did not.
- */
-export function redactListingSecrets(value: unknown): unknown {
-  if (!isRow(value)) return value;
-  let out: Row = value;
-  if ('icalUrl' in out) {
-    const { icalUrl, ...rest } = out;
-    out = isEmpty(icalUrl) ? rest : { ...rest, icalUrl: ICAL_URL_REDACTED };
-  }
-  if (isRow(out.listing)) out = { ...out, listing: redactListingSecrets(out.listing) };
-  return out;
-}
-
 /** Listing fields that are long text, media lists or the owner's profile; get_listing_details returns them. */
 const LISTING_DETAIL_FIELDS = ['description', 'careGuide', 'imageUrls', 'imageFocalPoints', 'videoUrls', 'owner', 'addOns'];
 
 /** A listing as a list row: scalar fields as they are, long text and media reduced to a preview and counts. */
 export function summarizeListing(listing: unknown): unknown {
   if (!isRow(listing)) return listing;
-  const out = withoutEmpty(redactListingSecrets(listing) as Row, LISTING_DETAIL_FIELDS);
+  const out = withoutEmpty(listing, LISTING_DETAIL_FIELDS);
   const description = preview(listing.description);
   if (description) out.descriptionPreview = description;
   const images = Array.isArray(listing.imageUrls) ? listing.imageUrls : [];
