@@ -105,12 +105,33 @@ describe('stateless client registration', () => {
     expect(registerClient({ client_name: 'Claude', redirect_uris: ['https://claude.ai/somewhere-else'] })).toMatchObject({ error: 'invalid_redirect_uri' });
     const ok = registerClient({ client_name: 'Claude', redirect_uris: ['https://claude.ai/api/mcp/auth_callback'] });
     expect('error' in ok).toBe(false);
+    // Below a pinned prefix only PLAIN segments pass: nothing a destination
+    // server might decode or strip before resolving dots (security review of
+    // a0f22cb), and no port, query or user info on a pinned callback.
+    expect(isAllowedRedirectUri('https://chatgpt.com/connector/oauth/abc_123-XYZ.v2~x')).toBe(true);
+    expect(isAllowedRedirectUri('https://chatgpt.com/connector/oauth/abc/def')).toBe(true);
+    expect(isAllowedRedirectUri('https://chatgpt.com/connector/oauth/..%2F..%2Fshare')).toBe(false);
+    expect(isAllowedRedirectUri('https://chatgpt.com/connector/oauth/..%5C..%5Cshare')).toBe(false);
+    expect(isAllowedRedirectUri('https://chatgpt.com/connector/oauth/..;/..;/share')).toBe(false);
+    expect(isAllowedRedirectUri('https://chatgpt.com/connector/oauth/abc;jsessionid=1')).toBe(false);
+    expect(isAllowedRedirectUri('https://chatgpt.com/connector/oauth/')).toBe(false);
+    expect(isAllowedRedirectUri('https://claude.ai:8443/api/mcp/auth_callback')).toBe(false);
+    expect(isAllowedRedirectUri('https://claude.ai/api/mcp/auth_callback?next=https://evil.example')).toBe(false);
+    expect(isAllowedRedirectUri('https://claude.ai:443/api/mcp/auth_callback')).toBe(true); // the default port serialises away
+    // User info is refused on every redirect URI, pinned or not.
+    expect(isAllowedRedirectUri('https://user@claude.ai/api/mcp/auth_callback')).toBe(false);
+    expect(isAllowedRedirectUri('https://claude.ai@evil.example/api/mcp/auth_callback')).toBe(false);
+    expect(isAllowedRedirectUri('http://user:pw@localhost:8765/cb')).toBe(false);
     // A leading dot still means "and subdomains", with or without a path.
     process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS = '.claude.com/api/mcp';
     expect(isAllowedRedirectUri('https://app.claude.com/api/mcp/auth_callback')).toBe(true);
     expect(isAllowedRedirectUri('https://claude.com/api/mcp/auth_callback')).toBe(true);
     expect(isAllowedRedirectUri('https://app.claude.com/other')).toBe(false);
     expect(isAllowedRedirectUri('https://evilclaude.com/api/mcp/auth_callback')).toBe(false);
+    // Host-only entries keep their old, looser meaning (any path, query, port).
+    process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS = 'a.example';
+    expect(isAllowedRedirectUri('https://a.example/cb?x=1')).toBe(true);
+    expect(isAllowedRedirectUri('https://a.example:8443/any/path')).toBe(true);
   });
 
   it('DENIES every https host when no allow-list is set, and says which variable to set', () => {

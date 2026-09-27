@@ -227,13 +227,24 @@ export function isLoopbackHost(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 }
 
+/** A path segment made only of unreserved characters (RFC 3986) and not a dot segment. */
+const PLAIN_SEGMENT = /^[A-Za-z0-9._~-]+$/;
+const DOTS_ONLY = /^\.+$/;
+
 /**
  * Is this redirect on the operator's allow-list? (false when no list is set)
- * Host rules match exactly, or as a real subdomain for a leading-dot entry;
- * a path entry also requires the redirect's path to equal the prefix or sit
- * below it on a segment boundary (`/connector/oauth` admits
- * `/connector/oauth/abc`, never `/connector/oauthx`). Paths are compared as
- * the URL parser normalises them, case-sensitively.
+ * Host rules match exactly, or as a real subdomain for a leading-dot entry.
+ *
+ * A PATH entry pins more than the path, because its whole point is that no
+ * other page on the host can receive a code: the redirect must use the
+ * default port and carry no query and no user info, and its path must be
+ * the prefix itself or the prefix followed by plain segments
+ * (`/connector/oauth` admits `/connector/oauth/abc123`, never
+ * `/connector/oauthx`). "Plain" means unreserved characters only and no dot
+ * segment, which refuses what the URL parser leaves in place but a
+ * destination server might still decode or strip before resolving dots
+ * (`%2F`, `%5C`, `;` path parameters, `..`). Paths compare case-sensitively,
+ * as the parser normalises them.
  */
 export function isAllowListedRedirect(url: URL): boolean {
   const host = url.hostname.toLowerCase();
@@ -241,7 +252,13 @@ export function isAllowListedRedirect(url: URL): boolean {
     const hostOk = host === entry.host || (entry.subdomains && host.endsWith(`.${entry.host}`));
     if (!hostOk) return false;
     if (entry.path === null) return true;
-    return url.pathname === entry.path || url.pathname.startsWith(`${entry.path}/`);
+    if (url.port !== '' || url.search !== '' || url.username !== '' || url.password !== '') return false;
+    if (url.pathname === entry.path) return true;
+    if (!url.pathname.startsWith(`${entry.path}/`)) return false;
+    return url.pathname
+      .slice(entry.path.length + 1)
+      .split('/')
+      .every((segment) => PLAIN_SEGMENT.test(segment) && !DOTS_ONLY.test(segment));
   });
 }
 

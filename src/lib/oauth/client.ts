@@ -57,7 +57,9 @@ export function isAllowedRedirectUri(value: string): boolean {
   } catch {
     return false;
   }
-  if (url.hash) return false;
+  // No fragment (RFC 6749 §3.1.2) and no user info: a redirect URI has no use
+  // for credentials, and `https://claude.ai@evil.example/` is how lookalikes are built.
+  if (url.hash || url.username || url.password) return false;
   if (url.protocol === 'http:') return isLoopbackHost(url.hostname);
   if (url.protocol !== 'https:') return false;
   return isAllowListedRedirect(url);
