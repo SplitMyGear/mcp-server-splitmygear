@@ -4,7 +4,7 @@
  * destinations and category catalogue (scope `read`).
  */
 import { z } from 'zod';
-import { defineTool, fail, fromResult, ok } from '../registry';
+import { defineTool, fail, fromAiResult, fromResult, ok } from '../registry';
 import { discoveryExtrasTools as extras, POI_RECIPES, SEARCH_ALERT_FREQUENCIES } from '../discovery-extras';
 import { dateError } from '../_shared';
 import { uuid, isoDate, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, UNTRUSTED_NOTE, token, LISTING_CATEGORIES } from './common';
@@ -396,7 +396,7 @@ export const generateAiTripPlan = defineTool({
     'AI-written packing and gear plan for a trip: a trip summary, gear categories with priorities and suggested items to rent, pro tips and an estimated budget. ' +
     'Give the destination, trip length in days, group size, activities (free text, 1 to 10) and optionally the group\'s experience level. ' +
     'Prefer plan_trip for real nearby listings, weather and itinerary; use this for a narrative checklist or when plan_trip cannot geocode the place. ' +
-    'Generation takes several seconds and may return { available: false } when Splitt\'s AI is off or busy; nothing is stored.',
+    'Generation takes several seconds and nothing is stored. Fails with an explanation when Splitt\'s AI is off or busy; then use plan_trip or write the checklist yourself.',
   access: 'public',
   scope: 'read',
   inputSchema: {
@@ -407,7 +407,7 @@ export const generateAiTripPlan = defineTool({
     experienceLevel: z.enum(EXPERIENCE_LEVELS).optional().describe('Group\'s experience level; shapes the gear suggestions.'),
   },
   annotations: READ,
-  handler: async (args) => fromResult(await extras.generateAiTripPlan({ ...args, destination: args.destination.trim() })),
+  handler: async (args) => fromAiResult(await extras.generateAiTripPlan({ ...args, destination: args.destination.trim() })),
 });
 
 // ── Destinations (public) ────────────────────────────────────────────────────

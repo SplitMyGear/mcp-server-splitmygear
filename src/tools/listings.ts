@@ -55,11 +55,24 @@ export const listingTools = {
   async searchListings(filters: SearchFilters): Promise<ListingRecord[]> {
     try {
       // A natural-language query → the backend's semantic "vibe" search, which
-      // runs the embedding + match_listings pgvector RPC server-side.
+      // runs the embedding + match_listings pgvector RPC server-side. It takes
+      // the same filters as browse (SPLIT-452 dates, SPLIT-566 category /
+      // location / price): without them, any vibe hit returned gear of every
+      // category, place and price, booked or not, for a query that asked for
+      // "under $40, free July 1-3".
       if (filters.query) {
         const vibe = await backendRequest<ListingListResponse>(
           'GET',
-          `/rentals/search/vibe${qs({ q: filters.query, limit: 50 })}`,
+          `/rentals/search/vibe${qs({
+            q: filters.query,
+            category: filters.category,
+            location: filters.location,
+            minPrice: filters.minPrice,
+            maxPrice: filters.maxPrice,
+            startDate: filters.checkIn,
+            endDate: filters.checkOut,
+            limit: 50,
+          })}`,
         );
         if (Array.isArray(vibe?.data) && vibe.data.length > 0) return vibe.data;
         // Fall through to structured browse if vibe returns nothing.

@@ -1,12 +1,14 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
 import { AI_GENERATION_TIMEOUT_MS } from '@/lib/timeouts';
 import type { PostResponse } from '@/lib/api-contract';
+import { aiUnavailableMessage, isAiUnavailable, type AiText } from './_shared';
 
 /**
  * Content tools are thin clients of the backend AI (SPLIT-277). The backend owns
  * the AI provider, prompts, token budget and fallbacks. A `{ available:false }`
- * body means the backend's AI feature flag is off — surface it rather than
- * pretend success.
+ * body means the backend's AI feature flag is off. Every helper returns an
+ * `AiText`, so that case, an empty result and any error reach the model as a
+ * failure, never as text it could mistake for generated copy.
  *
  * SPLIT-635: the backend added `JwtAuthGuard` to every `/ai/*` route (SPLIT-585),
  * so these tools MUST forward the caller's JWT (like every other authenticated
@@ -34,7 +36,7 @@ export const contentTools = {
     category: string,
     keywords: string[],
     token: string,
-  ): Promise<string> {
+  ): Promise<AiText> {
     try {
       const result = await backendRequest<DescriptionResponse>(
         'POST',
@@ -51,34 +53,39 @@ export const contentTools = {
           },
         },
       );
-      if (result?.available === false) {
-        return result.message || 'AI content generation is currently unavailable.';
-      }
-      return result?.description || 'Failed to generate description.';
+      if (isAiUnavailable(result)) return { ok: false, error: aiUnavailableMessage(result) };
+      if (!result?.description) return { ok: false, error: "Splitt's AI returned no description. Write it yourself, or try again." };
+      return { ok: true, text: result.description };
     } catch (error) {
-      if (isAuthError(error)) return AUTH_REQUIRED;
-      return error instanceof BackendApiError
-        ? `Error generating description: ${error.message}`
-        : 'Error generating description.';
+      if (isAuthError(error)) return { ok: false, error: AUTH_REQUIRED };
+      return {
+        ok: false,
+        error: error instanceof BackendApiError ? `Could not generate the description: ${error.message}` : 'Could not generate the description.',
+      };
     }
   },
 
-  async improveListingTitle(currentTitle: string, token: string): Promise<string> {
+  async improveListingTitle(currentTitle: string, token: string): Promise<AiText> {
     try {
       const result = await backendRequest<TitleResponse>('POST', '/ai/improve-title', {
         token,
         timeoutMs: AI_GENERATION_TIMEOUT_MS,
         body: { currentTitle },
       });
-      // On the disabled flag or any empty result, return the input unchanged.
-      if (result?.available === false) return currentTitle;
-      return result?.title || currentTitle;
+      // Returning the input unchanged here once read as "this title is already
+      // as good as it gets" when nothing had run at all (SPLIT-1501).
+      if (isAiUnavailable(result)) return { ok: false, error: aiUnavailableMessage(result) };
+      if (!result?.title) return { ok: false, error: "Splitt's AI returned no title. Keep the current one or write one yourself." };
+      return { ok: true, text: result.title };
     } catch (error) {
       // An auth failure is NOT a soft "keep the original title" case — the tool
       // never ran. Surface it so the caller re-authenticates instead of
       // silently believing their title could not be improved.
-      if (isAuthError(error)) return AUTH_REQUIRED;
-      return currentTitle;
+      if (isAuthError(error)) return { ok: false, error: AUTH_REQUIRED };
+      return {
+        ok: false,
+        error: error instanceof BackendApiError ? `Could not improve the title: ${error.message}` : 'Could not improve the title.',
+      };
     }
   },
 };

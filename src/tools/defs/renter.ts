@@ -1,6 +1,7 @@
 /** Signed-in user tools: profile, notifications, rental + experience bookings, reviews, favorites, messaging. */
 import { z } from 'zod';
-import { defineTool, ok, fail, fromResult } from '../registry';
+import { defineTool, ok, fail, fromAiText, fromResult } from '../registry';
+import { pageOf, summarizeBooking } from '../summaries';
 import { accountTools } from '../account';
 import { bookingTools } from '../bookings';
 import { reviewTools } from '../reviews';
@@ -166,20 +167,24 @@ export const setBookingProtection = defineTool({
 export const listMyBookings = defineTool({
   name: 'list_my_bookings',
   title: 'List my bookings',
-  description: 'Rental bookings the signed-in user made as a renter (status, dates, listing, price, deposit/verification state). Vendors: use list_incoming_bookings for bookings on your listings.',
+  description:
+    'Rental bookings the signed-in user made as a renter, one summary row each: status, dates, the listing (id, name, category, timezone), price, ' +
+    'deposit and verification state (empty fields are left out). get_booking_status returns one booking in full. ' +
+    'Vendors: use list_incoming_bookings for bookings on your listings.',
   access: 'user',
   scope: 'bookings',
   inputSchema: {
     ...pagination,
-    status: z.enum(['pending', 'confirmed', 'cancelled', 'completed', 'rejected']).optional().describe('Filter by status (client-side).'),
+    status: z
+      .enum(['pending', 'confirmed', 'cancelled', 'completed', 'rejected'])
+      .optional()
+      .describe('Filter by status. Applies to the fetched page only: when the result has nextOffset, call again with that offset to see the rest.'),
   },
   annotations: READ,
-  handler: async ({ limit, offset, status }, ctx) =>
-    fromResult(await bookingTools.listMyBookings(token(ctx), limit ?? 50, offset ?? 0), (bookings) => {
-      const list = Array.isArray(bookings) ? bookings : [];
-      const filtered = status ? list.filter((b) => (b as { status?: string })?.status === status) : list;
-      return { count: filtered.length, bookings: filtered };
-    }),
+  handler: async ({ limit, offset, status }, ctx) => {
+    const page = { limit: limit ?? 50, offset: offset ?? 0, status };
+    return fromResult(await bookingTools.listMyBookings(token(ctx), page.limit, page.offset), (bookings) => pageOf('bookings', bookings, page, summarizeBooking));
+  },
 });
 
 export const getBookingStatus = defineTool({
@@ -464,7 +469,9 @@ export const markConversationRead = defineTool({
 export const generateAiMessageDraft = defineTool({
   name: 'generate_ai_message_draft',
   title: 'Draft a message',
-  description: 'Have Splitt\'s AI draft a message for the signed-in user to review before sending (e.g. a polite delay notice, a pickup reminder). Nothing is sent.',
+  description:
+    'Have Splitt\'s AI draft a message for the signed-in user to review before sending (e.g. a polite delay notice, a pickup reminder). Nothing is sent. ' +
+    'Fails with an explanation when Splitt\'s AI is unavailable; then write the message yourself.',
   access: 'user',
   scope: 'messaging',
   inputSchema: {
@@ -473,7 +480,7 @@ export const generateAiMessageDraft = defineTool({
     tone: z.string().max(40).optional().default('professional'),
   },
   annotations: READ,
-  handler: async ({ context, userRole, tone }, ctx) => ok(await messagingTools.generateAIDraft(context, userRole, tone, token(ctx))),
+  handler: async ({ context, userRole, tone }, ctx) => fromAiText(await messagingTools.generateAIDraft(context, userRole, tone, token(ctx))),
 });
 
 // ── AI content helpers (any signed-in user; the backend gates /ai/* with JWT) ──
@@ -481,7 +488,9 @@ export const generateAiMessageDraft = defineTool({
 export const generateListingDescription = defineTool({
   name: 'generate_listing_description',
   title: 'Generate listing description',
-  description: 'AI-written listing description from an item name, category and key features. Returns text for the vendor to review and use in create_listing / update_listing.',
+  description:
+    'AI-written listing description from an item name, category and key features. Returns text for the vendor to review and use in create_listing / update_listing. ' +
+    'Fails with an explanation when Splitt\'s AI is unavailable; never put that explanation in a listing.',
   access: 'user',
   scope: 'listings',
   inputSchema: {
@@ -490,18 +499,18 @@ export const generateListingDescription = defineTool({
     keywords: z.array(z.string().max(80)).max(30).describe('Key features / specs.'),
   },
   annotations: READ,
-  handler: async ({ name, category, keywords }, ctx) => ok(await contentTools.generateListingDescription(name, category, keywords, token(ctx))),
+  handler: async ({ name, category, keywords }, ctx) => fromAiText(await contentTools.generateListingDescription(name, category, keywords, token(ctx))),
 });
 
 export const improveListingTitle = defineTool({
   name: 'improve_listing_title',
   title: 'Improve listing title',
-  description: 'AI-suggested, search-friendly rewrite of a listing title.',
+  description: 'AI-suggested, search-friendly rewrite of a listing title. Fails with an explanation when Splitt\'s AI is unavailable or suggests nothing.',
   access: 'user',
   scope: 'listings',
   inputSchema: { currentTitle: z.string().min(1).max(200) },
   annotations: READ,
-  handler: async ({ currentTitle }, ctx) => ok(await contentTools.improveListingTitle(currentTitle, token(ctx))),
+  handler: async ({ currentTitle }, ctx) => fromAiText(await contentTools.improveListingTitle(currentTitle, token(ctx))),
 });
 
 export const renterTools = [

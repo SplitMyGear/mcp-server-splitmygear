@@ -43,6 +43,31 @@ describe('Listing Tools (backend REST)', () => {
       expect(mockBackendRequest.mock.calls[0][1]).toContain('/rentals/search/vibe?q=');
     });
 
+    it('forwards every structured filter to the vibe search, under the backend DTO names (SPLIT-452/566)', async () => {
+      mockBackendRequest.mockResolvedValue({ success: true, data: [{ id: 'v1' }] });
+      await listingTools.searchListings({
+        query: 'lightweight tent',
+        category: 'Camping',
+        location: 'Seattle',
+        minPrice: 10,
+        maxPrice: 40,
+        checkIn: '2026-07-01',
+        checkOut: '2026-07-03',
+      });
+      const url = new URL(`http://x${mockBackendRequest.mock.calls[0][1]}`);
+      expect(url.pathname).toBe('/rentals/search/vibe');
+      expect(Object.fromEntries(url.searchParams)).toEqual({
+        q: 'lightweight tent',
+        category: 'Camping',
+        location: 'Seattle',
+        minPrice: '10',
+        maxPrice: '40',
+        startDate: '2026-07-01',
+        endDate: '2026-07-03',
+        limit: '50',
+      });
+    });
+
     it('falls through to structured browse when vibe returns nothing', async () => {
       mockBackendRequest
         .mockResolvedValueOnce({ success: true, data: [] }) // vibe
