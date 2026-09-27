@@ -1,6 +1,7 @@
 /** Vendor tools: listings, calendar, incoming bookings, experiences hosting, finance. Visible to the vendor family only. */
 import { z } from 'zod';
-import { defineTool, fail, fromResult } from '../registry';
+import { defineTool, fail, fromAiResult, fromResult } from '../registry';
+import { pageOf, summarizeBooking, summarizeListing } from '../summaries';
 import { vendorListingTools } from '../vendor-listings';
 import { vendorBookingTools } from '../vendor-bookings';
 import { vendorFinanceTools } from '../vendor-finance';
@@ -51,12 +52,18 @@ const listingFields = {
 export const listMyListings = defineTool({
   name: 'list_my_listings',
   title: 'My listings',
-  description: 'All listings owned by the signed-in vendor, including unpublished drafts, with status, price and booking counts.',
+  description:
+    'All listings owned by the signed-in vendor, including unpublished drafts, one summary row each: id, name, category, status, moderationStatus, prices, ' +
+    'rating, image count, first image and a short descriptionPreview (empty fields are left out). ' +
+    'status: draft = not yet published (see set_listing_published), available = live, unavailable / rented / archived = not bookable now. ' +
+    'moderationStatus: pending, approved, rejected, flagged or bypassed. Open one with get_listing_details for the full record, and read it before editing: ' +
+    'never write a descriptionPreview back as the description.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: {},
   annotations: READ,
-  handler: async (_args, ctx) => fromResult(await vendorListingTools.listMyListings(token(ctx))),
+  handler: async (_args, ctx) =>
+    fromResult(await vendorListingTools.listMyListings(token(ctx)), (listings) => (Array.isArray(listings) ? listings.map(summarizeListing) : listings)),
 });
 
 export const createListing = defineTool({
@@ -135,7 +142,9 @@ export const duplicateListing = defineTool({
 export const generateListingDraft = defineTool({
   name: 'generate_listing_draft',
   title: 'AI listing draft',
-  description: 'Have Splitt\'s AI draft a complete listing (title, description, specs, category, price guidance) from a short gear description. Review, then pass the fields to create_listing.',
+  description:
+    'Have Splitt\'s AI draft a complete listing (title, description, specs, category, price guidance) from a short gear description. Review, then pass the fields to create_listing. ' +
+    'Fails with an explanation when Splitt\'s AI is unavailable; then write the listing yourself.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: {
@@ -148,7 +157,7 @@ export const generateListingDraft = defineTool({
     vendorNotes: z.string().max(2000).optional().describe('Anything else the copy should mention.'),
   },
   annotations: READ,
-  handler: async (args, ctx) => fromResult(await vendorListingTools.generateListingDraft(token(ctx), args)),
+  handler: async (args, ctx) => fromAiResult(await vendorListingTools.generateListingDraft(token(ctx), args)),
 });
 
 export const getListingPerformance = defineTool({
@@ -211,7 +220,11 @@ export const removeBlackoutDate = defineTool({
 export const listIncomingBookings = defineTool({
   name: 'list_incoming_bookings',
   title: 'Bookings on my listings',
-  description: 'Rental bookings renters have made on the signed-in vendor\'s listings (upcoming, active, overdue, completed), with renter, dates, status and payout amounts. Filter by status client-side.',
+  description:
+    'Rental bookings renters have made on the signed-in vendor\'s listings (upcoming, active, overdue, completed), one summary row each: id, status, paymentStatus, ' +
+    'dates and times, the listing (id, name, category, timezone), the renter and renter card, guests, units, totals, deposit, notes and the pending-request expiry ' +
+    '(empty fields are left out). get_booking_status returns one booking in full (price breakdown, coverage, snapshots). ' +
+    'status filters the fetched page only: when the result has nextOffset, call again with that offset to see the rest.',
   access: 'vendor',
   scope: 'vendor_bookings',
   inputSchema: {
@@ -219,12 +232,10 @@ export const listIncomingBookings = defineTool({
     status: z.enum(['pending', 'confirmed', 'cancelled', 'completed', 'rejected']).optional(),
   },
   annotations: READ,
-  handler: async ({ limit, offset, status }, ctx) =>
-    fromResult(await vendorBookingTools.listIncomingBookings(token(ctx), limit ?? 50, offset ?? 0), (bookings) => {
-      const list = Array.isArray(bookings) ? bookings : [];
-      const filtered = status ? list.filter((b) => (b as { status?: string })?.status === status) : list;
-      return { count: filtered.length, bookings: filtered };
-    }),
+  handler: async ({ limit, offset, status }, ctx) => {
+    const page = { limit: limit ?? 50, offset: offset ?? 0, status };
+    return fromResult(await vendorBookingTools.listIncomingBookings(token(ctx), page.limit, page.offset), (bookings) => pageOf('bookings', bookings, page, summarizeBooking));
+  },
 });
 
 export const setBookingReturnStatus = defineTool({
@@ -299,7 +310,9 @@ export const respondToReview = defineTool({
 export const getVendorDashboard = defineTool({
   name: 'get_vendor_dashboard',
   title: 'Vendor dashboard',
-  description: 'Key metrics for the signed-in vendor: active listings, bookings, revenue, occupancy and a revenue series (optionally for a date range).',
+  description:
+    'Activity metrics for the signed-in vendor: active listings, bookings, revenue, occupancy and a revenue series (optionally for a date range). ' +
+    'For money the vendor is owed or has been paid (balances, fees, payouts) use get_vendor_earnings and get_vendor_payouts instead.',
   access: 'vendor',
   scope: 'finance',
   inputSchema: { startDate: z.string().optional(), endDate: z.string().optional() },

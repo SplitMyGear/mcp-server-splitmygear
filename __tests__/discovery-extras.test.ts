@@ -359,7 +359,7 @@ describe('discovery-extras tool defs', () => {
     expect(JSON.parse(text(sugg))).toEqual([{ label: 'Lake Minnetonka, MN', lat: 44.9, lng: -93.6 }]);
   });
 
-  it('generate_ai_trip_plan posts the PlanTripDto publicly and passes through an unavailable response', async () => {
+  it('generate_ai_trip_plan posts the PlanTripDto publicly and reports an unavailable answer as a failure', async () => {
     mockBackendRequest.mockResolvedValueOnce({ available: false, reason: 'generation-failed', message: 'Trip planning is temporarily unavailable, please try again.' });
     const res = await generateAiTripPlan.handler({ destination: ' Yosemite National Park, CA ', duration: 3, numPeople: 2, activities: ['hiking', 'camping'], experienceLevel: 'beginner' }, anon);
     expect(lastCall()).toMatchObject({
@@ -368,7 +368,17 @@ describe('discovery-extras tool defs', () => {
       opts: { body: { destination: 'Yosemite National Park, CA', duration: 3, numPeople: 2, activities: ['hiking', 'camping'], experienceLevel: 'beginner' } },
     });
     expect(lastCall().opts.token).toBeUndefined();
-    expect(JSON.parse(text(res))).toMatchObject({ available: false, reason: 'generation-failed' });
+    // A 200 `{ available: false }` is not a plan: the model must see a failure, with the backend's reason.
+    expect(res.isError).toBe(true);
+    expect(text(res)).toBe('Nothing was generated: Trip planning is temporarily unavailable, please try again. Write it yourself, or try again later.');
+  });
+
+  it('generate_ai_trip_plan returns a generated plan as it is', async () => {
+    const plan = { tripSummary: 'Three days in Yosemite', gearCategories: [{ category: 'Shelter', priority: 'essential', items: [] }], proTips: [], estimatedBudget: 240 };
+    mockBackendRequest.mockResolvedValueOnce(plan);
+    const res = await generateAiTripPlan.handler({ destination: 'Yosemite', duration: 3, numPeople: 2, activities: ['hiking'] }, anon);
+    expect(res.isError).toBeUndefined();
+    expect(JSON.parse(text(res))).toEqual(plan);
   });
 
   it('destinations: list unwraps, get requires a slug shape and unwraps', async () => {

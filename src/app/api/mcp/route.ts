@@ -14,7 +14,7 @@ import { LISTING_CATEGORIES } from '@/tools/listing-categories';
 import { oauthEnabled, publicBaseUrl, MCP_RESOURCE_PATH } from '@/lib/oauth/config';
 
 const SERVER_NAME = 'splitmygear-mcp';
-const SERVER_VERSION = '2.0.0';
+const SERVER_VERSION = '2.0.1';
 
 /**
  * CORS: the endpoint is bearer/API-key authenticated (never cookies), so a

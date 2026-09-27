@@ -29,6 +29,30 @@ export async function call<T = unknown>(
   }
 }
 
+/**
+ * An AI text helper's outcome: the generated text, or why there is none. Never a
+ * notice dressed up as text: returning the backend's "AI is switched off" message
+ * AS the draft read to the model like a real draft, one it could paste into a
+ * listing or a message.
+ */
+export type AiText = { ok: true; text: string } | { ok: false; error: string };
+
+/**
+ * The backend's AI routes answer 200 with `{ available: false, message }` when its
+ * AI is switched off (FEATURE_AI_ENABLED, or FEATURE_AI_RENTER_ENABLED for the
+ * renter-facing routes) and, for plan-trip, when a generation produced nothing
+ * usable (`reason: 'generation-failed'`). Either way nothing was generated.
+ */
+export function isAiUnavailable(data: unknown): data is { available: false; message?: unknown } {
+  return typeof data === 'object' && data !== null && (data as { available?: unknown }).available === false;
+}
+
+/** The tool error for an `available: false` answer: what happened, then what to do instead. */
+export function aiUnavailableMessage(data: { message?: unknown }): string {
+  const why = typeof data.message === 'string' && data.message.trim() ? data.message.trim() : "Splitt's AI is unavailable right now.";
+  return `Nothing was generated: ${why} Write it yourself, or try again later.`;
+}
+
 /** Build `?a=b&c=d` from defined, non-empty values (URLSearchParams encodes everything). */
 export function qs(params: Record<string, string | number | boolean | undefined | null>): string {
   const usp = new URLSearchParams();

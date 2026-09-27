@@ -1,6 +1,7 @@
 /** Public discovery tools: search, details, availability, pricing, reviews. Available to every principal. */
 import { z } from 'zod';
 import { defineTool, ok, fail, fromResult } from '../registry';
+import { summarizeListing } from '../summaries';
 import { listingTools } from '../listings';
 import { pricingTools } from '../pricing';
 import { reviewTools } from '../reviews';
@@ -16,7 +17,7 @@ export const searchListings = defineTool({
   title: 'Search gear rentals',
   description:
     'Search Splitt gear rentals (tents, bikes, kayaks, skis, RVs, cameras…) by natural-language query and/or filters. ' +
-    'Returns matching listings with id, name, category, price per day, location and rating. ' +
+    'Returns one summary row per match: id, name, category, prices, location, rating, the vendor (owner), image count, first image and a short descriptionPreview. ' +
     'Use `query` for plain English ("lightweight 2-person tent near Seattle under $40/day"); combine with structured filters to narrow. ' +
     'Follow up with get_listing_details for full info and check_availability / get_booking_quote before booking. ' +
     UNTRUSTED_NOTE,
@@ -38,7 +39,7 @@ export const searchListings = defineTool({
       if (err) return fail(err);
     }
     const results = await listingTools.searchListings(args);
-    return ok({ count: results.length, listings: results });
+    return ok({ count: results.length, listings: results.map(summarizeListing) });
   },
 });
 

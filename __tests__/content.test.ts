@@ -31,7 +31,7 @@ describe('Content Tools (backend AI)', () => {
 
       const description = await contentTools.generateListingDescription('Bike', 'cycling', ['light', 'fast'], TOKEN);
 
-      expect(description).toBe('A great bike for fast rides.');
+      expect(description).toEqual({ ok: true, text: 'A great bike for fast rides.' });
       expect(mockBackendRequest).toHaveBeenCalledWith('POST', '/ai/generate-description', {
         token: TOKEN,
         timeoutMs: AI_GENERATION_TIMEOUT_MS,
@@ -51,20 +51,28 @@ describe('Content Tools (backend AI)', () => {
       });
     });
 
-    it('surfaces the disabled notice when the backend AI flag is off', async () => {
+    it('reports the disabled flag as a failure, never as the description (it could end up in a listing)', async () => {
       mockBackendRequest.mockResolvedValue({ available: false, message: 'AI features are currently disabled.' });
 
       const description = await contentTools.generateListingDescription('Bike', 'cycling', [], TOKEN);
 
-      expect(description).toContain('disabled');
+      expect(description).toEqual({ ok: false, error: 'Nothing was generated: AI features are currently disabled. Write it yourself, or try again later.' });
     });
 
-    it('returns a friendly error on backend failure', async () => {
+    it('reports an empty description as a failure', async () => {
+      mockBackendRequest.mockResolvedValue({ description: '' });
+
+      const description = await contentTools.generateListingDescription('Bike', 'cycling', [], TOKEN);
+
+      expect(description.ok).toBe(false);
+    });
+
+    it('reports a backend failure with its reason', async () => {
       mockBackendRequest.mockRejectedValue(new BackendApiError(500, 'boom'));
 
       const description = await contentTools.generateListingDescription('Bike', 'cycling', [], TOKEN);
 
-      expect(description).toContain('Error generating description');
+      expect(description).toEqual({ ok: false, error: 'Could not generate the description: boom' });
     });
 
     it('surfaces a re-auth error (not a silent fallback) on a 401', async () => {
@@ -72,7 +80,7 @@ describe('Content Tools (backend AI)', () => {
 
       const description = await contentTools.generateListingDescription('Bike', 'cycling', [], TOKEN);
 
-      expect(description).toMatch(/Authentication required/);
+      expect(!description.ok && description.error).toMatch(/Authentication required/);
     });
 
     it('surfaces a re-auth error on a 403', async () => {
@@ -80,7 +88,7 @@ describe('Content Tools (backend AI)', () => {
 
       const description = await contentTools.generateListingDescription('Bike', 'cycling', [], TOKEN);
 
-      expect(description).toMatch(/Authentication required/);
+      expect(!description.ok && description.error).toMatch(/Authentication required/);
     });
   });
 
@@ -90,7 +98,7 @@ describe('Content Tools (backend AI)', () => {
 
       const title = await contentTools.improveListingTitle('Old Title', TOKEN);
 
-      expect(title).toBe('Pro Lightweight Road Bike');
+      expect(title).toEqual({ ok: true, text: 'Pro Lightweight Road Bike' });
       expect(mockBackendRequest).toHaveBeenCalledWith('POST', '/ai/improve-title', {
         token: TOKEN,
         timeoutMs: AI_GENERATION_TIMEOUT_MS,
@@ -98,20 +106,29 @@ describe('Content Tools (backend AI)', () => {
       });
     });
 
-    it('returns the original title when the backend AI flag is off', async () => {
+    // Returning the input unchanged read as "this title cannot be improved" when nothing had run (SPLIT-1501).
+    it('reports the disabled flag as a failure instead of echoing the original title', async () => {
       mockBackendRequest.mockResolvedValue({ available: false });
 
       const title = await contentTools.improveListingTitle('Original Title', TOKEN);
 
-      expect(title).toBe('Original Title');
+      expect(title).toEqual({ ok: false, error: "Nothing was generated: Splitt's AI is unavailable right now. Write it yourself, or try again later." });
     });
 
-    it('returns the original title on a non-auth backend failure', async () => {
+    it('reports an empty suggestion as a failure', async () => {
+      mockBackendRequest.mockResolvedValue({ title: '' });
+
+      const title = await contentTools.improveListingTitle('Original Title', TOKEN);
+
+      expect(title.ok).toBe(false);
+    });
+
+    it('reports a non-auth backend failure instead of echoing the original title', async () => {
       mockBackendRequest.mockRejectedValue(new Error('network'));
 
       const title = await contentTools.improveListingTitle('Original Title', TOKEN);
 
-      expect(title).toBe('Original Title');
+      expect(title).toEqual({ ok: false, error: 'Could not improve the title.' });
     });
 
     it('surfaces a re-auth error (not the unchanged title) on a 401', async () => {
@@ -119,8 +136,8 @@ describe('Content Tools (backend AI)', () => {
 
       const title = await contentTools.improveListingTitle('Original Title', TOKEN);
 
-      expect(title).toMatch(/Authentication required/);
-      expect(title).not.toBe('Original Title');
+      expect(title.ok).toBe(false);
+      expect(!title.ok && title.error).toMatch(/Authentication required/);
     });
 
     it('surfaces a re-auth error on a 403', async () => {
@@ -128,7 +145,7 @@ describe('Content Tools (backend AI)', () => {
 
       const title = await contentTools.improveListingTitle('Original Title', TOKEN);
 
-      expect(title).toMatch(/Authentication required/);
+      expect(!title.ok && title.error).toMatch(/Authentication required/);
     });
   });
 });

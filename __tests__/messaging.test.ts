@@ -1,6 +1,8 @@
 import { messagingTools } from '../src/tools/messaging';
 import { BackendApiError } from '../src/lib/backend-client';
 import { AI_GENERATION_TIMEOUT_MS } from '../src/lib/timeouts';
+import { generateAiMessageDraft } from '../src/tools/defs/renter';
+import type { ToolContext } from '../src/tools/registry';
 
 // sendMessage + getConversations forward the caller's JWT to the backend
 // (SPLIT-226); the backend derives the sender from the token.
@@ -109,7 +111,7 @@ describe('Messaging Tools', () => {
     it('returns the backend-drafted message and forwards the token', async () => {
       mockBackendRequest.mockResolvedValue({ draft: 'Hi! Yes, the kayak is available.' });
       const draft = await messagingTools.generateAIDraft('is the kayak available', 'renter', 'professional', TOKEN);
-      expect(draft).toBe('Hi! Yes, the kayak is available.');
+      expect(draft).toEqual({ ok: true, text: 'Hi! Yes, the kayak is available.' });
       expect(mockBackendRequest).toHaveBeenCalledWith('POST', '/ai/draft-message', {
         token: TOKEN,
         timeoutMs: AI_GENERATION_TIMEOUT_MS,
@@ -127,29 +129,54 @@ describe('Messaging Tools', () => {
       });
     });
 
-    it('surfaces the disabled notice when the backend AI flag is off', async () => {
+    it('reports the disabled flag as a failure, never as the draft', async () => {
       mockBackendRequest.mockResolvedValue({ available: false, message: 'AI features are currently disabled.' });
       const draft = await messagingTools.generateAIDraft('context', 'renter', 'professional', TOKEN);
-      expect(draft).toContain('disabled');
+      expect(draft).toEqual({ ok: false, error: 'Nothing was generated: AI features are currently disabled. Write it yourself, or try again later.' });
     });
 
-    it('returns an error string on a non-auth backend failure', async () => {
+    it('reports an empty draft as a failure', async () => {
+      mockBackendRequest.mockResolvedValue({ draft: '' });
+      const draft = await messagingTools.generateAIDraft('context', 'renter', 'professional', TOKEN);
+      expect(draft.ok).toBe(false);
+    });
+
+    it('reports a non-auth backend failure with its reason', async () => {
       mockBackendRequest.mockRejectedValue(new BackendApiError(500, 'boom'));
       const draft = await messagingTools.generateAIDraft('context', 'renter', 'professional', TOKEN);
-      expect(draft).toBe('Error generating draft.');
+      expect(draft).toEqual({ ok: false, error: 'Could not draft the message: boom' });
     });
 
     it('surfaces a re-auth error (not a silent template fallback) on a 401', async () => {
       mockBackendRequest.mockRejectedValue(new BackendApiError(401, 'Unauthorized'));
       const draft = await messagingTools.generateAIDraft('context', 'renter', 'professional', TOKEN);
-      expect(draft).toMatch(/Authentication required/);
-      expect(draft).not.toBe('Error generating draft.');
+      expect(draft.ok).toBe(false);
+      expect(!draft.ok && draft.error).toMatch(/Authentication required/);
     });
 
     it('surfaces a re-auth error on a 403', async () => {
       mockBackendRequest.mockRejectedValue(new BackendApiError(403, 'Forbidden'));
       const draft = await messagingTools.generateAIDraft('context', 'vendor', 'professional', TOKEN);
-      expect(draft).toMatch(/Authentication required/);
+      expect(!draft.ok && draft.error).toMatch(/Authentication required/);
+    });
+  });
+
+  describe('generate_ai_message_draft (tool)', () => {
+    const ctx: ToolContext = { userId: 'u', role: 'vendor_owner', token: TOKEN, kind: 'oauth' };
+    const text = (result: { content: Array<{ type: string; text?: string }> }) => result.content[0].text ?? '';
+
+    it('returns the draft as plain text', async () => {
+      mockBackendRequest.mockResolvedValue({ draft: 'See you at 9!' });
+      const result = await generateAiMessageDraft.handler({ context: 'pickup', userRole: 'vendor', tone: 'friendly' }, ctx);
+      expect(result.isError).toBeUndefined();
+      expect(text(result)).toBe('See you at 9!');
+    });
+
+    it('is an error, not a draft, when Splitt AI is off (2026-09-27 LLM vendor run)', async () => {
+      mockBackendRequest.mockResolvedValue({ available: false, message: 'AI features are currently disabled. They will be enabled once AI models are configured.' });
+      const result = await generateAiMessageDraft.handler({ context: 'pickup', userRole: 'vendor', tone: 'friendly' }, ctx);
+      expect(result.isError).toBe(true);
+      expect(text(result)).toMatch(/^Nothing was generated: AI features are currently disabled\./);
     });
   });
 });

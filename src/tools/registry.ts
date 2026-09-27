@@ -28,6 +28,7 @@ import type { CallToolResult, ToolAnnotations } from '@modelcontextprotocol/sdk/
 import type { ZodRawShape, ZodTypeAny, objectOutputType } from 'zod';
 import type { PrincipalKind } from '@/middleware/auth';
 import { canActAsVendor, canBookRentals, canManageVendorPayouts, canViewVendorFinance } from '@/lib/roles';
+import { aiUnavailableMessage, isAiUnavailable, type AiText, type Result } from './_shared';
 import { toResultText } from './result-budget';
 
 export type ToolAccess = 'public' | 'user' | 'renter' | 'vendor' | 'vendor_finance' | 'vendor_owner';
@@ -138,9 +139,20 @@ export function fail(message: string, details?: unknown): CallToolResult {
 }
 
 /** Map a `Result` from the shared backend wrapper to a tool result. */
-export function fromResult<T>(result: { ok: true; data: T } | { ok: false; error: string; status?: number }, map?: (data: T) => unknown): CallToolResult {
+export function fromResult<T>(result: Result<T>, map?: (data: T) => unknown): CallToolResult {
   if (!result.ok) return fail(withStatusHint(result.error, result.status));
   return ok(map ? map(result.data) : result.data);
+}
+
+/** `fromResult` for the backend's AI routes, where a 200 `{ available: false }` means nothing was generated. */
+export function fromAiResult<T>(result: Result<T>, map?: (data: T) => unknown): CallToolResult {
+  if (result.ok && isAiUnavailable(result.data)) return fail(aiUnavailableMessage(result.data));
+  return fromResult(result, map);
+}
+
+/** The tool result for an AI text helper: the text, or an error saying why there is none. */
+export function fromAiText(result: AiText): CallToolResult {
+  return result.ok ? ok(result.text) : fail(result.error);
 }
 
 function withStatusHint(message: string, status?: number): string {

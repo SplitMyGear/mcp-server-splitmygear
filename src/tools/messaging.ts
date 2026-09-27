@@ -1,7 +1,7 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
 import { AI_GENERATION_TIMEOUT_MS } from '@/lib/timeouts';
 import type { Conversation, PostResponse } from '@/lib/api-contract';
-import { call, compact, qs } from './_shared';
+import { aiUnavailableMessage, call, compact, isAiUnavailable, qs, type AiText } from './_shared';
 
 /**
  * `sendMessage` / `getConversations` call the backend REST API forwarding the
@@ -113,24 +113,23 @@ export const messagingTools = {
     // SPLIT-635: /ai/draft-message is now JwtAuthGuard-protected (SPLIT-585), so
     // this must forward the caller's JWT like every other authenticated tool.
     token?: string,
-  ): Promise<string> {
+  ): Promise<AiText> {
     try {
       const result = await backendRequest<{ draft?: string; available?: boolean; message?: string }>(
         'POST',
         '/ai/draft-message',
         { token, body: { context, userRole, tone }, timeoutMs: AI_GENERATION_TIMEOUT_MS },
       );
-      if (result?.available === false) {
-        return result.message || 'AI drafting is currently unavailable.';
-      }
-      return result?.draft || 'Failed to generate draft.';
+      if (isAiUnavailable(result)) return { ok: false, error: aiUnavailableMessage(result) };
+      if (!result?.draft) return { ok: false, error: "Splitt's AI returned no draft. Write the message yourself, or try again." };
+      return { ok: true, text: result.draft };
     } catch (error) {
       // An auth failure is NOT a soft "fall back to a template" case — the tool
       // never ran. Surface it so the caller re-authenticates instead of silently
       // receiving a canned string that masks the broken auth.
-      if (isAuthError(error)) return AUTH_REQUIRED;
+      if (isAuthError(error)) return { ok: false, error: AUTH_REQUIRED };
       console.error('AI draft error:', toMessage(error, 'unknown'));
-      return 'Error generating draft.';
+      return { ok: false, error: `Could not draft the message: ${toMessage(error, 'unexpected error')}` };
     }
   },
 };
