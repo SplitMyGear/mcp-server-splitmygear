@@ -29,13 +29,15 @@ function hasValue(value: unknown): boolean {
 /**
  * A copy of `value` with every secret field, at any depth, replaced by its note
  * (or left out when it holds nothing). Only plain objects and arrays are walked,
- * so Dates and other instances reach the serializer unchanged.
+ * so Dates and other instances reach the serializer unchanged. A JSON key named
+ * `__proto__` is dropped: it is never data, and assigning it would re-parent the copy.
  */
 export function scrubSecrets(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(scrubSecrets);
   if (!isPlainObject(value)) return value;
   const out: Record<string, unknown> = {};
   for (const [key, field] of Object.entries(value)) {
+    if (key === '__proto__') continue;
     const note = SECRET_FIELDS.get(key);
     if (note === undefined) out[key] = scrubSecrets(field);
     else if (hasValue(field)) out[key] = note;

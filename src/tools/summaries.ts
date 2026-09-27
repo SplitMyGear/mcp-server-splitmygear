@@ -31,11 +31,15 @@ function isEmpty(value: unknown): boolean {
   return value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0);
 }
 
-/** A copy of `row` without empty values and without the `drop` keys. */
+/**
+ * A copy of `row` without empty values and without the `drop` keys. A JSON key named
+ * `__proto__` is never a field, and assigning it would re-parent the copy into an object
+ * the secret scrub does not walk (see secrets.ts), so it is not copied.
+ */
 function withoutEmpty(row: Row, drop: readonly string[] = []): Row {
   const out: Row = {};
   for (const [key, value] of Object.entries(row)) {
-    if (!isEmpty(value) && !drop.includes(key)) out[key] = value;
+    if (key !== '__proto__' && !isEmpty(value) && !drop.includes(key)) out[key] = value;
   }
   return out;
 }

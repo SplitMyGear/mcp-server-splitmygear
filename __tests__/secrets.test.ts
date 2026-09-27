@@ -41,6 +41,26 @@ describe('scrubSecrets', () => {
   });
 });
 
+describe('a JSON "__proto__" key cannot smuggle a secret past the scrub', () => {
+  // JSON.parse makes "__proto__" an OWN key; copying it with `out[key] = value` would
+  // re-parent the copy into a non-plain object that the scrub does not walk.
+  const raw = () => JSON.parse(`{"__proto__":{"planted":true},"id":"l-1","icalUrl":"${FEED}"}`);
+
+  it('scrubSecrets drops the key and still scrubs the row', () => {
+    const out = scrubSecrets(raw()) as Record<string, unknown>;
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect(out).toEqual({ id: 'l-1', icalUrl: ICAL_URL_REDACTED });
+  });
+
+  it('a summarized row with the key is still scrubbed at the boundary', async () => {
+    mockBackendRequest.mockResolvedValue([raw()]);
+    const out = text(await listMyListings.handler({}, vendor));
+    expect(out).not.toContain('secret-token-123');
+    expect(out).not.toContain('planted');
+    expect(out).toContain(ICAL_URL_REDACTED);
+  });
+});
+
 describe('no tool result carries a listing iCal URL', () => {
   beforeEach(() => mockBackendRequest.mockReset());
 
