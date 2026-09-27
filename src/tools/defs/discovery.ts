@@ -1,7 +1,7 @@
 /** Public discovery tools: search, details, availability, pricing, reviews. Available to every principal. */
 import { z } from 'zod';
 import { defineTool, ok, fail, fromResult } from '../registry';
-import { summarizeListing } from '../summaries';
+import { redactListingSecrets, summarizeListing } from '../summaries';
 import { listingTools } from '../listings';
 import { pricingTools } from '../pricing';
 import { reviewTools } from '../reviews';
@@ -57,8 +57,7 @@ export const getListingDetails = defineTool({
     const listing = await listingTools.getListingDetails(listingId, ctx.token);
     if (!listing) return fail(`Listing ${listingId} was not found (it may be unpublished).`);
     // An owner's iCal subscription URL is a bearer secret: keep it out of transcripts.
-    const { icalUrl, ...safe } = listing as Record<string, unknown> & { icalUrl?: unknown };
-    return ok(icalUrl ? { ...safe, icalUrl: '[redacted: manage calendar feeds in the Splitt dashboard]' } : safe);
+    return ok(redactListingSecrets(listing));
   },
 });
 
