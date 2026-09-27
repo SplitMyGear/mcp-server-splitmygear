@@ -1,0 +1,132 @@
+/**
+ * Token endpoint logic (RFC 6749 §4.1.3 / §6, OAuth 2.1): `authorization_code`
+ * with mandatory PKCE, and `refresh_token` proxied to the backend's rotation.
+ * Public clients only; `client_id` travels in the body. Every response carries
+ * `scope`; a refresh may pass `scope` to NARROW the grant (RFC 6749 §6), never
+ * to widen it.
+ */
+import { verifyS256 } from './pkce';
+import { openAuthorizationCode, markCodeRedeemed, issueTokens, openRefreshToken, type RefreshTokenPayload } from './tokens';
+import { isOwnResource, oauthEnabled, resourceUrl } from './config';
+import { formatScope, isSubset, parseScopeParam, type ToolScope } from './scopes';
+import { backendRefresh, AuthBridgeError, type ClientContext } from './backend-auth';
+import { json, oauthError, readParams, clientIp } from './http';
+import { resolveClient } from './client';
+import { withRefreshGrace, type RotationOutcome } from './refresh-grace';
+
+/**
+ * The client must still be acceptable under the CURRENT redirect-host policy
+ * on every token request, not only at /oauth/authorize. Without this, narrowing
+ * `MCP_OAUTH_ALLOWED_REDIRECT_HOSTS` blocked new sign-ins but let every
+ * connection already issued to that client keep refreshing for as long as its
+ * refresh token lived, which is not the revocation lever the operator was told
+ * it is (see resolveClient).
+ */
+function clientRevoked(clientId: string): Response | null {
+  if (resolveClient(clientId)) return null;
+  return oauthError('invalid_client', 'This application is no longer allowed to connect to Splitt; connect it again', 401);
+}
+
+export async function handleTokenPost(request: Request): Promise<Response> {
+  if (!oauthEnabled()) return oauthError('temporarily_unavailable', 'OAuth is not enabled on this server', 503);
+  const p = await readParams(request);
+  const ctx: ClientContext = { ip: clientIp(request), userAgent: request.headers.get('user-agent') ?? undefined };
+
+  switch (p.grant_type) {
+    case 'authorization_code':
+      return authorizationCodeGrant(p, request);
+    case 'refresh_token':
+      return refreshTokenGrant(p, ctx);
+    case undefined:
+      return oauthError('invalid_request', 'grant_type is required');
+    default:
+      return oauthError('unsupported_grant_type', `grant_type "${p.grant_type}" is not supported`);
+  }
+}
+
+async function authorizationCodeGrant(p: Record<string, string>, request: Request): Promise<Response> {
+  if (!p.code) return oauthError('invalid_request', 'code is required');
+  if (!p.code_verifier) return oauthError('invalid_request', 'code_verifier is required (PKCE)');
+  if (!p.redirect_uri) return oauthError('invalid_request', 'redirect_uri is required');
+  if (!p.client_id) return oauthError('invalid_request', 'client_id is required');
+
+  const code = openAuthorizationCode(p.code);
+  if (!code) return oauthError('invalid_grant', 'Authorization code is invalid or expired');
+  if (code.cid !== p.client_id) return oauthError('invalid_grant', 'Authorization code was issued to a different client');
+  if (code.ru !== p.redirect_uri) return oauthError('invalid_grant', 'redirect_uri does not match the authorization request');
+  if (!verifyS256(p.code_verifier, code.cc)) return oauthError('invalid_grant', 'PKCE verification failed');
+  // RFC 8707: this server protects one resource, so any spelling of it that
+  // the authorize step would have accepted is fine here too (see isOwnResource).
+  if (p.resource !== undefined && !isOwnResource(p.resource, request)) {
+    return oauthError('invalid_target', `resource must be ${resourceUrl(request)}`);
+  }
+  const revoked = clientRevoked(code.cid);
+  if (revoked) return revoked;
+  if (!(await markCodeRedeemed(code.jti, code.exp))) return oauthError('invalid_grant', 'Authorization code has already been used');
+
+  const tokens = issueTokens({
+    clientId: code.cid,
+    user: { id: code.sub, role: code.role, email: code.email },
+    backendAccessToken: code.at,
+    backendRefreshToken: code.rt,
+    scopes: code.sc,
+  });
+  if (!tokens) return oauthError('server_error', 'Could not issue tokens for this session', 500);
+  return json(tokens);
+}
+
+/**
+ * RFC 6749 §6: an optional `scope` on refresh must not include anything the
+ * user did not originally grant; omitted means "same as before".
+ */
+function narrowedScopes(requested: string | undefined, granted: ToolScope[]): ToolScope[] | Response {
+  const parsed = parseScopeParam(requested);
+  if (!parsed.ok) return oauthError('invalid_scope', parsed.error);
+  if (!parsed.requested) return granted;
+  if (!isSubset(parsed.scopes, granted)) {
+    return oauthError('invalid_scope', `scope may only narrow the original grant (${formatScope(granted) || 'none'})`);
+  }
+  return parsed.scopes;
+}
+
+async function refreshTokenGrant(p: Record<string, string>, ctx: ClientContext): Promise<Response> {
+  if (!p.refresh_token) return oauthError('invalid_request', 'refresh_token is required');
+  // OAuth 2.1 §4.3.1: public clients identify themselves on every token request.
+  if (!p.client_id) return oauthError('invalid_request', 'client_id is required');
+  const rt = openRefreshToken(p.refresh_token);
+  if (!rt) return oauthError('invalid_grant', 'Refresh token is invalid or expired');
+  if (p.client_id !== rt.cid) return oauthError('invalid_grant', 'Refresh token was issued to a different client');
+  const revoked = clientRevoked(rt.cid);
+  if (revoked) return revoked;
+  const scopes = narrowedScopes(p.scope, rt.scp);
+  if (scopes instanceof Response) return scopes;
+  // A repeat of this exact refresh within the grace window (a retry, or a
+  // second request that raced this one) gets the same answer rather than
+  // presenting the already-rotated backend token again (see refresh-grace).
+  const outcome = await withRefreshGrace(p.refresh_token, p.scope, () => rotateAtBackend(rt, scopes, ctx));
+  if (outcome.ok) return json(outcome.tokens);
+  return oauthError(outcome.error.code, outcome.error.description, outcome.error.status);
+}
+
+async function rotateAtBackend(rt: RefreshTokenPayload, scopes: ToolScope[], ctx: ClientContext): Promise<RotationOutcome> {
+  try {
+    const rotated = await backendRefresh(rt.brt, ctx);
+    const tokens = issueTokens({
+      clientId: rt.cid,
+      user: { id: rt.sub, role: rt.role, email: rt.email },
+      backendAccessToken: rotated.accessToken,
+      backendRefreshToken: rotated.refreshToken,
+      scopes,
+    });
+    if (!tokens) return { ok: false, error: { code: 'server_error', description: 'Could not issue tokens for this session', status: 500 } };
+    return { ok: true, tokens };
+  } catch (error) {
+    // 400 (rejected DTO / rotated token), 401 (revoked or expired), 403
+    // (suspended): the grant is dead either way, so tell the client to
+    // re-authenticate instead of retrying against a "temporary" failure.
+    if (error instanceof AuthBridgeError && (error.status === 400 || error.status === 401 || error.status === 403)) {
+      return { ok: false, error: { code: 'invalid_grant', description: 'Refresh token has been revoked or expired; sign in again', status: 400 } };
+    }
+    return { ok: false, error: { code: 'temporarily_unavailable', description: 'Splitt is temporarily unavailable; try again shortly', status: 503 } };
+  }
+}

@@ -25,7 +25,10 @@ function defaultBackend() {
     // SPLIT-220: the createBooking listing pre-fetch hits the canonical /rentals
     // alias; the /bookings mutation paths are a different controller, unchanged.
     if (method === 'GET' && path.startsWith('/rentals/')) return { pricePerDay: '50.00' };
-    if (method === 'POST' && path === '/bookings') return { id: 'booking-1', status: 'pending', totalPrice: 100 };
+    // The create path prices via the public, server-authoritative quote.
+    if (method === 'POST' && path === '/bookings/quote') return { total: 123.45, nights: 2 };
+    if (method === 'POST' && path === '/payments/checkout-session') return { success: true, checkoutUrl: 'https://checkout.stripe.com/c/pay_123' };
+    if (method === 'POST' && path === '/bookings') return { id: 'booking-1', status: 'draft', totalPrice: 123.45 };
     if (method === 'PUT' && /^\/bookings\/.+\/status$/.test(path)) return { id: 'booking-1', status: 'cancelled' };
     if (method === 'GET' && /^\/bookings\/.+$/.test(path)) return { id: 'booking-1', status: 'pending' };
     throw new Error(`unexpected request ${method} ${path}`);
@@ -47,13 +50,18 @@ describe('Booking Tools (backend REST)', () => {
     });
     expect(result.success).toBe(true);
     expect(result.booking?.id).toBe('booking-1');
-    // SPLIT-220: the price pre-fetch hits the canonical /rentals/:id alias.
-    const prefetch = mockBackendRequest.mock.calls.find((c) => c[0] === 'GET');
-    expect(prefetch?.[1]).toBe('/rentals/listing-1');
-    // The POST carried the token and mapped checkIn/checkOut → startDate/endDate.
+    // Pricing comes from the public quote endpoint (no token needed), not a listing pre-fetch.
+    const quote = mockBackendRequest.mock.calls.find((c) => c[0] === 'POST' && c[1] === '/bookings/quote');
+    expect(quote?.[2].body).toMatchObject({ listingId: 'listing-1', startDate: '2026-07-01', endDate: '2026-07-03' });
+    expect(quote?.[2].token).toBeUndefined();
+    // The POST carried the token, mapped checkIn/checkOut → startDate/endDate, and the quoted total.
     const post = mockBackendRequest.mock.calls.find((c) => c[0] === 'POST' && c[1] === '/bookings');
     expect(post?.[2]).toMatchObject({ token: TOKEN });
-    expect(post?.[2].body).toMatchObject({ listingId: 'listing-1', startDate: '2026-07-01', endDate: '2026-07-03' });
+    expect(post?.[2].body).toMatchObject({ listingId: 'listing-1', startDate: '2026-07-01', endDate: '2026-07-03', totalPrice: 123.45 });
+    expect(result.quote).toEqual({ total: 123.45, nights: 2 });
+    // No payment link unless asked for.
+    expect(result.paymentUrl).toBeUndefined();
+    expect(mockBackendRequest.mock.calls.find((c) => c[1] === '/payments/checkout-session')).toBeUndefined();
     // guests is NOT forwarded (backend whitelist would 400 on it).
     expect(post?.[2].body).not.toHaveProperty('guests');
   });
@@ -142,6 +150,54 @@ describe('Booking Tools (backend REST)', () => {
       '/bookings/booking-1/status',
       expect.objectContaining({ token: TOKEN, body: { status: 'cancelled' } }),
     );
+  });
+
+  describe('cancelling an unpaid draft (SPLIT-1503)', () => {
+    const LIFECYCLE_403 = "Only the listing vendor can set a booking to 'cancelled'";
+
+    it('explains that a draft is an unpaid checkout instead of relaying the lifecycle 403', async () => {
+      const { BackendApiError } = jest.requireMock('../src/lib/backend-client');
+      mockBackendRequest.mockImplementation(async (method: string) => {
+        if (method === 'PUT') throw new BackendApiError(403, LIFECYCLE_403);
+        return { id: 'booking-1', status: 'draft' };
+      });
+      const result = await bookingTools.cancelBooking('booking-1', TOKEN);
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/unpaid checkout/);
+      expect(result.error).toMatch(/get_payment_link/);
+      expect(result.error).not.toContain('Only the listing vendor');
+      expect(mockBackendRequest).toHaveBeenCalledWith('GET', '/bookings/booking-1', { token: TOKEN });
+    });
+
+    it('relays the backend refusal unchanged when the booking is not a draft', async () => {
+      const { BackendApiError } = jest.requireMock('../src/lib/backend-client');
+      mockBackendRequest.mockImplementation(async (method: string) => {
+        if (method === 'PUT') throw new BackendApiError(403, 'You are not authorized to update this booking status');
+        return { id: 'booking-1', status: 'confirmed' };
+      });
+      const result = await bookingTools.cancelBooking('booking-1', TOKEN);
+      expect(result.error).toBe('You are not authorized to update this booking status');
+    });
+
+    it('relays the refusal when the follow-up read fails', async () => {
+      const { BackendApiError } = jest.requireMock('../src/lib/backend-client');
+      mockBackendRequest.mockImplementation(async (method: string) => {
+        if (method === 'PUT') throw new BackendApiError(403, LIFECYCLE_403);
+        throw new BackendApiError(404, 'Booking not found');
+      });
+      const result = await bookingTools.cancelBooking('booking-1', TOKEN);
+      expect(result.error).toBe(LIFECYCLE_403);
+    });
+
+    it('does not look the booking up for failures that are not a 403', async () => {
+      const { BackendApiError } = jest.requireMock('../src/lib/backend-client');
+      mockBackendRequest.mockImplementation(async () => {
+        throw new BackendApiError(409, 'This rental is flagged as not returned. Return the gear or contact support');
+      });
+      const result = await bookingTools.cancelBooking('booking-1', TOKEN);
+      expect(result.error).toMatch(/flagged as not returned/);
+      expect(mockBackendRequest).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('requires a token to cancel a booking', async () => {

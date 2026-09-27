@@ -36,10 +36,17 @@ interface RequestOptions {
   token?: string;
   body?: unknown;
   /**
-   * Override the default per-request timeout. The identity probe in lib/jwt.ts
-   * uses a tighter budget: it runs BEFORE the tool's own backend call, and two
-   * full-length stalls back to back would exceed the function's 30s
-   * maxDuration and surface as an opaque 500 instead of a clean 401.
+   * Extra request headers (e.g. the trusted-relay client-IP headers the OAuth
+   * login bridge sends so the backend's per-IP login throttle keys on the END
+   * USER, not on this server's egress address). Never overrides Authorization.
+   */
+  headers?: Record<string, string>;
+  /**
+   * Override the default per-request timeout (ms). Multi-step tool flows use a
+   * longer budget; the identity probe in lib/jwt.ts uses a TIGHTER one: it runs
+   * BEFORE the tool's own backend call, and two full-length stalls back to back
+   * would exceed the function's 30s maxDuration and surface as an opaque 500
+   * instead of a clean 401 (SPLIT-1438).
    */
   timeoutMs?: number;
 }
@@ -54,7 +61,7 @@ export async function backendRequest<T = unknown>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(options.headers ?? {}) };
   if (options.token) {
     headers['Authorization'] = `Bearer ${options.token}`;
   }

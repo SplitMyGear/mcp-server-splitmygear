@@ -28,9 +28,18 @@
  *     lets a client tell the two apart; note `Camping` is camping GEAR for
  *     rent, whereas `Campsites` is a bookable site.
  */
+export const LISTING_CATEGORY_IDS = [
+  'E-Bikes', 'Biking', 'Camping', 'RV', 'Hiking', 'Water Sports', 'Winter Sports',
+  'Snow Sports', 'Climbing', 'Surfing', 'Fishing', 'Golf', 'Kayaking', 'Skiing',
+  'Tennis', 'Boating', 'ATVs', 'Photography', 'Electronics', 'Cabins', 'Campsites',
+  'RV Sites', 'Glamping', 'Other',
+] as const;
+
+export type ListingCategoryId = (typeof LISTING_CATEGORY_IDS)[number];
+
 export interface ListingCategory {
   /** Canonical Title-Case value the API stores and filters on. */
-  id: string;
+  id: ListingCategoryId;
   name: string;
   icon: string;
   /** True for the nightly-booked lodging/site categories (SPLIT-1266). */
@@ -69,5 +78,3 @@ export const STAY_CATEGORIES: readonly string[] = LISTING_CATEGORIES.filter(
   (c) => c.stay,
 ).map((c) => c.id);
 
-/** Comma-joined ids, for tool `describe()` text that must list the options. */
-export const LISTING_CATEGORY_IDS: readonly string[] = LISTING_CATEGORIES.map((c) => c.id);

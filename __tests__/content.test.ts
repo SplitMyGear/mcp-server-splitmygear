@@ -1,5 +1,6 @@
 import { contentTools } from '../src/tools/content';
 import { BackendApiError } from '../src/lib/backend-client';
+import { AI_GENERATION_TIMEOUT_MS } from '../src/lib/timeouts';
 
 // Content tools call the backend AI (SPLIT-277); the MCP holds no LLM provider
 // key of its own, so only the backend client is mocked.
@@ -33,6 +34,7 @@ describe('Content Tools (backend AI)', () => {
       expect(description).toBe('A great bike for fast rides.');
       expect(mockBackendRequest).toHaveBeenCalledWith('POST', '/ai/generate-description', {
         token: TOKEN,
+        timeoutMs: AI_GENERATION_TIMEOUT_MS,
         body: { category: 'cycling', name: 'Bike', subAttributes: { keyFeatures: 'light, fast' } },
       });
     });
@@ -44,6 +46,7 @@ describe('Content Tools (backend AI)', () => {
 
       expect(mockBackendRequest).toHaveBeenCalledWith('POST', '/ai/generate-description', {
         token: TOKEN,
+        timeoutMs: AI_GENERATION_TIMEOUT_MS,
         body: { category: 'cycling', name: 'Bike' },
       });
     });
@@ -90,6 +93,7 @@ describe('Content Tools (backend AI)', () => {
       expect(title).toBe('Pro Lightweight Road Bike');
       expect(mockBackendRequest).toHaveBeenCalledWith('POST', '/ai/improve-title', {
         token: TOKEN,
+        timeoutMs: AI_GENERATION_TIMEOUT_MS,
         body: { currentTitle: 'Old Title' },
       });
     });
