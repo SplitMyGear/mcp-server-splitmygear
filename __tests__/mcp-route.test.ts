@@ -26,10 +26,11 @@ jest.mock('@/middleware/rate-limit', () => ({
 import { POST } from '../src/app/api/mcp/route';
 import { ALL_TOOLS } from '../src/tools/defs';
 
-function mcpRequest(body: unknown, withKey = true): any {
+function mcpRequest(body: unknown, withKey = true, extraHeaders: Record<string, string> = {}): any {
   const headers: Record<string, string> = {
     'content-type': 'application/json',
     accept: 'application/json, text/event-stream',
+    ...extraHeaders,
   };
   if (withKey) headers['x-api-key'] = 'test-operator-key';
   const req = new Request('http://localhost/api/mcp', {
@@ -64,6 +65,26 @@ describe('/api/mcp route handler (M2 stateless transport)', () => {
     expect(text).toContain('splitmygear-mcp');
     expect(text).toContain('protocolVersion');
     expect(text).not.toContain('Server not initialized');
+  });
+
+  // SPLIT-1604: the first request of each claude.ai connection got a 400 on
+  // prod and nothing said why. The SDK rejects an unsupported
+  // MCP-Protocol-Version itself and reports it only through onerror.
+  it('logs why the transport rejected a request (unsupported MCP-Protocol-Version), without the key or body', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const res = await POST(
+        mcpRequest({ jsonrpc: '2.0', id: 3, method: 'tools/list', params: {} }, true, { 'mcp-protocol-version': '2099-01-01' }),
+      );
+      expect(res.status).toBe(400);
+      const logged = warn.mock.calls.map((c) => String(c[0]));
+      const line = logged.find((l) => l.startsWith('[mcp] transport rejected a request:'));
+      expect(line).toContain('2099-01-01');
+      expect(logged.join('\n')).not.toContain('test-operator-key');
+      expect(logged.join('\n')).not.toContain('tools/list');
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('handles repeated requests independently (no "Already connected" leak)', async () => {

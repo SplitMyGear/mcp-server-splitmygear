@@ -447,7 +447,8 @@ export const listCategories = defineTool({
   title: 'List categories',
   description:
     'The live gear category catalogue (id, name, slug, description, icon, sort order) that listings and search filters use. ' +
-    'Pass withListingCounts to also get how many listings each category has. Use the `name` values as the category filter for search_listings and create_search_alert.',
+    'Pass withListingCounts to also get how many listings each category has: every approved, visible listing, including ones that are not bookable right now, ' +
+    'so check availability (or search with dates) before calling them available. Use the `name` values as the category filter for search_listings and create_search_alert.',
   access: 'public',
   scope: 'read',
   inputSchema: { withListingCounts: z.boolean().optional().describe('Include listingCount per category (default false).') },

@@ -14,7 +14,7 @@ import { LISTING_CATEGORIES } from '@/tools/listing-categories';
 import { oauthEnabled, publicBaseUrl, MCP_RESOURCE_PATH } from '@/lib/oauth/config';
 
 const SERVER_NAME = 'splitmygear-mcp';
-const SERVER_VERSION = '2.0.1';
+const SERVER_VERSION = '2.0.2';
 
 /**
  * CORS: the endpoint is bearer/API-key authenticated (never cookies), so a
@@ -181,6 +181,11 @@ async function handleRequest(request: NextRequest) {
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
     });
+    // SPLIT-1604: the transport answers some requests 400 on its own (an
+    // unsupported MCP-Protocol-Version, a malformed body) and says why only
+    // through onerror, so a client stuck on 400s left no trace. Log the SDK's
+    // message, never headers or the body. connect() chains this handler.
+    transport.onerror = (error) => console.warn(`[mcp] transport rejected a request: ${error.message.slice(0, 300)}`);
     await server.connect(transport);
     const response = await transport.handleRequest(request, bodyParsed ? { parsedBody } : undefined);
     return withHeaders(response, { 'X-RateLimit-Remaining': String(rateLimit.remaining ?? '') });
