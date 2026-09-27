@@ -251,7 +251,7 @@ describe('social sign-in on the hosted page', () => {
         expect(opts.token).toBeUndefined();
         expect(opts.headers['x-smg-relay-key']).toBe('relay-secret');
         expect(opts.headers['x-smg-client-ip']).toBe(IP);
-        expect(opts.headers['User-Agent']).toBe('TestBrowser/1 (via splitt-mcp)');
+        expect(opts.headers['User-Agent']).toBe('TestBrowser/1 (via splitt-mcp; Test Client)');
         return SESSION;
       });
       const res = await socialCallback(callbackRequest(returnTo, { code: EXCHANGE_CODE }, cookie));

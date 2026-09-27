@@ -24,6 +24,8 @@ import { backendRequest, BackendApiError } from '@/lib/backend-client';
 export interface ClientContext {
   ip?: string;
   userAgent?: string;
+  /** The OAuth client being signed in to (its registered name), shown in the user's Splitt sessions list. */
+  clientName?: string;
 }
 
 export interface BackendUser {
@@ -75,11 +77,23 @@ export class AuthBridgeError extends Error {
 }
 
 const MAX_UA_LENGTH = 200;
+const MAX_CLIENT_NAME_LENGTH = 40;
 
-/** Printable ASCII only, bounded: the UA is stored by the backend against the session. */
-function sanitizeUserAgent(ua: string | undefined): string {
+/**
+ * Printable ASCII only, bounded: the UA is stored by the backend against the session.
+ * The `splitt-mcp; <client>` label is how a user's Splitt sessions list tells an AI
+ * assistant apart from a browser, so they can revoke it (SPLIT-1603: assistants keep
+ * their session when disconnected, because the client never tells us). Refresh
+ * rotation copies the UA to each new session row, so the label lasts the connection.
+ */
+export function sanitizeUserAgent(ua: string | undefined, clientName?: string): string {
   const clean = (ua ?? '').replace(/[^\x20-\x7e]/g, '').trim().slice(0, MAX_UA_LENGTH);
-  return clean ? `${clean} (via splitt-mcp)` : 'splitt-mcp';
+  // The client name comes from dynamic client registration, where anyone picks it:
+  // letters, digits, spaces and . _ - only, so it cannot close the label's
+  // parentheses or pass for another part of the string.
+  const name = (clientName ?? '').replace(/[^A-Za-z0-9 ._-]/g, '').replace(/\s+/g, ' ').trim().slice(0, MAX_CLIENT_NAME_LENGTH).trim();
+  const label = name ? `splitt-mcp; ${name}` : 'splitt-mcp';
+  return clean ? `${clean} (via ${label})` : label;
 }
 
 function relayHeaders(ctx: ClientContext): Record<string, string> {
@@ -91,7 +105,7 @@ function relayHeaders(ctx: ClientContext): Record<string, string> {
     headers['x-smg-relay-key'] = relayKey;
     headers['x-smg-client-ip'] = ctx.ip;
   }
-  headers['User-Agent'] = sanitizeUserAgent(ctx.userAgent);
+  headers['User-Agent'] = sanitizeUserAgent(ctx.userAgent, ctx.clientName);
   return headers;
 }
 

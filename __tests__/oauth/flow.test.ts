@@ -439,6 +439,9 @@ describe('OAuth 2.1 flow', () => {
       if (path === '/auth/2fa/otp/send') return { success: true, maskedEmail: 'r***@x.test', resendAvailableAt: new Date().toISOString() };
       if (path === '/auth/2fa/otp/verify') {
         expect(opts.body).toEqual({ challengeToken: 'c'.repeat(64), code: '123456' });
+        // This call creates the backend session on a 2FA account, so it must carry the
+        // assistant label the user's sessions list shows next to Disconnect (SPLIT-1603).
+        expect(opts.headers['User-Agent']).toBe('TestClient/1 (via splitt-mcp; Test Client)');
         return { success: true, accessToken: backendAccess, refreshToken: 'brt-9', user: { id: 'user-1', email: 'r@x.test', role: 'renter' } };
       }
       throw new Error(`unexpected ${method} ${path}`);
@@ -731,7 +734,7 @@ describe('OAuth 2.1 flow', () => {
       if (path === '/users/login') {
         expect(opts.headers['x-smg-client-ip']).toBeUndefined();
         expect(opts.headers['x-smg-relay-key']).toBeUndefined();
-        expect(opts.headers['User-Agent']).toBe('TestClient/1 (via splitt-mcp)');
+        expect(opts.headers['User-Agent']).toBe('TestClient/1 (via splitt-mcp; Test Client)');
         return { accessToken: backendAccess, refreshToken: 'brt-1', user: { id: 'user-1', email: 'r@x.test', role: 'renter' } };
       }
       throw new Error(`unexpected ${path}`);

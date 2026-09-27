@@ -2,11 +2,11 @@
 
 `splitt-chatgpt-vendor-guide.pdf` is a 10-page guide for Splitt vendors: how to connect ChatGPT to their Splitt account through this MCP server, what they can ask it to do, who on a team can do what, how they stay in control, and what to do when something goes wrong. It follows the house style of the Google Things to do guide (SPLIT-1581, `splitmygear-frontend/content/vendor-resources/google-things-to-do/`).
 
-## Status: MCP 2.0 is live; three items before this guide goes to vendors
+## Status: MCP 2.0 is live; four items before this guide goes to vendors
 
 MCP 2.0 (OAuth sign-in and role-aware vendor tools) has been live at `https://mcp-server-splitmygear.vercel.app/api/mcp` since 2026-09-27: release v2.0.0, PR #45, which superseded #34, #40 and #43. ChatGPT, Claude and Claude Code connect with the vendor's own Splitt login and see production go-splitt.com data.
 
-**Send this guide to vendors once items 6 to 8 below are done.**
+**Send this guide to vendors once items 6 to 9 below are done.**
 
 ### Launch checklist
 
@@ -27,7 +27,8 @@ MCP 2.0 (OAuth sign-in and role-aware vendor tools) has been live at `https://mc
    - \+ › Developer mode or More in a chat
 
    These come from OpenAI's help center, developer docs and cookbook as of September 2026, and OpenAI renames these menus often.
-8. **Open: team seats (SPLIT-1602).** Managers and staff see none of their shop's listings or bookings today, because the backend scopes every vendor read to the caller's own id. That holds in ChatGPT, in Claude and in the vendor dashboard alike. The guide's "Manager or staff" rows describe the intended behaviour. Until SPLIT-1602 ships, hold the guide or tell vendors to connect with the owner login.
+8. **Open: remove the team-seat claims (SPLIT-1602).** Vendor teams are not built yet: production has no manager or staff seats, and nothing can create one (no invite flow; the admin editor cannot link a seat to a shop). A seat would also see none of its shop's data, because the backend scopes vendor reads to the caller's own id. Before the guide goes out, the "Manager or staff" rows and the "Who can do what" page must say that team seats are coming later, and that the owner login is the one to connect. The vendor-teams design is its own wave.
+9. **Open: say how to remove an assistant (SPLIT-1603).** Disconnecting Splitt inside an assistant may not end its Splitt session: claude.ai's Disconnect never calls this server's revoke endpoint (seen on production, 2026-09-27; ChatGPT not yet tested). Once SPLIT-1603 reaches production, Profile › "Where you're signed in" lists each connected assistant by name (for example "Claude via the Splitt MCP") with a Disconnect button, plus "Sign out everywhere". A disconnected assistant loses access when its current sign-in expires (the backend access-token lifetime: 15 minutes by default). The troubleshooting page should point there.
 
 ### Sign-in blockers found before launch (fixed and shipped in 2.0)
 

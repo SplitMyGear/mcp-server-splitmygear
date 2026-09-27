@@ -198,6 +198,11 @@ function bridgeErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+/** The caller's context plus the client they are signing in to, so the backend session names it (SPLIT-1603). */
+function forClient(ctx: ClientContext, rq: Pick<AuthorizeRequest, 'cn'>): ClientContext {
+  return { ...ctx, clientName: rq.cn };
+}
+
 function clientContext(request: Request): ClientContext {
   return { ip: clientIp(request), userAgent: request.headers.get('user-agent') ?? undefined };
 }
@@ -352,11 +357,11 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
     if (!attempt.allowed) return loginPage(rq, { email, error: THROTTLED_MESSAGE }, 429);
 
     try {
-      const outcome = await backendLogin(email, password, ctx);
+      const outcome = await backendLogin(email, password, forClient(ctx, rq));
       // The credentials were accepted (session or 2FA challenge): give the
       // slots back so a real sign-in never spends the failure budget.
       await attempt.refund();
-      return await completeLogin(rq, outcome, ctx, iss, email.toLowerCase());
+      return await completeLogin(rq, outcome, forClient(ctx, rq), iss, email.toLowerCase());
     } catch (error) {
       // A rejected attempt keeps its claims: they ARE the failure record. Only
       // now does the targeted account's budget apply (see throttleKeys).
@@ -377,7 +382,7 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
       // the gate is read atomically; hand it straight back.
       await attempt.refund();
       try {
-        const sent = await backendSendOtp(chal.ct, ctx);
+        const sent = await backendSendOtp(chal.ct, forClient(ctx, chal.rq));
         return otpPage(chal.rq, chal.ct, sent.maskedEmail || chal.me, 'A new code is on its way.', chal.em);
       } catch (error) {
         return otpPage(chal.rq, chal.ct, chal.me, bridgeErrorMessage(error, 'Could not resend the code.'), chal.em);
@@ -390,7 +395,7 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
       return otpPage(chal.rq, chal.ct, chal.me, 'Enter the code from your email.', chal.em);
     }
     try {
-      const session = await backendVerifyOtp(chal.ct, code, ctx);
+      const session = await backendVerifyOtp(chal.ct, code, forClient(ctx, chal.rq));
       await attempt.refund();
       return successRedirect(chal.rq, session, iss);
     } catch (error) {
@@ -588,7 +593,7 @@ export async function handleSocialCallbackGet(request: Request): Promise<Respons
     );
   }
   const rq = unbound(bound);
-  const ctx = clientContext(request);
+  const ctx = forClient(clientContext(request), rq);
 
   const error = q('error');
   const code = q('code');
