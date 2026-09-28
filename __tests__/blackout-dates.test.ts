@@ -63,7 +63,8 @@ describe('toInclusiveBlackout', () => {
       type: 'unavailable',
       reason: 'r',
     });
-    expect(toInclusiveBlackout({ startDate: '2028-03-01T00:00:00.000Z', endDate: '2028-03-02T00:00:00.000Z' })).toMatchObject({ endDate: '2028-03-01' });
+    // The create response carries startDate as a timestamp: both ends come back as plain days.
+    expect(toInclusiveBlackout({ startDate: '2028-03-01T00:00:00.000Z', endDate: '2028-03-02T00:00:00.000Z' })).toEqual({ startDate: '2028-03-01', endDate: '2028-03-01' });
   });
 
   it('returns timed holds, zero-width legacy rows and non-rows as stored', () => {
@@ -127,9 +128,13 @@ describe('list_blackout_dates', () => {
     const result = await listBlackoutDates.handler({ listingId: LISTING }, ctx);
 
     expect(mockBackendRequest.mock.calls[0].slice(0, 2)).toEqual(['GET', `/rentals/${LISTING}/blackout-dates`]);
-    expect(data(result)).toEqual([
-      { id: 'b1', startDate: '2028-03-01', endDate: '2028-03-02' },
-      { id: 'b2', startDate: '2028-04-10', endDate: '2028-04-10', startTime: '09:00', endTime: '12:00' },
-    ]);
+    expect(data(result)).toEqual({
+      total: 2,
+      offset: 0,
+      items: [
+        { id: 'b1', startDate: '2028-03-01', endDate: '2028-03-02' },
+        { id: 'b2', startDate: '2028-04-10', endDate: '2028-04-10', startTime: '09:00', endTime: '12:00' },
+      ],
+    });
   });
 });

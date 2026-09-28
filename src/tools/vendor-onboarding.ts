@@ -17,6 +17,7 @@
  * Staff routes (GET /applications, POST /invites, POST /:id/*) are deliberately
  * not wrapped. GET /status already lives in `accountTools`.
  */
+import { isVendorFamily } from '@/lib/roles';
 import { call, compact } from './_shared';
 
 /** `VendorOnboardingStatus` on the backend user entity. */
@@ -86,6 +87,31 @@ export interface VendorWaiver {
 }
 
 /** What the model should do next for a given pipeline status (mirrors the backend state machine). */
+const STEP_ACTIONS: Readonly<Record<string, string>> = {
+  profile: 'Call complete_vendor_business_profile with the storefront name, business phone, business address and description.',
+  stripe: 'Call start_vendor_stripe_onboarding, have the user finish on Stripe, then check_vendor_stripe_status and confirm_vendor_stripe.',
+  waiver: 'Call get_vendor_agreement, show the user the terms, then sign_vendor_agreement once they explicitly agree.',
+};
+
+/**
+ * The next step for a full status view. The stored status can lag behind the
+ * steps: on staging an account that already had the vendor_owner role read
+ * "stripe_pending" while its steps showed Stripe done and only the waiver open,
+ * and the status-only advice sent it back to Stripe (SPLIT-1608). The steps
+ * are what the backend checks now, so the first open one decides.
+ */
+export function onboardingNextStepForView(view: OnboardingStatusView | null | undefined): string {
+  const open = view?.steps?.find((step) => !step.complete);
+  const action = open ? STEP_ACTIONS[open.key] : undefined;
+  if (isVendorFamily(view?.role)) {
+    return open && action
+      ? `This account already has the vendor role (${view?.role}). The onboarding record still has one open step, ${open.label}: ${action}`
+      : `This account already has the vendor role (${view?.role}); no onboarding step is open.`;
+  }
+  if (action && (view?.status === 'profile_pending' || view?.status === 'stripe_pending' || view?.status === 'waiver_pending')) return action;
+  return onboardingNextStep(view?.status);
+}
+
 export function onboardingNextStep(status: string | null | undefined): string {
   switch (status) {
     case 'not_started':

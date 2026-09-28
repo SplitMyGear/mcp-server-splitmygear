@@ -12,7 +12,9 @@ import { dateError, dateRangeError } from '../_shared';
 import { uuid, isoDate, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, LISTING_CATEGORIES, token } from './common';
 
 const STAFF_NOTE = 'Vendor owner and manager seats can change pricing; vendor_staff seats cannot (Splitt returns 403).';
-const NIGHTLY_NOTE = 'Seasonal rate rules apply to nightly (stay) listings only; hourly listings are rejected.';
+const NIGHTLY_NOTE =
+  'Seasonal rate rules apply to stays only (bookingType nightly); Splitt refuses them on gear listings (daily, hourly or both). ' +
+  'To price gear by weekday, season or demand, use the dynamic pricing tools (get_dynamic_pricing_config, set_dynamic_pricing_config, preview_dynamic_price).';
 
 /** Rate rules may legitimately span several years (e.g. a multi-year "always" rule). */
 const MAX_RULE_SPAN_DAYS = 366 * 5;

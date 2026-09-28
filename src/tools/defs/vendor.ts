@@ -8,24 +8,53 @@ import { vendorFinanceTools } from '../vendor-finance';
 import { reviewTools } from '../reviews';
 import { experienceTools } from '../experiences';
 import { dateRangeError } from '../_shared';
-import { isoDay, shiftDay, toInclusiveBlackout } from '../blackout-dates';
+import { isoDay, pageBlackouts, shiftDay, toInclusiveBlackout } from '../blackout-dates';
 import { uuid, isoDate, pagination, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, LISTING_CATEGORIES, CANCELLATION_POLICIES, UNTRUSTED_NOTE, token } from './common';
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const stayTime = (what: string) =>
+  z.string().regex(HHMM, 'Use HH:MM, 24-hour.').optional().describe(`Stays only: ${what}, HH:MM 24-hour, the listing's local time (a default for the category applies when left out).`);
 
 const listingFields = {
   category: z.enum(LISTING_CATEGORIES).optional(),
-  pricePerDay: z.number().min(0).optional(),
-  pricePerHour: z.number().min(0).optional(),
-  bookingType: z.enum(['daily', 'hourly']).optional(),
-  location: z.string().max(200).optional().describe('City / area shown publicly.'),
-  address: z.string().max(300).optional().describe('Pickup address (kept private until booked).'),
-  generalArea: z.string().max(200).optional(),
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
-  imageUrls: z.array(z.string().url().max(2048)).max(20).optional().describe('Publicly reachable image URLs.'),
+  pricePerDay: z.number().min(0).optional().describe('Price per day in USD. For a stay (bookingType nightly) this is the price per night.'),
+  pricePerHour: z.number().min(0).optional().describe('Price per hour in USD, for bookingType hourly or both. Not allowed on a stay.'),
+  bookingType: z
+    .enum(['daily', 'hourly', 'both', 'nightly'])
+    .optional()
+    .describe(
+      'daily (the default): rented by the day, priced by pricePerDay. hourly: by the hour, priced by pricePerHour. ' +
+        'both: the renter picks days or hours on each booking (set both prices). ' +
+        'nightly: a stay booked by the night. It is required for, and only allowed with, the stay categories (Cabins, Campsites, RV Sites, Glamping), ' +
+        'and a stay also needs latitude, longitude and maxGuests.',
+    ),
+  // SPLIT-1608: there is no private address field. The backend writes a submitted
+  // `address` into the public `location` (it is the web form's name for it),
+  // so an "address kept private until booked" published the street address.
+  location: z
+    .string()
+    .max(200)
+    .optional()
+    .describe('Shown publicly on the listing and in search: a city or area such as "Minneapolis, MN". Never a street address: Splitt has no private address field.'),
+  latitude: z.number().min(-90).max(90).optional().describe('Map pin. Required for a stay.'),
+  longitude: z.number().min(-180).max(180).optional().describe('Map pin. Required for a stay.'),
+  imageUrls: z
+    .array(z.string().url().max(2048))
+    .max(20)
+    .optional()
+    .describe('Publicly reachable image URLs. Publishing needs at least 3 photos (upload_file returns a URL for your own photo).'),
   make: z.string().max(80).optional(),
   model: z.string().max(80).optional(),
   year: z.number().int().min(1900).max(2100).optional(),
-  maxGuests: z.number().int().min(1).max(50).optional(),
+  maxGuests: z
+    .number()
+    .int()
+    .min(1)
+    .max(50)
+    .optional()
+    .describe('Stays only (bookingType nightly): how many guests it sleeps. Required for a stay, refused on gear.'),
+  checkInTime: stayTime('check-in time'),
+  checkOutTime: stayTime('check-out time'),
   instantBook: z.boolean().optional(),
   requiresIdVerification: z.boolean().optional(),
   cancellationPolicy: z.enum(CANCELLATION_POLICIES).optional(),
@@ -45,7 +74,6 @@ const listingFields = {
     .describe('Replacement value in USD (drives protection pricing). Required for motorized categories: E-Bikes, Boating, Water Sports, RV and ATVs.'),
   weeklyDiscountPct: z.number().min(0).max(100).optional(),
   monthlyDiscountPct: z.number().min(0).max(100).optional(),
-  quantity: z.number().int().min(1).max(100).optional().describe('How many identical units you have.'),
 };
 
 // ── Listings ─────────────────────────────────────────────────────────────────
@@ -71,27 +99,61 @@ export const createListing = defineTool({
   name: 'create_listing',
   title: 'Create a listing',
   description:
-    'Create a new gear listing for the signed-in vendor. It starts UNPUBLISHED; review it, then call set_listing_published. ' +
-    'Required: name, description, category and a price (per day or per hour); motorized categories (E-Bikes, Boating, Water Sports, RV, ATVs) also need estimatedValue. Use suggest_listing_price and generate_listing_description to draft good content. ' +
-    'Vendor onboarding must be complete (see get_vendor_onboarding_status).',
+    'Create a new listing (gear, or a stay with bookingType nightly) for the signed-in vendor. It starts as an UNPUBLISHED draft; review it, then call set_listing_published. ' +
+    'Required: name, description, category and a price in USD (pricePerDay, or pricePerHour for hourly gear); motorized categories (E-Bikes, Boating, Water Sports, RV, ATVs) also need estimatedValue. ' +
+    'location is public: a city or area, never a street address. Publishing needs at least 3 photos. ' +
+    'Creating can take up to about 30 seconds (Splitt writes a care guide and indexes the listing for search), and Splitt emails the vendor that the listing was received. ' +
+    'Use suggest_listing_price and generate_listing_description to draft good content. Vendor onboarding must be complete (see get_vendor_onboarding_status).',
   access: 'vendor',
   scope: 'listings',
   inputSchema: {
     name: z.string().min(3).max(200),
     description: z.string().min(20).max(5000),
     ...listingFields,
+    quantity: z
+      .number()
+      .int()
+      .min(1)
+      .max(50)
+      .optional()
+      .describe('How many identical units you have (1 to 50; default 1). Later, add or remove units with add_fleet_units and delete_fleet_unit.'),
   },
   annotations: WRITE,
   handler: async (args, ctx) => {
-    if (args.pricePerDay === undefined && args.pricePerHour === undefined) return fail('Provide pricePerDay (daily gear) or pricePerHour (hourly gear).');
+    const priceError = missingPrice(args);
+    if (priceError) return fail(priceError);
+    if (args.bookingType === 'nightly') {
+      if (args.latitude === undefined || args.longitude === undefined) return fail('A stay (bookingType nightly) needs latitude and longitude, its map pin.');
+      if (args.maxGuests === undefined) return fail('A stay (bookingType nightly) needs maxGuests, how many guests it sleeps.');
+    }
     return fromResult(await vendorListingTools.createListing(token(ctx), args));
   },
 });
 
+/** Why an optional reporting range cannot be sent, or null: each given day must be real, and the range in order. */
+function optionalRangeError(startDate?: string, endDate?: string): string | null {
+  const start = startDate === undefined ? undefined : isoDay(startDate);
+  const end = endDate === undefined ? undefined : isoDay(endDate);
+  if (start === null || end === null) return 'Dates must be ISO dates such as 2026-07-04.';
+  if (start && end && end < start) return 'endDate must be on or after startDate.';
+  return null;
+}
+
+/** The price a new listing of this booking type must carry, as a message, or null when it has it. */
+function missingPrice(args: { bookingType?: 'daily' | 'hourly' | 'both' | 'nightly'; pricePerDay?: number; pricePerHour?: number }): string | null {
+  const { bookingType, pricePerDay, pricePerHour } = args;
+  if (bookingType === 'hourly') return pricePerHour === undefined ? 'An hourly listing needs pricePerHour.' : null;
+  if (bookingType === 'both') return pricePerDay === undefined || pricePerHour === undefined ? 'bookingType both needs pricePerDay and pricePerHour.' : null;
+  if (pricePerDay !== undefined) return null;
+  return bookingType === 'nightly' ? 'A stay needs pricePerDay, its price per night.' : 'Provide pricePerDay (or pricePerHour with bookingType hourly).';
+}
+
 export const updateListing = defineTool({
   name: 'update_listing',
   title: 'Update a listing',
-  description: 'Change any fields of one of the vendor\'s listings (only the fields you pass are changed). Use get_listing_details to see current values.',
+  description:
+    'Change any fields of one of the vendor\'s listings (only the fields you pass are changed). Use get_listing_details to see current values. ' +
+    'The number of units is not a listing field: use add_fleet_units and delete_fleet_unit. Changing the name or description can take up to about 30 seconds (Splitt re-indexes it for search).',
   access: 'vendor',
   scope: 'listings',
   inputSchema: {
@@ -110,13 +172,32 @@ export const updateListing = defineTool({
 export const setListingPublished = defineTool({
   name: 'set_listing_published',
   title: 'Publish / unpublish listing',
-  description: 'Make a listing live and bookable (published=true) or hide it from search (published=false). Existing bookings are unaffected.',
+  description:
+    'Publish a listing (published=true) or hide it from search (published=false). Existing bookings are unaffected. ' +
+    'Publishing needs at least 3 photos. A new listing is then reviewed by Splitt (moderationStatus pending): it is not in search or bookable until approved.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: { listingId: uuid('listing'), published: z.boolean() },
   annotations: WRITE_IDEMPOTENT,
-  handler: async ({ listingId, published }, ctx) => fromResult(await vendorListingTools.setPublished(listingId, published, token(ctx))),
+  handler: async ({ listingId, published }, ctx) =>
+    fromResult(await vendorListingTools.setPublished(listingId, published, token(ctx)), (listing) => withModerationNote(listing, published)),
 });
+
+/**
+ * A published listing that moderation still holds is not in search and cannot
+ * be booked; the bare "status: available" read as live (SPLIT-1608).
+ */
+function withModerationNote(listing: unknown, published: boolean): unknown {
+  if (!published || !listing || typeof listing !== 'object' || Array.isArray(listing)) return listing;
+  const { moderationStatus } = listing as { moderationStatus?: unknown };
+  if (moderationStatus === 'pending' || moderationStatus === 'flagged') {
+    return { ...listing, note: 'Published, but Splitt is still reviewing it: it is not in search and cannot be booked until moderation approves it.' };
+  }
+  if (moderationStatus === 'rejected') {
+    return { ...listing, note: 'Published, but moderation rejected it, so it is not in search and cannot be booked. See moderationReason.' };
+  }
+  return listing;
+}
 
 export const deleteListing = defineTool({
   name: 'delete_listing',
@@ -167,9 +248,13 @@ export const getListingPerformance = defineTool({
   description: 'Views, bookings, revenue and conversion per listing for the signed-in vendor (optionally for a date range).',
   access: 'vendor',
   scope: 'listings',
-  inputSchema: { startDate: z.string().optional().describe('ISO date.'), endDate: z.string().optional().describe('ISO date.') },
+  inputSchema: { startDate: isoDate('Range start').optional(), endDate: isoDate('Range end').optional() },
   annotations: READ,
-  handler: async ({ startDate, endDate }, ctx) => fromResult(await vendorListingTools.getListingPerformance(token(ctx), startDate, endDate)),
+  handler: async ({ startDate, endDate }, ctx) => {
+    const err = optionalRangeError(startDate, endDate);
+    if (err) return fail(err);
+    return fromResult(await vendorListingTools.getListingPerformance(token(ctx), startDate, endDate));
+  },
 });
 
 // ── Calendar ─────────────────────────────────────────────────────────────────
@@ -178,16 +263,23 @@ export const listBlackoutDates = defineTool({
   name: 'list_blackout_dates',
   title: 'List blackout dates',
   description:
-    'Dates the vendor has blocked on a listing (maintenance, personal use…), each with an id for remove_blackout_date. ' +
-    'startDate and endDate are the first and last blocked days, both included; a timed hold is one day with startTime and endTime.',
+    'Days blocked on a listing, each with an id for remove_blackout_date: blocks the vendor added (maintenance, personal use…) and holds synced from calendar feeds (type "sync", with sourceFeedId). ' +
+    'startDate and endDate are the first and last blocked days, both included; a timed hold is one day with startTime and endTime. ' +
+    'Sorted by startDate and paged: the answer is { total, offset, items }. Narrow it with from/to and source.',
   access: 'vendor',
   scope: 'listings',
-  inputSchema: { listingId: uuid('listing') },
+  inputSchema: {
+    listingId: uuid('listing'),
+    from: isoDate('Only blocks on or after this day').optional(),
+    to: isoDate('Only blocks on or before this day').optional(),
+    source: z.enum(['all', 'manual', 'synced']).optional().describe('manual = added by the vendor; synced = imported from calendar feeds. Default all.'),
+    ...pagination,
+  },
   annotations: READ,
-  handler: async ({ listingId }, ctx) =>
-    fromResult(await vendorListingTools.listBlackoutDates(listingId, token(ctx)), (rows) =>
-      Array.isArray(rows) ? rows.map((row) => toInclusiveBlackout(row)) : rows,
-    ),
+  handler: async ({ listingId, from, to, source, limit, offset }, ctx) => {
+    for (const day of [from, to]) if (day !== undefined && !isoDay(day)) return fail('Dates must be ISO dates such as 2026-07-04.');
+    return fromResult(await vendorListingTools.listBlackoutDates(listingId, token(ctx)), (rows) => pageBlackouts(rows, { from, to, source, limit, offset }));
+  },
 });
 
 export const addBlackoutDates = defineTool({
@@ -327,9 +419,15 @@ export const getVendorDashboard = defineTool({
     'For money the vendor is owed or has been paid (balances, fees, payouts) use get_vendor_earnings and get_vendor_payouts instead.',
   access: 'vendor',
   scope: 'finance',
-  inputSchema: { startDate: z.string().optional(), endDate: z.string().optional() },
+  inputSchema: { startDate: isoDate('Range start').optional(), endDate: isoDate('Range end').optional() },
   annotations: READ,
-  handler: async ({ startDate, endDate }, ctx) => fromResult(await vendorFinanceTools.getDashboard(token(ctx), startDate, endDate)),
+  handler: async ({ startDate, endDate }, ctx) => {
+    // An unreadable date reached the backend and came back as "revenue": null
+    // with no reason (SPLIT-1608).
+    const err = optionalRangeError(startDate, endDate);
+    if (err) return fail(err);
+    return fromResult(await vendorFinanceTools.getDashboard(token(ctx), startDate, endDate));
+  },
 });
 
 export const getVendorEarnings = defineTool({

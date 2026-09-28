@@ -33,9 +33,10 @@ export function shiftDay(day: string, days: number): string {
 }
 
 /**
- * A stored blackout with `endDate` as its last blocked day. A timed hold (one
- * day with startTime and endTime) and any row without a readable, later end are
- * returned as stored.
+ * A stored blackout with `startDate` and `endDate` as its first and last
+ * blocked days (plain days, even where the backend answers with a timestamp).
+ * A timed hold (startTime and endTime) and any row without a readable, later
+ * end are returned as stored.
  */
 export function toInclusiveBlackout<T>(row: T): T {
   if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
@@ -44,5 +45,61 @@ export function toInclusiveBlackout<T>(row: T): T {
   const start = isoDay(stored.startDate);
   const end = isoDay(stored.endDate);
   if (!start || !end || end <= start) return row;
-  return { ...stored, endDate: shiftDay(end, -1) } as T;
+  return { ...stored, startDate: start, endDate: shiftDay(end, -1) } as T;
+}
+
+export interface BlackoutQuery {
+  /** Only blocks with a day on or after this one (YYYY-MM-DD). */
+  from?: string;
+  /** Only blocks with a day on or before this one (YYYY-MM-DD). */
+  to?: string;
+  /** manual = added by the vendor; synced = imported from a calendar feed. */
+  source?: 'all' | 'manual' | 'synced';
+  limit?: number;
+  offset?: number;
+}
+
+export const DEFAULT_BLACKOUT_PAGE = 50;
+
+/**
+ * One page of a listing's blocks, inclusive days, sorted by first day. A feed
+ * with a few years of holidays holds more rows than fit in one answer, and the
+ * list was cut at 128 of 152 with no way to reach the rest (SPLIT-1608).
+ * A row whose days cannot be read is never filtered out: a block the vendor
+ * cannot see is a block they cannot remove.
+ */
+export function pageBlackouts(rows: unknown, query: BlackoutQuery = {}): unknown {
+  if (!Array.isArray(rows)) return rows;
+  const from = query.from ? isoDay(query.from) : null;
+  const to = query.to ? isoDay(query.to) : null;
+  const matching = rows
+    .map((row) => toInclusiveBlackout(row) as unknown)
+    .filter((row) => matchesSource(row, query.source ?? 'all') && overlaps(row, from, to))
+    .sort(byFirstDay);
+  const offset = query.offset ?? 0;
+  const limit = query.limit ?? DEFAULT_BLACKOUT_PAGE;
+  return { total: matching.length, offset, items: matching.slice(offset, offset + limit) };
+}
+
+function field(row: unknown, key: string): unknown {
+  return row && typeof row === 'object' ? (row as Record<string, unknown>)[key] : undefined;
+}
+
+function matchesSource(row: unknown, source: 'all' | 'manual' | 'synced'): boolean {
+  if (source === 'all') return true;
+  const synced = field(row, 'type') === 'sync' || Boolean(field(row, 'sourceFeedId'));
+  return source === 'synced' ? synced : !synced;
+}
+
+function overlaps(row: unknown, from: string | null, to: string | null): boolean {
+  const first = isoDay(field(row, 'startDate'));
+  const last = isoDay(field(row, 'endDate')) ?? first;
+  if (!first || !last) return true;
+  return (!from || last >= from) && (!to || first <= to);
+}
+
+function byFirstDay(a: unknown, b: unknown): number {
+  const x = isoDay(field(a, 'startDate')) ?? '';
+  const y = isoDay(field(b, 'startDate')) ?? '';
+  return x < y ? -1 : x > y ? 1 : 0;
 }

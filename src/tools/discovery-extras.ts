@@ -83,6 +83,23 @@ export interface EmailTripPlanInput {
   source?: 'board' | 'fallback';
 }
 
+/**
+ * A `/categories/stats` row in the same shape as a `/categories` row, plus a
+ * numeric listingCount. The stats route answers with raw query columns
+ * (`category_id`, `category_name`, …) and the count as a string, so the same
+ * tool returned two shapes depending on one flag (SPLIT-1608).
+ */
+function categoryWithCount(row: unknown): unknown {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) out[key.startsWith('category_') ? key.slice('category_'.length) : key] = value;
+  if (out.listingCount !== undefined) {
+    const count = Number(out.listingCount);
+    out.listingCount = Number.isFinite(count) ? count : out.listingCount;
+  }
+  return out;
+}
+
 export const discoveryExtrasTools = {
   // ── Search alerts (saved searches): JwtAuthGuard, owner-scoped by the service ──
 
@@ -168,8 +185,10 @@ export const discoveryExtrasTools = {
 
   // ── Categories (public) ──────────────────────────────────────────────────
 
-  listCategories(withListingCounts = false) {
-    return call('GET', withListingCounts ? '/categories/stats' : '/categories');
+  async listCategories(withListingCounts = false) {
+    if (!withListingCounts) return call('GET', '/categories');
+    const result = await call<unknown>('GET', '/categories/stats');
+    return result.ok && Array.isArray(result.data) ? { ...result, data: result.data.map(categoryWithCount) } : result;
   },
 
   getCategory(categoryId: string) {

@@ -9,7 +9,8 @@
 const DEFAULT_BASE_URL = 'https://splitmygear-backend.vercel.app/api/v1';
 
 /**
- * Per-request timeout. The function's Vercel `maxDuration` is 30s; without an
+ * Per-request timeout. The functions' Vercel `maxDuration` is 30s (60s for
+ * /api/mcp, whose listing writes take longer; see lib/timeouts.ts); without an
  * explicit bound a hung/slow backend ties the whole invocation up until that
  * hard limit and then surfaces as an opaque 500. Aborting at 15s keeps a single
  * upstream stall well inside the budget (leaving room for the create-booking
@@ -45,7 +46,7 @@ interface RequestOptions {
    * Override the default per-request timeout (ms). Multi-step tool flows use a
    * longer budget; the identity probe in lib/jwt.ts uses a TIGHTER one: it runs
    * BEFORE the tool's own backend call, and two full-length stalls back to back
-   * would exceed the function's 30s maxDuration and surface as an opaque 500
+   * would exceed the function's maxDuration and surface as an opaque 500
    * instead of a clean 401 (SPLIT-1438).
    */
   timeoutMs?: number;

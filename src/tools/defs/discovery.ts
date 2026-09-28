@@ -1,5 +1,6 @@
 /** Public discovery tools: search, details, availability, pricing, reviews. Available to every principal. */
 import { z } from 'zod';
+import { isoDay, shiftDay } from '../blackout-dates';
 import { defineTool, ok, fail, fromResult } from '../registry';
 import { summarizeListing } from '../summaries';
 import { listingTools } from '../listings';
@@ -64,18 +65,21 @@ export const getListingDetails = defineTool({
 export const checkAvailability = defineTool({
   name: 'check_availability',
   title: 'Check availability',
-  description: 'Check whether a listing is free for a date range. Returns available:true/false with a short reason. Use before creating a booking.',
+  description:
+    'Check whether a listing is free for a rental. checkIn is the first day; checkOut is the return day and is not part of the rental ' +
+    '(checkIn 2027-03-01, checkOut 2027-03-03 covers Mar 1 and 2, and Mar 3 stays free), so checkOut must be after checkIn. ' +
+    'Returns available:true/false with a short reason. Use before creating a booking.',
   access: 'public',
   scope: 'read',
   inputSchema: {
     listingId: uuid('listing'),
-    checkIn: isoDate('Rental start date'),
-    checkOut: isoDate('Rental end date'),
+    checkIn: isoDate('First day of the rental'),
+    checkOut: isoDate('Return day (not part of the rental)'),
     guests: z.number().int().min(1).max(200).optional().default(1).describe('Party size (default 1).'),
   },
   annotations: READ,
   handler: async ({ listingId, checkIn, checkOut, guests }) => {
-    const err = dateRangeError(checkIn, checkOut);
+    const err = dateRangeError(checkIn, checkOut, 365, { names: ['checkIn', 'checkOut'] });
     if (err) return fail(err);
     return ok(await listingTools.checkAvailability(listingId, checkIn, checkOut, guests));
   },
@@ -84,16 +88,23 @@ export const checkAvailability = defineTool({
 export const getListingCalendar = defineTool({
   name: 'get_listing_calendar',
   title: 'Get availability calendar',
-  description: 'Day-by-day availability for a listing over a window (max 92 days); use it to suggest alternative dates when the requested ones are taken.',
+  description:
+    'Day-by-day availability for a listing from `from` to `to`, both days included (max 92 days); use it to suggest alternative dates when the requested ones are taken.',
   access: 'public',
   scope: 'read',
-  inputSchema: { listingId: uuid('listing'), from: isoDate('Window start'), to: isoDate('Window end') },
+  inputSchema: { listingId: uuid('listing'), from: isoDate('First day of the window'), to: isoDate('Last day of the window (included)') },
   annotations: READ,
   handler: async ({ listingId, from, to }) => {
-    const err = dateRangeError(from, to, 92);
+    const err = dateRangeError(from, to, 92, { names: ['from', 'to'], allowSameDay: true });
     if (err) return fail(err);
+    // The backend's window includes `to` but needs `from` before it, so one
+    // day is asked for as [D, D+1] and the extra day is dropped (SPLIT-1608).
+    const day = isoDay(from);
+    const oneDay = day !== null && day === isoDay(to);
     try {
-      return ok(await listingTools.getAvailabilityCalendar(listingId, from, to));
+      const days = await listingTools.getAvailabilityCalendar(listingId, from, oneDay ? shiftDay(day, 1) : to);
+      if (oneDay && Array.isArray(days)) return ok(days.filter((row) => isoDay((row as { startDate?: unknown } | null)?.startDate) === day));
+      return ok(days);
     } catch (error) {
       return fail(error instanceof BackendApiError ? error.message : 'Could not load the calendar');
     }
@@ -127,13 +138,14 @@ export const getBookingQuote = defineTool({
   title: 'Get a price quote',
   description:
     'Server-authoritative price breakdown for a rental BEFORE booking: nightly rates, discounts, protection premium, add-ons, delivery, fees, deposit and total. ' +
-    'No booking is created. Use it to show the renter what they will pay; create_booking uses the same pricing.',
+    'No booking is created. Use it to show the renter what they will pay; create_booking uses the same pricing. ' +
+    'startDate is the first day and endDate the return day, which is not charged (2027-03-01 to 2027-03-03 is 2 days or nights).',
   access: 'public',
   scope: 'read',
   inputSchema: {
     listingId: uuid('listing'),
-    startDate: isoDate('Rental start date'),
-    endDate: isoDate('Rental end date'),
+    startDate: isoDate('First day of the rental'),
+    endDate: isoDate('Return day (not charged)'),
     quantity: z.number().int().min(1).max(10).optional().describe('Units of this listing (default 1).'),
     numberOfGuests: z.number().int().min(1).max(200).optional(),
     protectionPlan: z.enum(PROTECTION_PLANS).optional().describe('Damage-protection plan to price in.'),
