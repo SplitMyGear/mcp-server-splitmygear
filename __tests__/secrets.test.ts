@@ -102,6 +102,9 @@ describe('no tool result carries a listing iCal URL', () => {
     expect(out).not.toContain('secret-token-123');
     expect(out).not.toContain(ICAL_URL_REDACTED);
     expect(out).not.toContain('pricePerDay');
-    expect(JSON.parse(out)).toMatchObject({});
+    // update_fleet_unit embeds the listing at the top level; log_unit_maintenance
+    // nests it under `unit`. Either way it must come back as exactly { id, name }.
+    const parsed = JSON.parse(out) as { listing?: unknown; unit?: { listing?: unknown } };
+    expect(parsed.listing ?? parsed.unit?.listing).toEqual({ id: 'l-1', name: 'Kayak' });
   });
 });

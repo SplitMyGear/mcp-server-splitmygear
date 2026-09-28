@@ -547,10 +547,10 @@ describe('B1: a vendor cannot misread their own transactions as income', () => {
 });
 
 describe('B2: delete_service warns that it cascades even to paid bookings', () => {
-  it('says the backend has no guard and prefers taking the service offline', () => {
+  it('says it cannot be undone and prefers taking the service offline', () => {
     expect(deleteService.description).toMatch(/every booking and review/);
-    expect(deleteService.description).toMatch(/including confirmed or already-paid bookings/);
-    expect(deleteService.description).toMatch(/no guard against it/);
+    expect(deleteService.description).toMatch(/including confirmed or paid bookings/);
+    expect(deleteService.description).toMatch(/cannot be undone/);
     expect(deleteService.description).toContain('update_service(status="archived")');
     expect(deleteService.description).toMatch(/Confirm with the user/);
   });
