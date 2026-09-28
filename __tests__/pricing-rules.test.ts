@@ -22,6 +22,7 @@ import {
   previewDynamicPrice,
   getDynamicPricingRecommendations,
   applyDynamicPricing,
+  getSuggestedInitialPrice,
   getMarketInsights,
 } from '../src/tools/defs/pricing-rules';
 import { TOOL_SCOPES } from '../src/tools/registry';
@@ -246,6 +247,27 @@ describe('pricingRulesTools defs', () => {
     res = await previewDynamicPrice.handler({ listingId: L, date: '2026-07-01', endDate: '2026-07-10' }, ctx);
     expect(res.isError).toBeUndefined();
     expect(lastCall().path).toBe(`/dynamic-pricing/calculate/range/${L}?startDate=2026-07-01&endDate=2026-07-10`);
+  });
+
+  it('preview_dynamic_price caps a range at 366 days', async () => {
+    // 2026-01-01 to 2027-01-02 is exactly 366 days (2026 is not a leap year).
+    let res = await previewDynamicPrice.handler({ listingId: L, date: '2026-01-01', endDate: '2027-01-02' }, ctx);
+    expect(res.isError).toBeUndefined();
+    res = await previewDynamicPrice.handler({ listingId: L, date: '2026-01-01', endDate: '2027-01-03' }, ctx);
+    expect(text(res)).toMatch(/Date range too long \(max 366 days\)/);
+  });
+
+  it('preview_dynamic_price and get_suggested_initial_price describe the range shape and the no-market-data fallback', () => {
+    expect(previewDynamicPrice.description).toMatch(/endDate is the checkout\/return day and is not itself priced/);
+    expect(previewDynamicPrice.description).toMatch(/2027-03-03 to 2027-03-10 is 7 days/);
+    expect(previewDynamicPrice.description).toMatch(/both dates are required together/);
+    expect(previewDynamicPrice.description).toMatch(/366 days apart/);
+    expect(previewDynamicPrice.description).toMatch(/totalPrice \(the exact sum of days\)/);
+    expect(previewDynamicPrice.description).toMatch(/factorTotals \(the whole-stay dollar total for each reason\)/);
+
+    expect(getSuggestedInitialPrice.description).toMatch(/marketRateBasis is category_market/);
+    expect(getSuggestedInitialPrice.description).toMatch(/marketRateBasis is none, marketRate is null/);
+    expect(getSuggestedInitialPrice.description).toMatch(/suggestedPrice, minPrice and maxPrice instead come from the listing's own price, not the market/);
   });
 
   it('get_dynamic_pricing_recommendations validates dates; apply_dynamic_pricing switches on bulk', async () => {

@@ -99,9 +99,11 @@ export const createListing = defineTool({
   title: 'Create a listing',
   description:
     'Create a new listing (gear, or a stay with bookingType nightly) for the signed-in vendor. It starts as an UNPUBLISHED draft; review it, then call set_listing_published. ' +
-    'Required: name, description, category and a price in USD (pricePerDay, or pricePerHour for hourly gear); motorized categories (E-Bikes, Boating, Water Sports, RV, ATVs) also need estimatedValue. ' +
-    'location is public: a city or area, never a street address. Publishing needs at least 3 photos. ' +
+    'Required to create: name, description and a price in USD (pricePerDay, or pricePerHour for hourly gear); motorized categories (E-Bikes, Boating, Water Sports, RV, ATVs) also need estimatedValue. ' +
+    'Publishing additionally needs a category, a location, a description of at least 20 characters and at least 3 photos (see set_listing_published). ' +
+    'location is public: a city or area, never a street address. ' +
     'Creating can take up to about 30 seconds (Splitt writes a care guide and indexes the listing for search), and Splitt emails the vendor that the listing was received. ' +
+    'When Splitt\'s AI is slow the new listing can start with no care guide; generate_care_guide writes one afterwards. ' +
     'Use suggest_listing_price and generate_listing_description to draft good content. Vendor onboarding must be complete (see get_vendor_onboarding_status).',
   access: 'vendor',
   scope: 'listings',
@@ -246,6 +248,23 @@ export const duplicateListing = defineTool({
   handler: async ({ listingId }, ctx) => fromResult(await vendorListingTools.duplicateListing(listingId, token(ctx))),
 });
 
+export const generateCareGuide = defineTool({
+  name: 'generate_care_guide',
+  title: 'Generate care guide',
+  description:
+    'Have Splitt\'s AI write (or rewrite) the care guide renters see for one of the vendor\'s listings. This REPLACES whatever guide is there now, including one the vendor wrote or edited by hand, ' +
+    'so confirm with the user before calling it. Splitt\'s AI can also be too slow to write a guide when a listing is first created (see create_listing); use this afterwards to fill one in.',
+  access: 'vendor',
+  scope: 'listings',
+  inputSchema: { listingId: uuid('listing') },
+  annotations: WRITE,
+  handler: async ({ listingId }, ctx) => {
+    const result = await vendorListingTools.generateCareGuide(listingId, token(ctx));
+    if (!result.ok && result.status === 503) return fail('Splitt\'s AI is unavailable right now; the current guide was kept.');
+    return fromResult(result, (listing) => ({ careGuide: (listing as { careGuide?: unknown } | null)?.careGuide ?? null }));
+  },
+});
+
 export const generateListingDraft = defineTool({
   name: 'generate_listing_draft',
   title: 'AI listing draft',
@@ -270,7 +289,9 @@ export const generateListingDraft = defineTool({
 export const getListingPerformance = defineTool({
   name: 'get_listing_performance',
   title: 'Listing performance',
-  description: 'Views, bookings, revenue and conversion per listing for the signed-in vendor (optionally for a date range).',
+  description:
+    'Views, bookings, revenue and conversion per listing for the signed-in vendor (optionally for a date range; a date-only endDate includes that whole day). ' +
+    'conversionRate is confirmed or completed bookings divided by views in the same window, never above 100.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: { startDate: isoDate('Range start').optional(), endDate: isoDate('Range end').optional() },
@@ -442,7 +463,8 @@ export const getVendorDashboard = defineTool({
   name: 'get_vendor_dashboard',
   title: 'Vendor dashboard',
   description:
-    'Activity metrics for the signed-in vendor: active listings, bookings, revenue, occupancy and a revenue series (optionally for a date range). ' +
+    'Activity metrics for the signed-in vendor: active listings, bookings, revenue, occupancy and a revenue series (optionally for a date range; a date-only endDate includes that whole day). ' +
+    'conversionRate is confirmed or completed bookings divided by views in the same window, never above 100. ' +
     'For money the vendor is owed or has been paid (balances, fees, payouts) use get_vendor_earnings and get_vendor_payouts instead.',
   access: 'vendor',
   scope: 'finance',
@@ -690,6 +712,7 @@ export const vendorTools = [
   deleteListing,
   archiveListing,
   duplicateListing,
+  generateCareGuide,
   generateListingDraft,
   getListingPerformance,
   listBlackoutDates,

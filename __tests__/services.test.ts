@@ -473,5 +473,18 @@ describe('service tool defs', () => {
     const missing = await deleteService.handler({ serviceId: S }, vendorCtx);
     expect(missing.isError).toBe(true);
     expect(text(missing)).toMatch(/^Not found: /);
+    // A booking that holds a payment, or is pending/confirmed/completed/refunded, makes the backend refuse (SPLIT-1609).
+    mockBackendRequest.mockRejectedValueOnce(new BackendApiError(409, 'Cannot delete a service with an active or paid booking; archive it instead'));
+    const conflict = await deleteService.handler({ serviceId: S }, vendorCtx);
+    expect(conflict.isError).toBe(true);
+    expect(text(conflict)).toMatch(/^Conflict: /);
+  });
+
+  it('delete_service describes the refusal and points at archiving, not a blanket cascade', () => {
+    expect(deleteService.description).toMatch(/Splitt refuses \(Conflict\)/);
+    expect(deleteService.description).toMatch(/holds a payment, or is pending, confirmed, completed or refunded/);
+    expect(deleteService.description).toMatch(/no bookings, or only cancelled and unpaid ones, is deleted/);
+    expect(deleteService.description).toContain('update_service(status="archived")');
+    expect(deleteService.description).toMatch(/Confirm with the user/);
   });
 });

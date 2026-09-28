@@ -74,6 +74,16 @@ export const vendorListingTools = {
     return call('POST', `/rentals/${listingId}/duplicate`, { token, body: {}, timeoutMs: LISTING_WRITE_TIMEOUT_MS });
   },
 
+  /**
+   * Replace the listing's AI care guide with a freshly written one (the
+   * controller serves this under both /listings and /rentals; other listing
+   * tools use /rentals, so this does too). Answers the whole updated listing;
+   * on an AI outage the backend answers 503 and keeps the old guide.
+   */
+  generateCareGuide(listingId: string, token: string) {
+    return call('POST', `/rentals/${listingId}/care-guide/regenerate`, { token, body: {}, timeoutMs: LISTING_WRITE_TIMEOUT_MS });
+  },
+
   /** AI-drafted listing (title/description/specs/price guidance) from a gear description. */
   generateListingDraft(
     token: string,
