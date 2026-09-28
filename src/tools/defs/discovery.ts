@@ -1,7 +1,7 @@
 /** Public discovery tools: search, details, availability, pricing, reviews. Available to every principal. */
 import { z } from 'zod';
 import { isoDay, shiftDay } from '../blackout-dates';
-import { defineTool, ok, fail, fromResult } from '../registry';
+import { defineTool, ok, fail, fromResult, withStatusHint } from '../registry';
 import { summarizeListing } from '../summaries';
 import { listingTools } from '../listings';
 import { pricingTools } from '../pricing';
@@ -10,6 +10,7 @@ import { bookingTools } from '../bookings';
 import { experienceTools } from '../experiences';
 import { experienceCategorySchema } from '../experience-categories';
 import { BackendApiError } from '@/lib/backend-client';
+import { isVendorFamily } from '@/lib/roles';
 import { dateRangeError } from '../_shared';
 import { uuid, isoDate, READ, LISTING_CATEGORIES, PROTECTION_PLANS, UNTRUSTED_NOTE } from './common';
 
@@ -133,11 +134,14 @@ export const getListingReviews = defineTool({
   handler: async ({ listingId }) => fromResult(await reviewTools.getListingReviews(listingId)),
 });
 
+const QUOTE_MODERATION_HINT = "If this is one of your own listings, quotes work only once it is published and approved by Splitt's review.";
+
 export const getBookingQuote = defineTool({
   name: 'get_booking_quote',
   title: 'Get a price quote',
   description:
     'Server-authoritative price breakdown for a rental BEFORE booking: nightly rates, discounts, protection premium, add-ons, delivery, fees, deposit and total. ' +
+    'Works only for a published, Splitt-approved listing: a draft, unpublished, or moderation-pending/rejected listing answers not found, even for its own vendor. ' +
     'No booking is created. Use it to show the renter what they will pay; create_booking uses the same pricing. ' +
     'startDate is the first day and endDate the return day, which is not charged (2027-03-01 to 2027-03-03 is 2 days or nights).',
   access: 'public',
@@ -154,10 +158,17 @@ export const getBookingQuote = defineTool({
     bringingPets: z.boolean().optional(),
   },
   annotations: READ,
-  handler: async (args) => {
+  handler: async (args, ctx) => {
     const err = dateRangeError(args.startDate, args.endDate);
     if (err) return fail(err);
-    return fromResult(await bookingTools.getQuote(args));
+    const result = await bookingTools.getQuote(args);
+    // POST /bookings/quote is anonymous-only and 404s a vendor's own unpublished
+    // or unapproved listing; without this hint that reads as a bug, not a status
+    // to fix (SPLIT-1608).
+    if (!result.ok && result.status === 404 && isVendorFamily(ctx.role)) {
+      return fail(`${withStatusHint(result.error, result.status)} ${QUOTE_MODERATION_HINT}`);
+    }
+    return fromResult(result);
   },
 });
 

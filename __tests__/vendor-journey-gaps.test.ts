@@ -29,23 +29,48 @@ import {
   updateListing,
   duplicateListing,
   setListingPublished,
+  deleteListing,
   listBlackoutDates,
+  removeBlackoutDate,
   getVendorDashboard,
   getListingPerformance,
+  createExperience,
+  updateExperience,
+  vendorTools,
 } from '../src/tools/defs/vendor';
-import { checkAvailability, getListingCalendar } from '../src/tools/defs/discovery';
+import * as vendorDefs from '../src/tools/defs/vendor';
+import { checkAvailability, getListingCalendar, getExperienceDetails, getBookingQuote } from '../src/tools/defs/discovery';
 import { getVendorOnboardingStatus, improveListingTitle } from '../src/tools/defs/renter';
 import { listCategories } from '../src/tools/defs/discovery-extras';
-import { setAutoApprove, getReportSubscription, setReportSubscription, getTaxSummary } from '../src/tools/defs/vendor-extras';
-import { createRateRule } from '../src/tools/defs/pricing-rules';
+import { setAutoApprove, getReportSubscription, setReportSubscription, getTaxSummary, listMyTransactions, getTransaction } from '../src/tools/defs/vendor-extras';
+import { createRateRule, setDynamicPricingConfig } from '../src/tools/defs/pricing-rules';
 import { listMyRoutes } from '../src/tools/defs/routes';
+import { listFleetUnits, getUnitStats, getUnitMaintenanceHistory, addFleetUnits, updateFleetUnit, logUnitMaintenance } from '../src/tools/defs/fleet';
+import { addCalendarFeed, updateCalendarFeed, syncCalendarFeed } from '../src/tools/defs/calendar-feeds';
+import { deleteService, updateService } from '../src/tools/defs/services';
 
 const LISTING = '11111111-1111-4111-8111-111111111111';
+const EXPERIENCE = '33333333-3333-4333-8333-333333333333';
 const ctx: ToolContext = { userId: 'u', role: 'vendor_owner', token: 'T', kind: 'oauth' };
 type Result = { isError?: boolean; content: Array<{ type: string; text?: string }> };
 const text = (r: Result) => r.content.map((c) => c.text ?? '').join('');
 const data = (r: Result) => JSON.parse(text(r));
 const lastCall = () => mockBackendRequest.mock.calls[mockBackendRequest.mock.calls.length - 1];
+
+/**
+ * archive_listing and delete_experience are new tools added by the batch-2
+ * commit under test below (bdbe977). A named import of either fails to compile
+ * against the pre-batch tree (cbbcb26) and would take every other test in this
+ * file down with it, so they are read off the namespace import at a generic
+ * shape instead, keeping the rest of the file's tests independently runnable
+ * against both trees (SPLIT-1608).
+ */
+interface NewVendorTool {
+  description: string;
+  handler: (args: Record<string, unknown>, ctx: ToolContext) => Promise<Result>;
+}
+const archiveListing = (vendorDefs as unknown as Record<string, NewVendorTool>).archiveListing;
+const deleteExperience = (vendorDefs as unknown as Record<string, NewVendorTool>).deleteExperience;
 
 const kayak = { name: 'Journey kayak', description: 'A stable touring kayak for lakes and calm rivers.', category: 'Kayaking' as const, pricePerDay: 45 };
 
@@ -297,5 +322,278 @@ describe('the route library list leaves the tracks out', () => {
   it('drops geometry, polyline and elevation profile from each row', async () => {
     mockBackendRequest.mockResolvedValue({ routes: [{ id: 'r1', name: 'Lake loop', distanceM: 5200, geometry: { type: 'LineString' }, encodedPolyline: 'abc', elevationProfile: [1, 2] }] });
     expect(data(await listMyRoutes.handler({}, ctx))).toEqual({ routes: [{ id: 'r1', name: 'Lake loop', distanceM: 5200 }] });
+  });
+});
+
+// ── SPLIT-1608 batch 2 (bdbe977) ─────────────────────────────────────────────
+
+describe('fleet tools trim an embedded listing to id and name', () => {
+  const UNIT = '22222222-2222-4222-8222-222222222222';
+  const bigListing = { id: 'L1', name: 'Journey kayak', description: 'A'.repeat(400), careGuide: 'Rinse after every use.' };
+  const trimmedListing = { id: 'L1', name: 'Journey kayak' };
+
+  it('list_fleet_units, get_unit_stats and get_unit_maintenance_history trim it, however deep it is nested', async () => {
+    mockBackendRequest.mockResolvedValue([{ id: UNIT, label: 'Unit 1', listing: bigListing }]);
+    expect(data(await listFleetUnits.handler({}, ctx))).toEqual([{ id: UNIT, label: 'Unit 1', listing: trimmedListing }]);
+
+    mockBackendRequest.mockResolvedValue({ id: UNIT, listing: bigListing, completedBookings: 5 });
+    expect(data(await getUnitStats.handler({ unitId: UNIT }, ctx))).toEqual({ id: UNIT, listing: trimmedListing, completedBookings: 5 });
+
+    mockBackendRequest.mockResolvedValue([{ id: 'm1', kind: 'service', unit: { id: UNIT, listing: bigListing } }]);
+    expect(data(await getUnitMaintenanceHistory.handler({ unitId: UNIT }, ctx))).toEqual([{ id: 'm1', kind: 'service', unit: { id: UNIT, listing: trimmedListing } }]);
+  });
+
+  it('add_fleet_units trims it for a single unit and for a bulk batch, and still caps bulk at 50 per call', async () => {
+    mockBackendRequest.mockResolvedValue({ id: UNIT, listing: bigListing });
+    expect(data(await addFleetUnits.handler({ listingId: LISTING, label: 'Unit' }, ctx))).toEqual({ id: UNIT, listing: trimmedListing });
+
+    mockBackendRequest.mockResolvedValue([{ id: UNIT, listing: bigListing }, { id: 'u2', listing: bigListing }]);
+    expect(data(await addFleetUnits.handler({ listingId: LISTING, count: 2 }, ctx))).toEqual({
+      created: 2,
+      units: [{ id: UNIT, listing: trimmedListing }, { id: 'u2', listing: trimmedListing }],
+    });
+    expect(addFleetUnits.description).toContain('capped at 50 units per call');
+  });
+
+  it('update_fleet_unit and log_unit_maintenance trim it too', async () => {
+    mockBackendRequest.mockResolvedValue({ id: UNIT, status: 'available', listing: bigListing });
+    expect(data(await updateFleetUnit.handler({ unitId: UNIT, status: 'available' }, ctx))).toEqual({ id: UNIT, status: 'available', listing: trimmedListing });
+
+    mockBackendRequest.mockResolvedValue({ unit: { id: UNIT, listing: bigListing }, record: { id: 'm1' } });
+    expect(data(await logUnitMaintenance.handler({ unitId: UNIT, kind: 'service', description: 'Oil change' }, ctx))).toEqual({
+      unit: { id: UNIT, listing: trimmedListing },
+      record: { id: 'm1' },
+    });
+  });
+});
+
+describe('archive_listing retires a listing through the bulk status endpoint', () => {
+  it('sends listingIds/status and the token, and returns { archived, listingId }', async () => {
+    mockBackendRequest.mockResolvedValue([{ id: LISTING, status: 'archived' }]);
+    const result = await archiveListing.handler({ listingId: LISTING }, ctx);
+    const [method, path, opts] = mockBackendRequest.mock.calls[0];
+    expect([method, path]).toEqual(['POST', '/rentals/bulk/status']);
+    expect(opts).toMatchObject({ token: ctx.token, body: { listingIds: [LISTING], status: 'archived' } });
+    expect(result.isError).toBeUndefined();
+    expect(data(result)).toEqual({ archived: true, listingId: LISTING });
+  });
+
+  it('is a registered vendor tool, and delete_listing points to it', () => {
+    expect(vendorTools.some((t) => t.name === 'archive_listing')).toBe(true);
+    expect(deleteListing.description).toContain('archive_listing');
+  });
+});
+
+describe('set_listing_published uses the listing-write timeout', () => {
+  it('passes LISTING_WRITE_TIMEOUT_MS to the backend call', async () => {
+    mockBackendRequest.mockResolvedValue({ id: LISTING, status: 'available', moderationStatus: 'approved' });
+    await setListingPublished.handler({ listingId: LISTING, published: true }, ctx);
+    expect(mockBackendRequest.mock.calls[0][2].timeoutMs).toBe(LISTING_WRITE_TIMEOUT_MS);
+  });
+
+  it('describes every field publishing actually requires', () => {
+    expect(setListingPublished.description).toMatch(/a category, a location, a description of at least 20 characters and a price above 0/);
+  });
+});
+
+describe('get_experience_details forwards the caller token', () => {
+  it('sends it on both the detail and the schedules request when ctx has one', async () => {
+    mockBackendRequest
+      .mockResolvedValueOnce({ success: true, experience: { id: EXPERIENCE, status: 'draft' } })
+      .mockResolvedValueOnce({ success: true, schedules: [] });
+    const result = await getExperienceDetails.handler({ experienceId: EXPERIENCE }, ctx);
+    expect(result.isError).toBeUndefined();
+    expect(mockBackendRequest.mock.calls[0][2]?.token).toBe(ctx.token);
+    expect(mockBackendRequest.mock.calls[1][2]?.token).toBe(ctx.token);
+  });
+
+  it('still works with no token, for an anonymous read', async () => {
+    mockBackendRequest
+      .mockResolvedValueOnce({ success: true, experience: { id: EXPERIENCE, status: 'published' } })
+      .mockResolvedValueOnce({ success: true, schedules: [] });
+    const result = await getExperienceDetails.handler({ experienceId: EXPERIENCE }, { ...ctx, token: undefined });
+    expect(result.isError).toBeUndefined();
+  });
+
+  it('says a host sees their own draft or archived experience here', () => {
+    expect(getExperienceDetails.description).toMatch(/host also sees their own draft or archived experience/);
+  });
+});
+
+describe('delete_experience', () => {
+  it('sends DELETE with the token and returns { deleted, experienceId }', async () => {
+    mockBackendRequest.mockResolvedValue(undefined);
+    const result = await deleteExperience.handler({ experienceId: EXPERIENCE }, ctx);
+    const [method, path, opts] = mockBackendRequest.mock.calls[0];
+    expect([method, path]).toEqual(['DELETE', `/packages/${EXPERIENCE}`]);
+    expect(opts.token).toBe(ctx.token);
+    expect(result.isError).toBeUndefined();
+    expect(data(result)).toEqual({ deleted: true, experienceId: EXPERIENCE });
+  });
+
+  it('is registered, and a 409 comes back as isError with the Conflict text', async () => {
+    expect(vendorTools.some((t) => t.name === 'delete_experience')).toBe(true);
+    mockBackendRequest.mockRejectedValue(new BackendApiError(409, 'Experience has confirmed bookings'));
+    const result = await deleteExperience.handler({ experienceId: EXPERIENCE }, ctx);
+    expect(result.isError).toBe(true);
+    expect(text(result)).toBe('Conflict: Experience has confirmed bookings');
+  });
+});
+
+describe('create_experience and update_experience accept guidanceType and pricingMode', () => {
+  const base = { title: 'Sunset kayak tour', description: 'A guided two-hour paddle at golden hour.', duration: 2, durationUnit: 'hours', pricePerPerson: 60 };
+
+  it('create_experience forwards both to the backend', async () => {
+    mockBackendRequest.mockResolvedValue({ id: EXPERIENCE });
+    const parsed = z.object(createExperience.inputSchema).parse({ ...base, guidanceType: 'staff_guided', pricingMode: 'flat_rate' });
+    const result = await createExperience.handler(parsed, ctx);
+    expect(result.isError).toBeUndefined();
+    expect(mockBackendRequest.mock.calls[0][2].body).toMatchObject({ guidanceType: 'staff_guided', pricingMode: 'flat_rate' });
+  });
+
+  it('update_experience forwards both too', async () => {
+    mockBackendRequest.mockResolvedValue({ id: EXPERIENCE });
+    const parsed = z.object(updateExperience.inputSchema).parse({ experienceId: EXPERIENCE, guidanceType: 'self_guided', pricingMode: 'per_person' });
+    const result = await updateExperience.handler(parsed, ctx);
+    expect(result.isError).toBeUndefined();
+    expect(mockBackendRequest.mock.calls[0][2].body).toMatchObject({ guidanceType: 'self_guided', pricingMode: 'per_person' });
+  });
+
+  it('rejects any other value for either field', () => {
+    const shape = z.object(createExperience.inputSchema);
+    expect(shape.safeParse({ ...base, guidanceType: 'robot_guided' }).success).toBe(false);
+    expect(shape.safeParse({ ...base, pricingMode: 'subscription' }).success).toBe(false);
+  });
+});
+
+describe('set_dynamic_pricing_config accepts null to clear minPrice/maxPrice', () => {
+  it('the schema accepts null for either field', () => {
+    const shape = z.object(setDynamicPricingConfig.inputSchema);
+    expect(shape.safeParse({ listingId: LISTING, minPrice: null }).success).toBe(true);
+    expect(shape.safeParse({ listingId: LISTING, maxPrice: null }).success).toBe(true);
+  });
+
+  it('forwards null in the body', async () => {
+    mockBackendRequest.mockResolvedValue({ listingId: LISTING, minPrice: null });
+    const parsed = z.object(setDynamicPricingConfig.inputSchema).parse({ listingId: LISTING, minPrice: null });
+    const result = await setDynamicPricingConfig.handler(parsed, ctx);
+    expect(result.isError).toBeUndefined();
+    expect(mockBackendRequest.mock.calls[0][2].body).toEqual({ minPrice: null });
+  });
+
+  it('still refuses minPrice > maxPrice when both are plain numbers', async () => {
+    const result = await setDynamicPricingConfig.handler({ listingId: LISTING, minPrice: 100, maxPrice: 50 }, ctx);
+    expect(result.isError).toBe(true);
+    expect(text(result)).toBe('minPrice must not exceed maxPrice.');
+    expect(mockBackendRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe('calendar feeds accept treatFreeAllDayAsBusy', () => {
+  const FEED = '44444444-4444-4444-8444-444444444444';
+
+  it('add_calendar_feed forwards it in the body', async () => {
+    mockBackendRequest.mockResolvedValue({ feed: { id: FEED }, importedCount: 0, removedCount: 0 });
+    const parsed = z.object(addCalendarFeed.inputSchema).parse({ listingId: LISTING, url: 'https://calendar.example/a.ics', treatFreeAllDayAsBusy: false });
+    const result = await addCalendarFeed.handler(parsed, ctx);
+    expect(result.isError).toBeUndefined();
+    expect(mockBackendRequest.mock.calls[0][2].body).toMatchObject({ treatFreeAllDayAsBusy: false });
+  });
+
+  it('update_calendar_feed forwards it, and it alone satisfies "pass at least one field"', async () => {
+    mockBackendRequest.mockResolvedValue({ id: FEED });
+    const parsed = z.object(updateCalendarFeed.inputSchema).parse({ feedId: FEED, treatFreeAllDayAsBusy: true });
+    const result = await updateCalendarFeed.handler(parsed, ctx);
+    expect(result.isError).toBeUndefined();
+    expect(mockBackendRequest.mock.calls[0][2].body).toMatchObject({ treatFreeAllDayAsBusy: true });
+  });
+
+  it('sync_calendar_feed says a paused feed can still be synced by hand', () => {
+    expect(syncCalendarFeed.description).toMatch(/paused feed can still be synced by hand/);
+  });
+});
+
+describe('pricing and blackout descriptions point at the right follow-up tool', () => {
+  it('the seasonal-rules note names applyWeekendPremium', () => {
+    expect(createRateRule.description).toContain('applyWeekendPremium');
+  });
+
+  it('remove_blackout_date explains the sync suppression and clear_feed_suppression', () => {
+    expect(removeBlackoutDate.description).toMatch(/suppression/);
+    expect(removeBlackoutDate.description).toContain('clear_feed_suppression');
+  });
+});
+
+// ── SPLIT-1608 remaining fixes (B1-B3) ───────────────────────────────────────
+
+describe('B1: a vendor cannot misread their own transactions as income', () => {
+  it('list_my_transactions and get_transaction both say these are the caller\'s own ledger, not a vendor income report', () => {
+    for (const tool of [listMyTransactions, getTransaction]) {
+      expect(tool.description).toMatch(/own ledger/);
+      expect(tool.description).toContain('get_vendor_earnings');
+      expect(tool.description).toContain('get_vendor_payouts');
+    }
+  });
+
+  it('list_my_transactions says a PAYMENT row is a payment this account made, not income', () => {
+    expect(listMyTransactions.description).toMatch(/PAYMENT row is a payment this account made/);
+    expect(listMyTransactions.description).toMatch(/for example, as a renter/);
+  });
+
+  it('get_transaction explains whose share vendorPayout is', () => {
+    expect(getTransaction.description).toMatch(/vendorPayout is the share of that booking's vendor/);
+    expect(getTransaction.description).toMatch(/that vendor is someone else, not this account's income/);
+  });
+});
+
+describe('B2: delete_service warns that it cascades even to paid bookings', () => {
+  it('says the backend has no guard and prefers taking the service offline', () => {
+    expect(deleteService.description).toMatch(/every booking and review/);
+    expect(deleteService.description).toMatch(/including confirmed or already-paid bookings/);
+    expect(deleteService.description).toMatch(/no guard against it/);
+    expect(deleteService.description).toContain('update_service(status="archived")');
+    expect(deleteService.description).toMatch(/Confirm with the user/);
+  });
+
+  it('only names update_service(status="archived") because that field genuinely exists', () => {
+    expect(Object.keys(updateService.inputSchema)).toContain('status');
+    expect(z.object(updateService.inputSchema).shape.status.unwrap().options).toContain('archived');
+  });
+
+  it('keeps the DESTRUCTIVE annotation', () => {
+    expect(deleteService.annotations.destructiveHint).toBe(true);
+  });
+});
+
+describe('B3: get_booking_quote hints a vendor toward moderation when their own listing 404s', () => {
+  const quoteArgs = { listingId: LISTING, startDate: '2027-03-01', endDate: '2027-03-03' };
+  const vendorCtx: ToolContext = { userId: 'v', role: 'vendor_owner', token: 'T', kind: 'oauth' };
+  const renterCtx: ToolContext = { userId: 'r', role: 'renter', token: 'T', kind: 'oauth' };
+
+  it('appends the publish/approval hint for a vendor-family caller on a 404', async () => {
+    mockBackendRequest.mockRejectedValue(new BackendApiError(404, 'Listing not found'));
+    const result = await getBookingQuote.handler(quoteArgs, vendorCtx);
+    expect(result.isError).toBe(true);
+    expect(text(result)).toBe("Not found: Listing not found If this is one of your own listings, quotes work only once it is published and approved by Splitt's review.");
+  });
+
+  it('leaves a renter\'s or anonymous 404 exactly as the backend said', async () => {
+    mockBackendRequest.mockRejectedValue(new BackendApiError(404, 'Listing not found'));
+    const asRenter = await getBookingQuote.handler(quoteArgs, renterCtx);
+    expect(text(asRenter)).toBe('Not found: Listing not found');
+
+    mockBackendRequest.mockRejectedValue(new BackendApiError(404, 'Listing not found'));
+    const anonymous = await getBookingQuote.handler(quoteArgs, { kind: 'operator' });
+    expect(text(anonymous)).toBe('Not found: Listing not found');
+  });
+
+  it('does not touch a non-404 failure', async () => {
+    mockBackendRequest.mockRejectedValue(new BackendApiError(409, 'Conflict'));
+    const result = await getBookingQuote.handler(quoteArgs, vendorCtx);
+    expect(text(result)).toBe('Conflict: Conflict');
+  });
+
+  it('says in its own description that quotes need a published, approved listing', () => {
+    expect(getBookingQuote.description).toMatch(/published, Splitt-approved listing/);
   });
 });

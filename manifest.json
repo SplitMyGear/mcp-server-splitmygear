@@ -498,6 +498,10 @@
       "description": "Delete a listing"
     },
     {
+      "name": "archive_listing",
+      "description": "Archive a listing"
+    },
+    {
       "name": "duplicate_listing",
       "description": "Duplicate a listing"
     },
@@ -588,6 +592,10 @@
     {
       "name": "delete_experience_schedule",
       "description": "Remove a schedule slot"
+    },
+    {
+      "name": "delete_experience",
+      "description": "Delete an experience"
     },
     {
       "name": "list_experience_host_bookings",
