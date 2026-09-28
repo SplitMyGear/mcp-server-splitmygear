@@ -21,6 +21,7 @@ import { messagingTools } from '../src/tools/messaging';
 import { experienceTools } from '../src/tools/experiences';
 import { listingTools } from '../src/tools/listings';
 import { call, compact, qs, dateRangeError } from '../src/tools/_shared';
+import { LISTING_WRITE_TIMEOUT_MS } from '../src/lib/timeouts';
 
 const T = 'h.p.s';
 const { BackendApiError } = jest.requireMock('../src/lib/backend-client');
@@ -216,6 +217,8 @@ describe('vendorListingTools', () => {
     expect(lastCall()).toMatchObject({ method: 'DELETE', path: '/rentals/l1' });
     await vendorListingTools.duplicateListing('l1', T);
     expect(lastCall()).toMatchObject({ method: 'POST', path: '/rentals/l1/duplicate' });
+    await vendorListingTools.generateCareGuide('l1', T);
+    expect(lastCall()).toMatchObject({ method: 'POST', path: '/rentals/l1/care-guide/regenerate', opts: { token: T, body: {}, timeoutMs: LISTING_WRITE_TIMEOUT_MS } });
     await vendorListingTools.generateListingDraft(T, { gearType: 'tent', features: ['light'] });
     expect(lastCall()).toMatchObject({ method: 'POST', path: '/ai/generate-listing', opts: { body: { gearType: 'tent', features: ['light'] } } });
     await vendorListingTools.getListingPerformance(T, '2026-01-01', undefined);

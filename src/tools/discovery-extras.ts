@@ -89,10 +89,16 @@ export interface EmailTripPlanInput {
  * (`category_id`, `category_name`, …) and the count as a string, so the same
  * tool returned two shapes depending on one flag (SPLIT-1608).
  */
-function categoryWithCount(row: unknown): unknown {
+export function categoryWithCount(row: unknown): unknown {
   if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
   const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(row)) out[key.startsWith('category_') ? key.slice('category_'.length) : key] = value;
+  for (const [key, value] of Object.entries(row)) {
+    // A JSON "__proto__" key is an own key, not the prototype slot; assigning it
+    // with out[key] = ... would re-parent out, the same hazard scrubSecrets
+    // guards against (SPLIT-1609).
+    if (key === '__proto__') continue;
+    out[key.startsWith('category_') ? key.slice('category_'.length) : key] = value;
+  }
   if (out.listingCount !== undefined) {
     const count = Number(out.listingCount);
     out.listingCount = Number.isFinite(count) ? count : out.listingCount;

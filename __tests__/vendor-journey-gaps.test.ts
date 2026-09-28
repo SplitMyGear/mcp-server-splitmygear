@@ -36,6 +36,7 @@ import {
   getListingPerformance,
   createExperience,
   updateExperience,
+  generateCareGuide,
   vendorTools,
 } from '../src/tools/defs/vendor';
 import * as vendorDefs from '../src/tools/defs/vendor';
@@ -45,9 +46,10 @@ import { listCategories } from '../src/tools/defs/discovery-extras';
 import { setAutoApprove, getReportSubscription, setReportSubscription, getTaxSummary, listMyTransactions, getTransaction } from '../src/tools/defs/vendor-extras';
 import { createRateRule, setDynamicPricingConfig } from '../src/tools/defs/pricing-rules';
 import { listMyRoutes } from '../src/tools/defs/routes';
-import { listFleetUnits, getUnitStats, getUnitMaintenanceHistory, addFleetUnits, updateFleetUnit, logUnitMaintenance } from '../src/tools/defs/fleet';
+import { listFleetUnits, getUnitStats, getUnitMaintenanceHistory, addFleetUnits, updateFleetUnit, logUnitMaintenance, withListingRefs } from '../src/tools/defs/fleet';
 import { addCalendarFeed, updateCalendarFeed, syncCalendarFeed } from '../src/tools/defs/calendar-feeds';
 import { deleteService, updateService } from '../src/tools/defs/services';
+import { categoryWithCount } from '../src/tools/discovery-extras';
 
 const LISTING = '11111111-1111-4111-8111-111111111111';
 const EXPERIENCE = '33333333-3333-4333-8333-333333333333';
@@ -126,6 +128,18 @@ describe('instantBook is an update_listing-only setting', () => {
     expect(updateListing.inputSchema.instantBook.description).toMatch(/confirmed automatically/);
     expect(updateListing.inputSchema.instantBook.description).toMatch(/lands as PENDING/);
     expect(updateListing.inputSchema.instantBook.description).toContain('set_auto_approve');
+  });
+});
+
+describe('create_listing describes only what create actually requires', () => {
+  it('says create needs name, description and a price, and publish needs the rest', () => {
+    expect(createListing.description).toContain('Required to create: name, description and a price');
+    expect(createListing.description).not.toContain('Required: name, description, category and a price');
+    expect(createListing.description).toMatch(/Publishing additionally needs a category, a location, a description of at least 20 characters and at least 3 photos/);
+  });
+
+  it('points at generate_care_guide for a listing whose AI-written guide did not arrive at create time', () => {
+    expect(createListing.description).toContain('generate_care_guide');
   });
 });
 
@@ -314,6 +328,11 @@ describe('reporting ranges are checked before they reach Splitt', () => {
     expect(text(await tool.handler({ startDate: 'not-a-date' }, ctx))).toMatch(/ISO dates/);
     expect(text(await tool.handler({ startDate: '2026-09-07', endDate: '2026-09-01' }, ctx))).toMatch(/on or after/);
     expect(mockBackendRequest).not.toHaveBeenCalled();
+  });
+
+  it.each([getVendorDashboard, getListingPerformance])('%# describes conversionRate and the date-only endDate', (tool) => {
+    expect(tool.description).toMatch(/conversionRate is confirmed or completed bookings divided by views in the same window, never above 100/);
+    expect(tool.description).toMatch(/a date-only endDate includes that whole day/);
   });
 });
 
@@ -615,10 +634,10 @@ describe('B1: a vendor cannot misread their own transactions as income', () => {
   });
 });
 
-describe('B2: delete_service warns that it cascades even to paid bookings', () => {
-  it('says it cannot be undone and prefers taking the service offline', () => {
-    expect(deleteService.description).toMatch(/every booking and review/);
-    expect(deleteService.description).toMatch(/including confirmed or paid bookings/);
+describe('B2: delete_service refuses when a booking is active or paid (SPLIT-1609)', () => {
+  it('says Splitt refuses (Conflict) for such bookings and prefers taking the service offline', () => {
+    // The full refusal wording and the 409-to-Conflict mapping are covered in services.test.ts.
+    expect(deleteService.description).toMatch(/Splitt refuses \(Conflict\)/);
     expect(deleteService.description).toMatch(/cannot be undone/);
     expect(deleteService.description).toContain('update_service(status="archived")');
     expect(deleteService.description).toMatch(/Confirm with the user/);
@@ -664,5 +683,55 @@ describe('B3: get_booking_quote hints a vendor toward moderation when their own 
 
   it('says in its own description that quotes need a published, approved listing', () => {
     expect(getBookingQuote.description).toMatch(/published, Splitt-approved listing/);
+  });
+});
+
+// ── SPLIT-1609 (backend v2.54.0 contracts) ───────────────────────────────────
+
+describe('generate_care_guide replaces the listing care guide', () => {
+  it('sends the write timeout and returns only the careGuide from the updated listing', async () => {
+    mockBackendRequest.mockResolvedValue({ id: LISTING, name: 'Kayak', careGuide: 'Rinse after every use.', description: 'A'.repeat(200) });
+    const result = await generateCareGuide.handler({ listingId: LISTING }, ctx);
+    const [method, path, opts] = mockBackendRequest.mock.calls[0];
+    expect([method, path]).toEqual(['POST', `/rentals/${LISTING}/care-guide/regenerate`]);
+    expect(opts).toMatchObject({ token: ctx.token, timeoutMs: LISTING_WRITE_TIMEOUT_MS });
+    expect(result.isError).toBeUndefined();
+    expect(data(result)).toEqual({ careGuide: 'Rinse after every use.' });
+  });
+
+  it('maps a 503 (AI outage) to a clear error, without claiming the guide changed', async () => {
+    mockBackendRequest.mockRejectedValue(new BackendApiError(503, 'AI generation service unavailable'));
+    const result = await generateCareGuide.handler({ listingId: LISTING }, ctx);
+    expect(result.isError).toBe(true);
+    expect(text(result)).toBe("Splitt's AI is unavailable right now; the current guide was kept.");
+  });
+
+  it('is a registered, WRITE-annotated vendor tool that warns it replaces an edited guide', () => {
+    expect(vendorTools.some((t) => t.name === 'generate_care_guide')).toBe(true);
+    expect(generateCareGuide.description).toMatch(/REPLACES whatever guide is there now, including one the vendor wrote or edited by hand/);
+    expect(generateCareGuide.description).toMatch(/confirm with the user/);
+    expect(generateCareGuide.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+  });
+});
+
+describe('proto-key hardening on withListingRefs and categoryWithCount', () => {
+  // Both functions build their output with out[key] = ...; JSON.stringify only
+  // serializes OWN properties, so a round trip through a tool result would hide
+  // a re-parented prototype either way. Call the functions directly instead, the
+  // same way secrets.test.ts calls scrubSecrets directly for the same hazard.
+  it('withListingRefs does not re-parent its output on a planted __proto__ key', () => {
+    const planted = JSON.parse('{"__proto__": {"polluted": true}, "id": "u1", "listing": {"id": "L1", "name": "Kayak"}}');
+    const out = withListingRefs(planted) as Record<string, unknown>;
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect(out).not.toHaveProperty('polluted');
+    expect(out).toEqual({ id: 'u1', listing: { id: 'L1', name: 'Kayak' } });
+  });
+
+  it('categoryWithCount does not re-parent its output on a planted __proto__ key', () => {
+    const planted = JSON.parse('{"__proto__": {"polluted": true}, "category_id": "c1", "category_name": "ATVs", "category_slug": "atvs", "listingCount": "3"}');
+    const out = categoryWithCount(planted) as Record<string, unknown>;
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect(out).not.toHaveProperty('polluted');
+    expect(out).toEqual({ id: 'c1', name: 'ATVs', slug: 'atvs', listingCount: 3 });
   });
 });

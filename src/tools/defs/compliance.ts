@@ -239,11 +239,19 @@ export const deleteWaiver = defineTool({
   inputSchema: { waiverId: uuid('waiver') },
   annotations: DESTRUCTIVE,
   handler: async ({ waiverId }, ctx) =>
-    fromResult(await complianceApi.deleteWaiver(token(ctx), waiverId), () => ({
-      deleted: true,
-      waiverId,
-      note: 'If renters had already signed this waiver, Splitt deactivated it instead of deleting it and kept the signed records.',
-    })),
+    fromResult(await complianceApi.deleteWaiver(token(ctx), waiverId), (body) => {
+      const outcome = body?.outcome;
+      // The backend now reports what actually happened; only fall back to a
+      // hedge when an older/odd response carries no outcome at all (SPLIT-1609).
+      if (outcome === 'deleted' || outcome === 'deactivated') {
+        return { waiverId, outcome, deleted: outcome === 'deleted', deactivated: outcome === 'deactivated' };
+      }
+      return {
+        deleted: true,
+        waiverId,
+        note: 'If renters had already signed this waiver, Splitt deactivated it instead of deleting it and kept the signed records.',
+      };
+    }),
 });
 
 // ── Waiver signing (renters and any signed-in user) ──────────────────────────

@@ -23,8 +23,13 @@ jest.mock('@/middleware/rate-limit', () => ({
   countToolCalls: jest.fn().mockReturnValue(0),
 }));
 
+import fs from 'fs';
+import path from 'path';
 import { POST } from '../src/app/api/mcp/route';
 import { ALL_TOOLS } from '../src/tools/defs';
+
+const ROOT = path.join(__dirname, '..');
+const readJson = (name: string) => JSON.parse(fs.readFileSync(path.join(ROOT, name), 'utf8'));
 
 function mcpRequest(body: unknown, withKey = true, extraHeaders: Record<string, string> = {}): any {
   const headers: Record<string, string> = {
@@ -65,6 +70,18 @@ describe('/api/mcp route handler (M2 stateless transport)', () => {
     expect(text).toContain('splitmygear-mcp');
     expect(text).toContain('protocolVersion');
     expect(text).not.toContain('Server not initialized');
+  });
+
+  it('reports the same version on the wire as package.json, package-lock.json and manifest.json (SPLIT-1609)', async () => {
+    const pkg = readJson('package.json');
+    const lock = readJson('package-lock.json');
+    const manifest = readJson('manifest.json');
+    expect(pkg.version).toBe('2.0.4');
+    expect(lock.version).toBe('2.0.4');
+    expect(lock.packages[''].version).toBe('2.0.4');
+    expect(manifest.version).toBe('2.0.4');
+    const res = await POST(mcpRequest(INIT));
+    expect(await res.text()).toContain('2.0.4');
   });
 
   // SPLIT-1604: the first request of each claude.ai connection got a 400 on

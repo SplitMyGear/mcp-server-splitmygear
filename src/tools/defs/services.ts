@@ -308,8 +308,9 @@ export const deleteService = defineTool({
   name: 'delete_service',
   title: 'Delete a service',
   description:
-    'Permanently delete one of the signed-in vendor\'s services together with every booking and review of it, including confirmed or paid bookings; this cannot ' +
-    'be undone. Confirm with the user first, and prefer update_service(status="archived") to take the service offline while keeping its bookings and reviews.',
+    'Permanently delete one of the signed-in vendor\'s services. Splitt refuses (Conflict) while the service has any booking that holds a payment, or is pending, ' +
+    'confirmed, completed or refunded: archive it instead. A service with no bookings, or only cancelled and unpaid ones, is deleted along with them, and this ' +
+    'cannot be undone. Confirm with the user first, and prefer update_service(status="archived") to take the service offline.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: { serviceId: uuid('service') },

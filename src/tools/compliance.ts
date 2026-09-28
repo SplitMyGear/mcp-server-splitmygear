@@ -97,9 +97,9 @@ export const complianceApi = {
     return call('PUT', `/vendors/waivers/${waiverId}`, { token, body: compact(input) });
   },
 
-  /** Hard-deletes an unsigned waiver; a signed one is deactivated instead (record retained). */
+  /** Hard-deletes an unsigned waiver; a signed one is deactivated instead (record retained). Reports which one happened (SPLIT-1609). */
   deleteWaiver(token: string, waiverId: string) {
-    return call<void>('DELETE', `/vendors/waivers/${waiverId}`, { token });
+    return call<{ outcome?: 'deleted' | 'deactivated' } | undefined>('DELETE', `/vendors/waivers/${waiverId}`, { token });
   },
 
   // ── Waiver signing (any signed-in user; /waivers) ─────────────────────────

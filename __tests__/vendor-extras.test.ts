@@ -341,4 +341,14 @@ describe('vendorExtrasTools defs', () => {
     expect(res.isError).toBe(true);
     expect(text(res)).toMatch(/Not allowed for this account/);
   });
+
+  it('get_booking_risk describes the low-risk terminal-status path and an unknown id as not found, not high risk', () => {
+    expect(getBookingRisk.description).toMatch(/Only pending and confirmed bookings are actually scored/);
+    expect(getBookingRisk.description).toMatch(/rejected, cancelled or completed booking instead gets riskLevel low/);
+    expect(getBookingRisk.description).toMatch(/no confirmation decision/);
+    expect(getBookingRisk.description).toMatch(/No action needed/);
+    expect(getBookingRisk.description).toMatch(/unknown booking id answers not found/);
+    expect(getBookingRisk.description).not.toMatch(/high risk/);
+    expect(getBookingRisk.description).not.toMatch(/Booking not found/);
+  });
 });

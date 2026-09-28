@@ -17,11 +17,15 @@ const MAX_UNIT_YEAR = new Date().getFullYear() + 1;
  * answers embedded it (about 6 KB each, most of it the care guide) where an id
  * and a name are all anyone needs (SPLIT-1608).
  */
-function withListingRefs(value: unknown): unknown {
+export function withListingRefs(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(withListingRefs);
   if (!value || typeof value !== 'object') return value;
   const out: Record<string, unknown> = {};
   for (const [key, field] of Object.entries(value)) {
+    // A JSON "__proto__" key is an own key, not the prototype slot; assigning it
+    // with out[key] = ... would re-parent out, the same hazard scrubSecrets
+    // guards against (SPLIT-1609).
+    if (key === '__proto__') continue;
     const listing = key === 'listing' && field && typeof field === 'object' && !Array.isArray(field) ? (field as { id?: unknown; name?: unknown }) : null;
     out[key] = listing && listing.id !== undefined ? { id: listing.id, name: listing.name } : withListingRefs(field);
   }

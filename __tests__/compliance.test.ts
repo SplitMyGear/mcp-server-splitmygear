@@ -248,7 +248,15 @@ describe('complianceTools defs', () => {
     expect(lastCall()).toMatchObject({ method: 'PUT', path: `/vendors/waivers/${WAIVER}`, opts: { token: T, body: { isActive: false } } });
     expect(lastCall().opts.body).not.toHaveProperty('waiverId');
 
-    mockBackendRequest.mockResolvedValueOnce(undefined); // 200 with an empty body
+    mockBackendRequest.mockResolvedValueOnce({ outcome: 'deleted' });
+    const wasDeleted = await tool('delete_waiver').handler({ waiverId: WAIVER }, vendorCtx);
+    expect(JSON.parse(text(wasDeleted))).toEqual({ waiverId: WAIVER, outcome: 'deleted', deleted: true, deactivated: false });
+
+    mockBackendRequest.mockResolvedValueOnce({ outcome: 'deactivated' });
+    const wasDeactivated = await tool('delete_waiver').handler({ waiverId: WAIVER }, vendorCtx);
+    expect(JSON.parse(text(wasDeactivated))).toEqual({ waiverId: WAIVER, outcome: 'deactivated', deleted: false, deactivated: true });
+
+    mockBackendRequest.mockResolvedValueOnce(undefined); // 200 with an empty body: no outcome to report, fall back
     const deleted = await tool('delete_waiver').handler({ waiverId: WAIVER }, vendorCtx);
     expect(deleted.isError).toBeUndefined();
     expect(JSON.parse(text(deleted))).toMatchObject({ deleted: true, waiverId: WAIVER });

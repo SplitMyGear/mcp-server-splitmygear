@@ -222,9 +222,11 @@ export const previewDynamicPrice = defineTool({
   name: 'preview_dynamic_price',
   title: 'Preview dynamic price',
   description:
-    'What Splitt\'s dynamic pricing would charge for one of the vendor\'s listings, WITHOUT changing anything: suggestedPrice, min/max, confidence, the base price and the factors (demand, weekend, season, length, ...) with their multipliers. ' +
-    'Pass a single date (default today) plus an optional rental length in days, or pass date + endDate to get the aggregate over a date range. Returns zeros when pricing cannot be computed. ' +
-    'Use apply_dynamic_pricing to actually adopt a suggestion.',
+    'What Splitt\'s dynamic pricing would charge for one of the vendor\'s listings, WITHOUT changing anything. Pass a single date (default today) plus an optional rental length in days for one ' +
+    'suggestion: suggestedPrice, min/max, confidence, the base price and the factors (demand, weekend, season, length, ...) with their multipliers. Pass date and endDate together instead to price ' +
+    'a whole stay: endDate is the checkout/return day and is not itself priced (2027-03-03 to 2027-03-10 is 7 days), both dates are required together (up to 366 days apart), and the result is ' +
+    'days (one entry per priced day, each with date, price and factors), nights, totalPrice (the exact sum of days), averagePrice, and factorTotals (the whole-stay dollar total for each reason). ' +
+    'Returns zeros when pricing cannot be computed. Use apply_dynamic_pricing to actually adopt a suggestion.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: {
@@ -324,8 +326,9 @@ export const getSuggestedInitialPrice = defineTool({
   name: 'get_suggested_initial_price',
   title: 'Suggested starting price',
   description:
-    'A market-based starting price for one of the vendor\'s own listings (suggestedPrice, minPrice, maxPrice, marketRate), derived from its category, value and market data. ' +
-    'Good when a listing is new or its price has never been reviewed; the public suggest_listing_price tool covers categories without a listing. Read-only.',
+    'A market-based starting price for one of the vendor\'s own listings: suggestedPrice, minPrice, maxPrice, marketRate and marketRateBasis. marketRateBasis is category_market (with marketRate ' +
+    'set from it) when Splitt has market data for the category; when it does not, marketRateBasis is none, marketRate is null, and suggestedPrice, minPrice and maxPrice instead come from the ' +
+    'listing\'s own price, not the market. Good when a listing is new or its price has never been reviewed; the public suggest_listing_price tool covers categories without a listing. Read-only.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: { listingId: uuid('listing') },

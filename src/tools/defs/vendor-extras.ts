@@ -245,8 +245,9 @@ export const getBookingRisk = defineTool({
   title: 'Booking risk check',
   description:
     'Risk assessment of one booking on the signed-in vendor\'s listings before accepting it: riskLevel (low, medium, high), the flags behind it (low renter trust ' +
-    'score, high-value booking from a new account, far-future dates, renter not ID-verified) and a recommendation. Only a party to the booking can read it; an ' +
-    'unknown booking id comes back as high risk with a "Booking not found" flag.',
+    'score, high-value booking from a new account, far-future dates, renter not ID-verified) and a recommendation. Only pending and confirmed bookings are actually ' +
+    'scored this way: a rejected, cancelled or completed booking instead gets riskLevel low, a flag reading "Booking status is <status>; no confirmation decision ' +
+    'is pending", and a recommendation starting "No action needed." Only a party to the booking can read it; an unknown booking id answers not found.',
   access: 'vendor',
   scope: 'vendor_bookings',
   inputSchema: { bookingId: uuid('booking') },
