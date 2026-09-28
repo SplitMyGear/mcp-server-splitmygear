@@ -2,7 +2,7 @@
   "dxt_version": "0.1",
   "name": "Splitt",
   "display_name": "Splitt: Outdoor Gear Rental",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "Search, book and manage outdoor gear rentals and experiences on Splitt as a renter or vendor. Sign in with your Splitt account (OAuth) or use an operator key for public search.",
   "long_description": "The Splitt MCP server lets an assistant act for you on the Splitt outdoor gear rental marketplace. Renters: search 19 gear categories with natural language, check availability, get exact price quotes, book (payment on a Stripe-hosted page), manage and cancel bookings, message vendors, leave reviews and keep favorites. Vendors: create and price listings with AI help, publish, block dates, handle incoming bookings, propose reschedules, respond to reviews, host experiences and schedules, and see earnings and payouts. Sign in with your Splitt account via OAuth (two-step verification supported); the tool list adapts to your role. An operator API key alternatively unlocks the public search tools only.",
   "author": {
@@ -498,6 +498,10 @@
       "description": "Delete a listing"
     },
     {
+      "name": "archive_listing",
+      "description": "Archive a listing"
+    },
+    {
       "name": "duplicate_listing",
       "description": "Duplicate a listing"
     },
@@ -588,6 +592,10 @@
     {
       "name": "delete_experience_schedule",
       "description": "Remove a schedule slot"
+    },
+    {
+      "name": "delete_experience",
+      "description": "Delete an experience"
     },
     {
       "name": "list_experience_host_bookings",

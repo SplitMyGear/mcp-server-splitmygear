@@ -4,7 +4,7 @@
  * Only fields from `CreateListingDto` are ever sent (the backend's global
  * ValidationPipe rejects undeclared fields with a 400).
  */
-import { AI_GENERATION_TIMEOUT_MS } from '@/lib/timeouts';
+import { AI_GENERATION_TIMEOUT_MS, LISTING_WRITE_TIMEOUT_MS } from '@/lib/timeouts';
 import { call, compact, qs } from './_shared';
 
 export interface ListingInput {
@@ -13,10 +13,8 @@ export interface ListingInput {
   category?: string;
   pricePerDay?: number;
   pricePerHour?: number;
-  bookingType?: 'daily' | 'hourly';
+  bookingType?: 'daily' | 'hourly' | 'both' | 'nightly';
   location?: string;
-  address?: string;
-  generalArea?: string;
   latitude?: number;
   longitude?: number;
   imageUrls?: string[];
@@ -24,6 +22,8 @@ export interface ListingInput {
   model?: string;
   year?: number;
   maxGuests?: number;
+  checkInTime?: string;
+  checkOutTime?: string;
   instantBook?: boolean;
   requiresIdVerification?: boolean;
   cancellationPolicy?: 'flexible' | 'flexible_72h' | 'moderate' | 'strict' | 'non_refundable';
@@ -49,15 +49,21 @@ export const vendorListingTools = {
   },
 
   createListing(token: string, input: ListingInput) {
-    return call('POST', '/rentals', { token, body: compact(input) });
+    return call('POST', '/rentals', { token, body: compact(input), timeoutMs: LISTING_WRITE_TIMEOUT_MS });
   },
 
   updateListing(listingId: string, token: string, input: Partial<ListingInput>) {
-    return call('PUT', `/rentals/${listingId}`, { token, body: compact(input) });
+    return call('PUT', `/rentals/${listingId}`, { token, body: compact(input), timeoutMs: LISTING_WRITE_TIMEOUT_MS });
   },
 
   setPublished(listingId: string, published: boolean, token: string) {
-    return call('POST', `/rentals/${listingId}/${published ? 'publish' : 'unpublish'}`, { token, body: {} });
+    // Publishing indexes a listing that has no search embedding yet (AI), like a create.
+    return call('POST', `/rentals/${listingId}/${published ? 'publish' : 'unpublish'}`, { token, body: {}, timeoutMs: LISTING_WRITE_TIMEOUT_MS });
+  },
+
+  /** The web app's own archive path (the bulk toolbar); there is no single-listing route. */
+  archiveListing(listingId: string, token: string) {
+    return call('POST', '/rentals/bulk/status', { token, body: { listingIds: [listingId], status: 'archived' } });
   },
 
   deleteListing(listingId: string, token: string) {
@@ -65,7 +71,7 @@ export const vendorListingTools = {
   },
 
   duplicateListing(listingId: string, token: string) {
-    return call('POST', `/rentals/${listingId}/duplicate`, { token, body: {} });
+    return call('POST', `/rentals/${listingId}/duplicate`, { token, body: {}, timeoutMs: LISTING_WRITE_TIMEOUT_MS });
   },
 
   /** AI-drafted listing (title/description/specs/price guidance) from a gear description. */

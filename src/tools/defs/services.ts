@@ -308,8 +308,8 @@ export const deleteService = defineTool({
   name: 'delete_service',
   title: 'Delete a service',
   description:
-    'Permanently delete one of the signed-in vendor\'s services. This also removes its bookings and reviews and cannot be undone; prefer update_service(status="archived") to take it offline. ' +
-    'Only for services created by mistake or never booked. Confirm with the user first.',
+    'Permanently delete one of the signed-in vendor\'s services together with every booking and review of it, including confirmed or paid bookings; this cannot ' +
+    'be undone. Confirm with the user first, and prefer update_service(status="archived") to take the service offline while keeping its bookings and reviews.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: { serviceId: uuid('service') },

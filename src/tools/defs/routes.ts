@@ -91,17 +91,34 @@ const shareSlug = z
 
 // ── Route library ────────────────────────────────────────────────────────────
 
+/**
+ * The library list without each route's track. Every row carried it three times
+ * over (geometry, encodedPolyline and elevationProfile, about 5 KB per route),
+ * which pushed a library of a few dozen routes past what an answer holds
+ * (SPLIT-1608); get_route still returns the whole route.
+ */
+const TRACK_FIELDS = ['geometry', 'encodedPolyline', 'elevationProfile'];
+function withoutTracks(data: unknown): unknown {
+  const strip = (row: unknown) =>
+    row && typeof row === 'object' && !Array.isArray(row) ? Object.fromEntries(Object.entries(row).filter(([key]) => !TRACK_FIELDS.includes(key))) : row;
+  if (Array.isArray(data)) return data.map(strip);
+  if (data && typeof data === 'object' && Array.isArray((data as { routes?: unknown }).routes)) {
+    return { ...data, routes: (data as { routes: unknown[] }).routes.map(strip) };
+  }
+  return data;
+}
+
 export const listMyRoutes = defineTool({
   name: 'list_my_routes',
   title: 'My route library',
   description:
     'List the reusable routes/trails in the signed-in vendor\'s library (newest first) with distance, elevation, difficulty, activity type, share slug ' +
-    'and how many listings/experiences each is attached to. Active routes only unless includeArchived is true. Use get_route for one route\'s full detail.',
+    'and how many listings/experiences each is attached to. Active routes only unless includeArchived is true. Tracks are left out here: use get_route for one route\'s full detail, track included.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: { includeArchived: z.boolean().optional().describe('Also return archived routes (default false).') },
   annotations: READ,
-  handler: async ({ includeArchived }, ctx) => fromResult(await routesApi.listMine(token(ctx), includeArchived ?? false)),
+  handler: async ({ includeArchived }, ctx) => fromResult(await routesApi.listMine(token(ctx), includeArchived ?? false), withoutTracks),
 });
 
 export const getRoute = defineTool({

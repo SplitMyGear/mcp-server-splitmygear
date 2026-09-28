@@ -1,3 +1,4 @@
+import { requestUrl } from '@/lib/request-url';
 import { trustProxyHeaders, validIp } from './config';
 
 /**
@@ -121,7 +122,7 @@ export function isSameOriginPost(request: Request): boolean {
     if (origin === 'null') return fetchSite === 'same-origin';
     let requestOrigin: string;
     try {
-      requestOrigin = new URL(request.url).origin;
+      requestOrigin = requestUrl(request).origin;
     } catch {
       return false;
     }

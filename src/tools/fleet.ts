@@ -62,7 +62,7 @@ export const fleetTools = {
     return call('POST', `/fleet/listings/${listingId}/units`, { token, body: compact(input) });
   },
 
-  /** `count` identical stubs labeled `<label> N` (label defaults to "Unit" server-side; fleet capped at 200 units). */
+  /** `count` identical stubs labeled `<label> N` (label defaults to "Unit" server-side; capped at 50 units per call, 200 per listing). */
   createUnitsBulk(token: string, listingId: string, input: { count: number; label?: string }) {
     return call('POST', `/fleet/listings/${listingId}/units/bulk`, { token, body: compact(input) });
   },

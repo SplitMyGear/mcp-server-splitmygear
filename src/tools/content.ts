@@ -30,6 +30,11 @@ function isAuthError(error: unknown): error is BackendApiError {
   return error instanceof BackendApiError && (error.status === 401 || error.status === 403);
 }
 
+function sameTitle(a: string, b: string): boolean {
+  const norm = (t: string) => t.trim().replace(/\s+/g, ' ').toLowerCase();
+  return norm(a) === norm(b);
+}
+
 export const contentTools = {
   async generateListingDescription(
     name: string,
@@ -76,6 +81,12 @@ export const contentTools = {
       // as good as it gets" when nothing had run at all (SPLIT-1501).
       if (isAiUnavailable(result)) return { ok: false, error: aiUnavailableMessage(result) };
       if (!result?.title) return { ok: false, error: "Splitt's AI returned no title. Keep the current one or write one yourself." };
+      // The backend answers with the ORIGINAL title when its model fails or
+      // returns nothing, so an unchanged title is "nothing suggested", never a
+      // success: in 0.4 s it read as a rewrite that had run (SPLIT-1608).
+      if (sameTitle(result.title, currentTitle)) {
+        return { ok: false, error: "Splitt's AI suggested no change (it may be unavailable right now). Keep the current title or write one yourself." };
+      }
       return { ok: true, text: result.title };
     } catch (error) {
       // An auth failure is NOT a soft "keep the original title" case — the tool

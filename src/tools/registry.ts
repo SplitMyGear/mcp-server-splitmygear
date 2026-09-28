@@ -159,7 +159,8 @@ export function fromAiText(result: AiText): CallToolResult {
   return result.ok ? ok(result.text) : fail(result.error);
 }
 
-function withStatusHint(message: string, status?: number): string {
+/** Exported so a handler can append its own hint to a specific status without re-deriving the base text (SPLIT-1608). */
+export function withStatusHint(message: string, status?: number): string {
   if (status === 401) return `Splitt rejected the session (expired or revoked). Reconnect and try again. (${message})`;
   if (status === 403) return `Not allowed for this account: ${message}`;
   if (status === 404) return `Not found: ${message}`;

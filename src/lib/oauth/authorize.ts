@@ -25,6 +25,7 @@
  */
 import crypto from 'crypto';
 import { backendBaseUrl } from '@/lib/backend-client';
+import { requestUrl } from '@/lib/request-url';
 import { resolveClient, clientAllowsRedirect, isLoopbackRedirectUri, isVerifiedRedirectUri } from './client';
 import { isValidCodeChallenge } from './pkce';
 import { open, seal, nowSeconds } from './envelope';
@@ -209,7 +210,7 @@ function clientContext(request: Request): ClientContext {
 
 export async function handleAuthorizeGet(request: Request): Promise<Response> {
   if (!oauthEnabled()) return html(renderErrorPage('Sign-in unavailable', 'OAuth sign-in is not enabled on this server.'), 404);
-  const url = new URL(request.url);
+  const url = requestUrl(request);
   const q = (name: string) => url.searchParams.get(name) ?? undefined;
 
   const client = resolveClient(q('client_id'));
@@ -542,7 +543,7 @@ export async function handleSocialStartGet(request: Request): Promise<Response> 
       403,
     );
   }
-  const url = new URL(request.url);
+  const url = requestUrl(request);
   const provider = url.searchParams.get('provider');
   if (!isSocialProvider(provider)) return html(renderErrorPage('Invalid request', 'Unknown sign-in provider.'), 400);
   const rq = open<AuthorizeRequestPayload>('req', url.searchParams.get('req'));
@@ -575,7 +576,7 @@ export async function handleSocialStartGet(request: Request): Promise<Response> 
 
 export async function handleSocialCallbackGet(request: Request): Promise<Response> {
   if (!oauthEnabled()) return html(renderErrorPage('Sign-in unavailable', 'OAuth sign-in is not enabled on this server.'), 404);
-  const url = new URL(request.url);
+  const url = requestUrl(request);
   const q = (name: string) => url.searchParams.get(name) ?? undefined;
   const done = (response: Response) => clearingSocialCookie(response, request);
 

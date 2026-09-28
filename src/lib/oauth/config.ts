@@ -17,6 +17,7 @@
  */
 import crypto from 'crypto';
 import net from 'net';
+import { requestUrl } from '@/lib/request-url';
 import { sharedStoreEnabled, sharedStoreRequired } from '@/lib/shared-store';
 
 /** Minimum length of the sealing secret; generate it with `openssl rand -base64 48`. */
@@ -112,7 +113,7 @@ export function publicBaseUrl(request?: Request): string {
   if (process.env.VERCEL_URL) return `https://${stripTrailingSlash(process.env.VERCEL_URL)}`;
   if (request) {
     try {
-      return new URL(request.url).origin;
+      return requestUrl(request).origin;
     } catch {
       /* fall through */
     }

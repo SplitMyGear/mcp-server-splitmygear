@@ -11,7 +11,10 @@ import { defineTool, fail, fromResult } from '../registry';
 import { vendorExtrasApi, REPORT_FREQUENCIES, REPORT_TYPES, SPONSOR_TIERS } from '../vendor-extras';
 import { uuid, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, token } from './common';
 
-const STAFF_NOTE = 'Account-level setting shared by every seat of the vendor account (owner, manager and staff seats may all change it).';
+// SPLIT-1608: the old shared note said every seat may change these. Auto-approve
+// needs the pricing capability, and report emails are stored per seat.
+const PRICING_SEATS_NOTE = 'Owner and manager seats can change it; vendor_staff seats cannot (Splitt returns 403).';
+const PER_SEAT_NOTE = "Each seat of a vendor account has its own report email settings; this is the signed-in seat's.";
 
 // ── Vendor settings ──────────────────────────────────────────────────────────
 
@@ -22,7 +25,7 @@ export const setAutoApprove = defineTool({
     'Turn account-level auto-approve on or off for the signed-in vendor. enabled=true sets the vendor default AND switches instantBook on for EVERY listing the ' +
     'vendor owns, so new booking requests are confirmed automatically; enabled=false reverses both and requests wait for manual acceptance. Returns ' +
     'autoApproveBookings and listingsUpdated. This changes the whole fleet at once, so confirm with the user first; use update_listing(instantBook) for a single listing. ' +
-    STAFF_NOTE,
+    PRICING_SEATS_NOTE,
   access: 'vendor',
   scope: 'vendor_bookings',
   inputSchema: { enabled: z.boolean().describe('true: auto-confirm new bookings on all listings; false: require manual acceptance.') },
@@ -36,7 +39,7 @@ export const getReportSubscription = defineTool({
   description:
     'The signed-in vendor\'s scheduled report email preferences: frequency (daily, weekly, monthly, quarterly, annual, none), the subscribed report sections ' +
     '(revenue, bookings, payouts, listings, all) and the available options. Use set_report_subscription to change them. ' +
-    STAFF_NOTE,
+    PER_SEAT_NOTE,
   access: 'vendor',
   scope: 'finance',
   inputSchema: {},
@@ -50,7 +53,7 @@ export const setReportSubscription = defineTool({
   description:
     'Change how often the signed-in vendor receives the scheduled report email and which sections it contains. Only the fields you pass change; frequency ' +
     '"none" stops the emails. An empty subscribedTypes list falls back to "all". Returns the saved frequency and subscribedTypes. ' +
-    STAFF_NOTE,
+    PER_SEAT_NOTE,
   access: 'vendor',
   scope: 'finance',
   inputSchema: {
@@ -72,8 +75,7 @@ export const getTaxSummary = defineTool({
   description:
     'On-demand year-end earnings summary for the signed-in vendor\'s tax filing: gross earnings, platform fees, net payout and transaction count for one ' +
     'calendar year (default: the current year; years before 2000 or after next year are rejected). format "csv" returns { csv, filename } for download instead ' +
-    'of the JSON summary. Completed rental payments only. ' +
-    STAFF_NOTE,
+    'of the JSON summary. Completed rental payments only.',
   access: 'vendor',
   scope: 'finance',
   inputSchema: {
@@ -184,9 +186,10 @@ export const listMyTransactions = defineTool({
   name: 'list_my_transactions',
   title: 'My transactions',
   description:
-    'Payment history of the signed-in user (renter or vendor): every transaction on their account with type (payment, refund, payout, deposit, deposit_release, ' +
-    'deposit_claim, ...), amount, platform fee, tax amount, status (pending, processing, completed, failed, cancelled), description and date. Use get_transaction ' +
-    'for the booking link and payout split of one row.',
+    'The signed-in user\'s own ledger rows, newest first: id, type (PAYMENT, REFUND, PAYOUT, PLATFORM_FEE, DEPOSIT, DEPOSIT_RELEASE, DEPOSIT_CLAIM, DATE_CHANGE), ' +
+    'amount, platformFee, taxAmount, status (pending, processing, completed, failed, cancelled), description and createdAt. ' +
+    'A PAYMENT row is a payment this account made (for example, as a renter), not income, and this list is not a vendor\'s earnings: use get_vendor_earnings and ' +
+    'get_vendor_payouts for that. Use get_transaction for the booking link and payout split of one row.',
   access: 'user',
   scope: 'finance',
   inputSchema: {},
@@ -198,8 +201,10 @@ export const getTransaction = defineTool({
   name: 'get_transaction',
   title: 'Transaction details',
   description:
-    'Full details of one transaction on the signed-in user\'s account: booking id, type, amount, platform fee, vendor payout, tax amount, status, description, ' +
-    'failure reason, created and processed dates. Only the transaction\'s own user can read it.',
+    'Full details of one row from the signed-in user\'s own ledger (see list_my_transactions): bookingId, type, amount, platformFee, vendorPayout, taxAmount, ' +
+    'status, description, failureReason, createdAt and processedAt. Only the transaction\'s own user can read it. ' +
+    'vendorPayout is the share of that booking\'s vendor: for a PAYMENT row this account made as a renter, that vendor is someone else, not this account\'s income. ' +
+    'A vendor\'s own earnings and payouts come from get_vendor_earnings and get_vendor_payouts, not from here.',
   access: 'user',
   scope: 'finance',
   inputSchema: { transactionId: uuid('transaction') },

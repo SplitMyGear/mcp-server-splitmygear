@@ -24,7 +24,12 @@ import { call, compact } from './_shared';
 // let these be generated like the listing tools.
 type ExperienceRecord = Record<string, unknown>;
 
-/** Fields of the backend's CreateExperienceDto the MCP exposes. */
+/**
+ * Fields of the backend's CreateExperienceDto the MCP exposes. pricePerPerson
+ * is required only for the default per_person pricing; a flat_rate package
+ * instead needs flatRatePrice and guidanceType staff_guided (SPLIT-1608),
+ * enforced client-side in defs/vendor.ts before either ever reaches here.
+ */
 export interface ExperienceInput {
   title: string;
   description: string;
@@ -34,8 +39,9 @@ export interface ExperienceInput {
   durationUnit: string;
   minGuests?: number;
   maxGuests?: number;
-  pricePerPerson: number;
+  pricePerPerson?: number;
   pricePerChild?: number;
+  flatRatePrice?: number;
   location?: string;
   latitude?: number;
   longitude?: number;
@@ -45,6 +51,8 @@ export interface ExperienceInput {
   requirements?: string;
   cancellationPolicy?: string;
   imageUrls?: string[];
+  guidanceType?: 'self_guided' | 'staff_guided';
+  pricingMode?: 'per_person' | 'flat_rate';
 }
 
 const AUTH_REQUIRED =
@@ -77,13 +85,20 @@ export const experienceTools = {
     }
   },
 
+  /**
+   * `token` is optional: with the owner's, the backend also returns their own
+   * draft or archived experience and its slots, which anonymous reads 404
+   * (SPLIT-1608).
+   */
   async getExperienceDetails(
     experienceId: string,
+    token?: string,
   ): Promise<{ experience: ExperienceRecord; schedules: ExperienceRecord[] } | null> {
     try {
       const detail = await backendRequest<{ success: boolean; experience: ExperienceRecord }>(
         'GET',
         `/packages/${experienceId}`,
+        { token },
       );
       if (!detail?.experience) return null;
 
@@ -94,6 +109,7 @@ export const experienceTools = {
         const sched = await backendRequest<{ success: boolean; schedules: ExperienceRecord[] }>(
           'GET',
           `/packages/${experienceId}/schedules`,
+          { token },
         );
         schedules = Array.isArray(sched?.schedules) ? sched.schedules : [];
       } catch {
@@ -190,6 +206,10 @@ export const experienceTools = {
 
   deleteSchedule(experienceId: string, scheduleId: string, token: string) {
     return call('DELETE', `/packages/${experienceId}/schedules/${scheduleId}`, { token });
+  },
+
+  deleteExperience(experienceId: string, token: string) {
+    return call('DELETE', `/packages/${experienceId}`, { token });
   },
 
   listHostBookings(token: string) {

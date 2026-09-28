@@ -83,6 +83,39 @@ export interface EmailTripPlanInput {
   source?: 'board' | 'fallback';
 }
 
+/**
+ * A `/categories/stats` row in the same shape as a `/categories` row, plus a
+ * numeric listingCount. The stats route answers with raw query columns
+ * (`category_id`, `category_name`, …) and the count as a string, so the same
+ * tool returned two shapes depending on one flag (SPLIT-1608).
+ */
+function categoryWithCount(row: unknown): unknown {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) out[key.startsWith('category_') ? key.slice('category_'.length) : key] = value;
+  if (out.listingCount !== undefined) {
+    const count = Number(out.listingCount);
+    out.listingCount = Number.isFinite(count) ? count : out.listingCount;
+  }
+  return out;
+}
+
+/**
+ * Map the stats rows wherever they actually are: the live `GET /categories/stats`
+ * answers `{ success, categories: [...] }`, an envelope, not a bare array, so
+ * checking `Array.isArray(data)` alone never matched it and the raw
+ * `category_*`/string-count rows passed straight through (SPLIT-1608). A bare
+ * array is still mapped too, in case a caller (or a future backend build) ever
+ * answers that way.
+ */
+function mapCategoryRows(data: unknown): unknown {
+  if (Array.isArray(data)) return data.map(categoryWithCount);
+  if (data && typeof data === 'object' && Array.isArray((data as { categories?: unknown }).categories)) {
+    return { ...(data as Record<string, unknown>), categories: (data as { categories: unknown[] }).categories.map(categoryWithCount) };
+  }
+  return data;
+}
+
 export const discoveryExtrasTools = {
   // ── Search alerts (saved searches): JwtAuthGuard, owner-scoped by the service ──
 
@@ -168,8 +201,10 @@ export const discoveryExtrasTools = {
 
   // ── Categories (public) ──────────────────────────────────────────────────
 
-  listCategories(withListingCounts = false) {
-    return call('GET', withListingCounts ? '/categories/stats' : '/categories');
+  async listCategories(withListingCounts = false) {
+    if (!withListingCounts) return call('GET', '/categories');
+    const result = await call<unknown>('GET', '/categories/stats');
+    return result.ok ? { ...result, data: mapCategoryRows(result.data) } : result;
   },
 
   getCategory(categoryId: string) {

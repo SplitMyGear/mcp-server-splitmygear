@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { defineTool, ok, fail, fromAiText, fromResult } from '../registry';
 import { pageOf, summarizeBooking } from '../summaries';
 import { accountTools } from '../account';
+import { onboardingNextStepForView, type OnboardingStatusView } from '../vendor-onboarding';
 import { bookingTools } from '../bookings';
 import { reviewTools } from '../reviews';
 import { favoriteTools } from '../favorites';
@@ -63,7 +64,11 @@ export const getVendorOnboardingStatus = defineTool({
   scope: 'profile',
   inputSchema: {},
   annotations: READ,
-  handler: async (_args, ctx) => fromResult(await accountTools.getVendorOnboardingStatus(token(ctx))),
+  handler: async (_args, ctx) =>
+    fromResult(await accountTools.getVendorOnboardingStatus(token(ctx)), (view) => {
+      const status = (view ?? {}) as OnboardingStatusView;
+      return { ...status, nextStep: onboardingNextStepForView(status) };
+    }),
 });
 
 export const listNotifications = defineTool({

@@ -1,6 +1,7 @@
 /** Public discovery tools: search, details, availability, pricing, reviews. Available to every principal. */
 import { z } from 'zod';
-import { defineTool, ok, fail, fromResult } from '../registry';
+import { isoDay, shiftDay } from '../blackout-dates';
+import { defineTool, ok, fail, fromResult, withStatusHint } from '../registry';
 import { summarizeListing } from '../summaries';
 import { listingTools } from '../listings';
 import { pricingTools } from '../pricing';
@@ -9,6 +10,7 @@ import { bookingTools } from '../bookings';
 import { experienceTools } from '../experiences';
 import { experienceCategorySchema } from '../experience-categories';
 import { BackendApiError } from '@/lib/backend-client';
+import { isVendorFamily } from '@/lib/roles';
 import { dateRangeError } from '../_shared';
 import { uuid, isoDate, READ, LISTING_CATEGORIES, PROTECTION_PLANS, UNTRUSTED_NOTE } from './common';
 
@@ -64,18 +66,21 @@ export const getListingDetails = defineTool({
 export const checkAvailability = defineTool({
   name: 'check_availability',
   title: 'Check availability',
-  description: 'Check whether a listing is free for a date range. Returns available:true/false with a short reason. Use before creating a booking.',
+  description:
+    'Check whether a listing is free for a rental. checkIn is the first day; checkOut is the return day and is not part of the rental ' +
+    '(checkIn 2027-03-01, checkOut 2027-03-03 covers Mar 1 and 2, and Mar 3 stays free), so checkOut must be after checkIn. ' +
+    'Returns available:true/false with a short reason. Use before creating a booking.',
   access: 'public',
   scope: 'read',
   inputSchema: {
     listingId: uuid('listing'),
-    checkIn: isoDate('Rental start date'),
-    checkOut: isoDate('Rental end date'),
+    checkIn: isoDate('First day of the rental'),
+    checkOut: isoDate('Return day (not part of the rental)'),
     guests: z.number().int().min(1).max(200).optional().default(1).describe('Party size (default 1).'),
   },
   annotations: READ,
   handler: async ({ listingId, checkIn, checkOut, guests }) => {
-    const err = dateRangeError(checkIn, checkOut);
+    const err = dateRangeError(checkIn, checkOut, 365, { names: ['checkIn', 'checkOut'] });
     if (err) return fail(err);
     return ok(await listingTools.checkAvailability(listingId, checkIn, checkOut, guests));
   },
@@ -84,16 +89,23 @@ export const checkAvailability = defineTool({
 export const getListingCalendar = defineTool({
   name: 'get_listing_calendar',
   title: 'Get availability calendar',
-  description: 'Day-by-day availability for a listing over a window (max 92 days); use it to suggest alternative dates when the requested ones are taken.',
+  description:
+    'Day-by-day availability for a listing from `from` to `to`, both days included (max 92 days); use it to suggest alternative dates when the requested ones are taken.',
   access: 'public',
   scope: 'read',
-  inputSchema: { listingId: uuid('listing'), from: isoDate('Window start'), to: isoDate('Window end') },
+  inputSchema: { listingId: uuid('listing'), from: isoDate('First day of the window'), to: isoDate('Last day of the window (included)') },
   annotations: READ,
   handler: async ({ listingId, from, to }) => {
-    const err = dateRangeError(from, to, 92);
+    const err = dateRangeError(from, to, 92, { names: ['from', 'to'], allowSameDay: true });
     if (err) return fail(err);
+    // The backend's window includes `to` but needs `from` before it, so one
+    // day is asked for as [D, D+1] and the extra day is dropped (SPLIT-1608).
+    const day = isoDay(from);
+    const oneDay = day !== null && day === isoDay(to);
     try {
-      return ok(await listingTools.getAvailabilityCalendar(listingId, from, to));
+      const days = await listingTools.getAvailabilityCalendar(listingId, from, oneDay ? shiftDay(day, 1) : to);
+      if (oneDay && Array.isArray(days)) return ok(days.filter((row) => isoDay((row as { startDate?: unknown } | null)?.startDate) === day));
+      return ok(days);
     } catch (error) {
       return fail(error instanceof BackendApiError ? error.message : 'Could not load the calendar');
     }
@@ -122,18 +134,22 @@ export const getListingReviews = defineTool({
   handler: async ({ listingId }) => fromResult(await reviewTools.getListingReviews(listingId)),
 });
 
+const QUOTE_MODERATION_HINT = "If this is one of your own listings, quotes work only once it is published and approved by Splitt's review.";
+
 export const getBookingQuote = defineTool({
   name: 'get_booking_quote',
   title: 'Get a price quote',
   description:
     'Server-authoritative price breakdown for a rental BEFORE booking: nightly rates, discounts, protection premium, add-ons, delivery, fees, deposit and total. ' +
-    'No booking is created. Use it to show the renter what they will pay; create_booking uses the same pricing.',
+    'Works only for a published, Splitt-approved listing: a draft, unpublished, or moderation-pending/rejected listing answers not found, even for its own vendor. ' +
+    'No booking is created. Use it to show the renter what they will pay; create_booking uses the same pricing. ' +
+    'startDate is the first day and endDate the return day, which is not charged (2027-03-01 to 2027-03-03 is 2 days or nights).',
   access: 'public',
   scope: 'read',
   inputSchema: {
     listingId: uuid('listing'),
-    startDate: isoDate('Rental start date'),
-    endDate: isoDate('Rental end date'),
+    startDate: isoDate('First day of the rental'),
+    endDate: isoDate('Return day (not charged)'),
     quantity: z.number().int().min(1).max(10).optional().describe('Units of this listing (default 1).'),
     numberOfGuests: z.number().int().min(1).max(200).optional(),
     protectionPlan: z.enum(PROTECTION_PLANS).optional().describe('Damage-protection plan to price in.'),
@@ -142,10 +158,17 @@ export const getBookingQuote = defineTool({
     bringingPets: z.boolean().optional(),
   },
   annotations: READ,
-  handler: async (args) => {
+  handler: async (args, ctx) => {
     const err = dateRangeError(args.startDate, args.endDate);
     if (err) return fail(err);
-    return fromResult(await bookingTools.getQuote(args));
+    const result = await bookingTools.getQuote(args);
+    // POST /bookings/quote is anonymous-only and 404s a vendor's own unpublished
+    // or unapproved listing; without this hint that reads as a bug, not a status
+    // to fix (SPLIT-1608).
+    if (!result.ok && result.status === 404 && isVendorFamily(ctx.role)) {
+      return fail(`${withStatusHint(result.error, result.status)} ${QUOTE_MODERATION_HINT}`);
+    }
+    return fromResult(result);
   },
 });
 
@@ -205,13 +228,15 @@ export const searchExperiences = defineTool({
 export const getExperienceDetails = defineTool({
   name: 'get_experience_details',
   title: 'Get experience details',
-  description: 'Full details for an experience plus its upcoming schedule slots (scheduleId, date, start time, spots left, price). ' + UNTRUSTED_NOTE,
+  description:
+    'Full details for an experience plus its upcoming schedule slots (scheduleId, date, start time, spots left, price). ' +
+    'A host also sees their own draft or archived experience here, with its slots. ' + UNTRUSTED_NOTE,
   access: 'public',
   scope: 'read',
   inputSchema: { experienceId: uuid('experience') },
   annotations: READ,
-  handler: async ({ experienceId }) => {
-    const details = await experienceTools.getExperienceDetails(experienceId);
+  handler: async ({ experienceId }, ctx) => {
+    const details = await experienceTools.getExperienceDetails(experienceId, ctx.token);
     return details ? ok(details) : fail(`Experience ${experienceId} was not found.`);
   },
 });

@@ -12,6 +12,22 @@ import { uuid, isoDate, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, token } from
 /** Mirrors the backend's MAX_UNIT_YEAR (next year's models ship early). */
 const MAX_UNIT_YEAR = new Date().getFullYear() + 1;
 
+/**
+ * Units with a reference to their listing instead of the whole listing. Fleet
+ * answers embedded it (about 6 KB each, most of it the care guide) where an id
+ * and a name are all anyone needs (SPLIT-1608).
+ */
+function withListingRefs(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withListingRefs);
+  if (!value || typeof value !== 'object') return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, field] of Object.entries(value)) {
+    const listing = key === 'listing' && field && typeof field === 'object' && !Array.isArray(field) ? (field as { id?: unknown; name?: unknown }) : null;
+    out[key] = listing && listing.id !== undefined ? { id: listing.id, name: listing.name } : withListingRefs(field);
+  }
+  return out;
+}
+
 export const FLEET_UNIT_STATUSES = ['available', 'maintenance', 'retired'] as const;
 export const MAINTENANCE_KINDS = ['service', 'repair', 'inspection'] as const;
 
@@ -59,7 +75,7 @@ export const listFleetUnits = defineTool({
   },
   annotations: READ,
   handler: async ({ listingId }, ctx) =>
-    fromResult(listingId ? await fleet.listUnitsForListing(token(ctx), listingId) : await fleet.listMyUnits(token(ctx))),
+    fromResult(listingId ? await fleet.listUnitsForListing(token(ctx), listingId) : await fleet.listMyUnits(token(ctx)), withListingRefs),
 });
 
 export const getUnitStats = defineTool({
@@ -72,7 +88,7 @@ export const getUnitStats = defineTool({
   scope: 'listings',
   inputSchema: { unitId: uuid('fleet unit') },
   annotations: READ,
-  handler: async ({ unitId }, ctx) => fromResult(await fleet.getUnitStats(token(ctx), unitId)),
+  handler: async ({ unitId }, ctx) => fromResult(await fleet.getUnitStats(token(ctx), unitId), withListingRefs),
 });
 
 export const getUnitMaintenanceHistory = defineTool({
@@ -85,7 +101,7 @@ export const getUnitMaintenanceHistory = defineTool({
   scope: 'listings',
   inputSchema: { unitId: uuid('fleet unit') },
   annotations: READ,
-  handler: async ({ unitId }, ctx) => fromResult(await fleet.getMaintenanceRecords(token(ctx), unitId)),
+  handler: async ({ unitId }, ctx) => fromResult(await fleet.getMaintenanceRecords(token(ctx), unitId), withListingRefs),
 });
 
 // ── Writes ───────────────────────────────────────────────────────────────────
@@ -97,7 +113,7 @@ export const addFleetUnits = defineTool({
     'Add physical units to one of the vendor\'s listings. New units start as available and increase the listing\'s bookable capacity. ' +
     'count=1 (default) creates one unit with any of the identity fields (label, serialNumber, VIN/HIN, make, model, year, acquisitionValue, notes, maintenanceIntervalHours). ' +
     'count>1 creates that many identical stubs labeled "<label> 1", "<label> 2"... (label defaults to "Unit"); identity fields are not allowed in bulk mode, set them afterwards with update_fleet_unit. ' +
-    'Bulk creation is capped at 200 units per call. Returns the created unit(s).',
+    'Bulk creation is capped at 50 units per call; bulk labels are numbered on from the units the listing already has. Returns the created unit(s).',
   access: 'vendor',
   scope: 'listings',
   inputSchema: {
@@ -114,10 +130,10 @@ export const addFleetUnits = defineTool({
       if (extra.length) return fail(`Bulk mode (count > 1) only accepts label as a prefix. Remove ${extra.join(', ')} or add units one at a time (count = 1) and set fields with update_fleet_unit.`);
       return fromResult(await fleet.createUnitsBulk(token(ctx), listingId, { count: n, label }), (units) => ({
         created: Array.isArray(units) ? units.length : n,
-        units,
+        units: withListingRefs(units),
       }));
     }
-    return fromResult(await fleet.createUnit(token(ctx), listingId, unit));
+    return fromResult(await fleet.createUnit(token(ctx), listingId, unit), withListingRefs);
   },
 });
 
@@ -138,7 +154,7 @@ export const updateFleetUnit = defineTool({
   annotations: WRITE_IDEMPOTENT,
   handler: async ({ unitId, ...rest }, ctx) => {
     if (Object.values(rest).every((v) => v === undefined)) return fail('Pass at least one field to update (status, label, serialNumber, notes, ...).');
-    return fromResult(await fleet.updateUnit(token(ctx), unitId, rest));
+    return fromResult(await fleet.updateUnit(token(ctx), unitId, rest), withListingRefs);
   },
 });
 
@@ -186,7 +202,7 @@ export const logUnitMaintenance = defineTool({
       if (err) return fail(err);
       if (new Date(input.performedAt).getTime() > Date.now() + 60_000) return fail('performedAt cannot be in the future.');
     }
-    return fromResult(await fleet.recordMaintenance(token(ctx), unitId, { ...input, description: input.description.trim() }));
+    return fromResult(await fleet.recordMaintenance(token(ctx), unitId, { ...input, description: input.description.trim() }), withListingRefs);
   },
 });
 

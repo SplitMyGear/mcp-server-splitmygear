@@ -80,13 +80,31 @@ describe('no tool result carries a listing iCal URL', () => {
     ['apply_dynamic_pricing', { success: true, listing }, () => applyDynamicPricing.handler({ listingId: ID }, vendor)],
     ['apply_dynamic_pricing (bulk)', { success: true, applied: 1, listing }, () => applyDynamicPricing.handler({ listingId: ID, bulk: true }, vendor)],
     ['update_rate_rule', { id: 'r-1', name: 'Summer', listing }, () => updateRateRule.handler({ ruleId: ID, name: 'Summer peak' }, vendor)],
-    ['update_fleet_unit', { id: 'u-1', status: 'maintenance', listing }, () => updateFleetUnit.handler({ unitId: ID, status: 'maintenance' }, vendor)],
-    ['log_unit_maintenance', { unit: { id: 'u-1', listing }, record: { id: 'm-1' } }, () => logUnitMaintenance.handler({ unitId: ID, kind: 'service', description: 'Replaced the seat.' }, vendor)],
   ];
   it.each(cases)('%s', async (_name, reply, run) => {
     mockBackendRequest.mockResolvedValue(reply);
     const out = text(await run());
     expect(out).not.toContain('secret-token-123');
     expect(out).toContain(ICAL_URL_REDACTED);
+  });
+
+  // Fleet tools reduce an embedded listing to { id, name } before scrubSecrets
+  // ever runs (SPLIT-1608, withListingRefs in defs/fleet.ts): the secret field
+  // is removed outright rather than redacted, so there is nothing left to scrub
+  // and no ICAL_URL_REDACTED marker either.
+  const fleetCases: Array<[string, unknown, () => Promise<{ content: Array<{ type: string; text?: string }> }>]> = [
+    ['update_fleet_unit', { id: 'u-1', status: 'maintenance', listing }, () => updateFleetUnit.handler({ unitId: ID, status: 'maintenance' }, vendor)],
+    ['log_unit_maintenance', { unit: { id: 'u-1', listing }, record: { id: 'm-1' } }, () => logUnitMaintenance.handler({ unitId: ID, kind: 'service', description: 'Replaced the seat.' }, vendor)],
+  ];
+  it.each(fleetCases)('%s strips the listing down to id/name instead of redacting it', async (_name, reply, run) => {
+    mockBackendRequest.mockResolvedValue(reply);
+    const out = text(await run());
+    expect(out).not.toContain('secret-token-123');
+    expect(out).not.toContain(ICAL_URL_REDACTED);
+    expect(out).not.toContain('pricePerDay');
+    // update_fleet_unit embeds the listing at the top level; log_unit_maintenance
+    // nests it under `unit`. Either way it must come back as exactly { id, name }.
+    const parsed = JSON.parse(out) as { listing?: unknown; unit?: { listing?: unknown } };
+    expect(parsed.listing ?? parsed.unit?.listing).toEqual({ id: 'l-1', name: 'Kayak' });
   });
 });
