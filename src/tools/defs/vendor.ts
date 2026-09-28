@@ -8,6 +8,7 @@ import { vendorFinanceTools } from '../vendor-finance';
 import { reviewTools } from '../reviews';
 import { experienceTools } from '../experiences';
 import { dateRangeError } from '../_shared';
+import { isoDay, shiftDay, toInclusiveBlackout } from '../blackout-dates';
 import { uuid, isoDate, pagination, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, LISTING_CATEGORIES, CANCELLATION_POLICIES, UNTRUSTED_NOTE, token } from './common';
 
 const listingFields = {
@@ -176,31 +177,42 @@ export const getListingPerformance = defineTool({
 export const listBlackoutDates = defineTool({
   name: 'list_blackout_dates',
   title: 'List blackout dates',
-  description: 'Dates the vendor has blocked on a listing (maintenance, personal use…), each with an id for remove_blackout_date.',
+  description:
+    'Dates the vendor has blocked on a listing (maintenance, personal use…), each with an id for remove_blackout_date. ' +
+    'startDate and endDate are the first and last blocked days, both included; a timed hold is one day with startTime and endTime.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: { listingId: uuid('listing') },
   annotations: READ,
-  handler: async ({ listingId }, ctx) => fromResult(await vendorListingTools.listBlackoutDates(listingId, token(ctx))),
+  handler: async ({ listingId }, ctx) =>
+    fromResult(await vendorListingTools.listBlackoutDates(listingId, token(ctx)), (rows) =>
+      Array.isArray(rows) ? rows.map((row) => toInclusiveBlackout(row)) : rows,
+    ),
 });
 
 export const addBlackoutDates = defineTool({
   name: 'add_blackout_dates',
   title: 'Block dates',
-  description: 'Block a date range on a listing so it cannot be booked. Existing confirmed bookings in the range are not cancelled.',
+  description:
+    'Block a date range on a listing so it cannot be booked. startDate and endDate are the first and last blocked days, both included ' +
+    '(one day: startDate = endDate). Existing confirmed bookings in the range are not cancelled.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: {
     listingId: uuid('listing'),
     startDate: isoDate('First blocked day'),
-    endDate: isoDate('Last blocked day'),
+    endDate: isoDate('Last blocked day (blocked too)'),
     reason: z.string().max(200).optional(),
   },
   annotations: WRITE,
-  handler: async ({ listingId, ...input }, ctx) => {
-    if (Number.isNaN(new Date(input.startDate).getTime()) || Number.isNaN(new Date(input.endDate).getTime())) return fail('Dates must be ISO dates such as 2026-07-04.');
-    if (new Date(input.endDate).getTime() < new Date(input.startDate).getTime()) return fail('endDate must be on or after startDate.');
-    return fromResult(await vendorListingTools.addBlackoutDates(listingId, token(ctx), input));
+  handler: async ({ listingId, startDate, endDate, reason }, ctx) => {
+    const first = isoDay(startDate);
+    const last = isoDay(endDate);
+    if (!first || !last) return fail('Dates must be ISO dates such as 2026-07-04.');
+    if (last < first) return fail('endDate must be on or after startDate.');
+    // SPLIT-1606: the backend's endDate is exclusive, the day after the last blocked day.
+    const body = { startDate: first, endDate: shiftDay(last, 1), reason };
+    return fromResult(await vendorListingTools.addBlackoutDates(listingId, token(ctx), body), (block) => toInclusiveBlackout(block));
   },
 });
 
