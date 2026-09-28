@@ -55,7 +55,6 @@ const listingFields = {
     .describe('Stays only (bookingType nightly): how many guests it sleeps. Required for a stay, refused on gear.'),
   checkInTime: stayTime('check-in time'),
   checkOutTime: stayTime('check-out time'),
-  instantBook: z.boolean().optional(),
   requiresIdVerification: z.boolean().optional(),
   cancellationPolicy: z.enum(CANCELLATION_POLICIES).optional(),
   depositAmount: z.number().min(0).optional().describe('Refundable security deposit.'),
@@ -160,6 +159,15 @@ export const updateListing = defineTool({
     listingId: uuid('listing'),
     name: z.string().min(3).max(200).optional(),
     description: z.string().min(20).max(5000).optional(),
+    // Not offered on create_listing: the backend forces it to true there, so a
+    // value sent on create is silently ignored (SPLIT-1608).
+    instantBook: z
+      .boolean()
+      .optional()
+      .describe(
+        'true: a booking on this listing is confirmed automatically once the renter\'s payment is authorized. false: the booking lands as PENDING and waits for the vendor to accept or reject it. ' +
+          'create_listing always creates a listing with this forced to true (a value sent there is ignored); use update_listing to change it afterwards. set_auto_approve instead sets it on every listing the vendor owns at once.',
+      ),
     ...listingFields,
   },
   annotations: WRITE_IDEMPOTENT,
@@ -512,6 +520,11 @@ const experienceFields = {
   minGuests: z.number().int().min(1).optional(),
   maxGuests: z.number().int().min(1).optional(),
   pricePerChild: z.number().min(0).optional(),
+  flatRatePrice: z
+    .number()
+    .min(0)
+    .optional()
+    .describe('Price for the whole booking in USD, instead of per person. Required (greater than $0) when pricingMode is flat_rate, which also requires guidanceType staff_guided.'),
   location: z.string().max(200).optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
@@ -531,6 +544,22 @@ const experienceFields = {
     .describe('per_person (the default) charges each guest; flat_rate charges one price per booking and needs guidanceType staff_guided.'),
 };
 
+/**
+ * The backend's CreateExperienceDto requires pricePerPerson only for the
+ * default per_person pricing; a flat_rate package instead needs flatRatePrice
+ * above $0 and guidanceType staff_guided. Checked here so a package built with
+ * only flatRatePrice doesn't reach the backend still needing pricePerPerson
+ * (SPLIT-1608).
+ */
+function experiencePriceError(args: { pricingMode?: 'per_person' | 'flat_rate'; guidanceType?: 'self_guided' | 'staff_guided'; pricePerPerson?: number; flatRatePrice?: number }): string | null {
+  if (args.pricingMode === 'flat_rate') {
+    if (!(args.flatRatePrice !== undefined && args.flatRatePrice > 0)) return 'pricingMode flat_rate needs flatRatePrice, the whole-booking price, greater than $0.';
+    if (args.guidanceType !== 'staff_guided') return 'pricingMode flat_rate also needs guidanceType staff_guided.';
+    return null;
+  }
+  return args.pricePerPerson === undefined ? 'Provide pricePerPerson (or pricingMode flat_rate with flatRatePrice and guidanceType staff_guided).' : null;
+}
+
 export const createExperience = defineTool({
   name: 'create_experience',
   title: 'Create an experience',
@@ -542,11 +571,15 @@ export const createExperience = defineTool({
     description: z.string().min(20).max(5000),
     duration: z.number().min(0.25).describe('Length of the experience.'),
     durationUnit: z.enum(['minutes', 'hours', 'days']),
-    pricePerPerson: z.number().min(0),
+    pricePerPerson: z.number().min(0).optional().describe('Required unless pricingMode is flat_rate.'),
     ...experienceFields,
   },
   annotations: WRITE,
-  handler: async (args, ctx) => fromResult(await experienceTools.createExperience(token(ctx), args)),
+  handler: async (args, ctx) => {
+    const err = experiencePriceError(args);
+    if (err) return fail(err);
+    return fromResult(await experienceTools.createExperience(token(ctx), args));
+  },
 });
 
 export const updateExperience = defineTool({
