@@ -174,7 +174,8 @@ export const setListingPublished = defineTool({
   title: 'Publish / unpublish listing',
   description:
     'Publish a listing (published=true) or hide it from search (published=false). Existing bookings are unaffected. ' +
-    'Publishing needs at least 3 photos. A new listing is then reviewed by Splitt (moderationStatus pending): it is not in search or bookable until approved.',
+    'Publishing needs at least 3 photos, a category, a location, a description of at least 20 characters and a price above 0 for its booking type. ' +
+    'A new listing is then reviewed by Splitt (moderationStatus pending): it is not in search or bookable until approved.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: { listingId: uuid('listing'), published: z.boolean() },
@@ -202,12 +203,28 @@ function withModerationNote(listing: unknown, published: boolean): unknown {
 export const deleteListing = defineTool({
   name: 'delete_listing',
   title: 'Delete a listing',
-  description: 'Permanently delete one of the vendor\'s listings. Prefer set_listing_published(false) to hide it. Confirm with the user first.',
+  description:
+    'Permanently delete one of the vendor\'s listings. Prefer set_listing_published(false) to hide it. Confirm with the user first. ' +
+    'Splitt refuses (Conflict) a listing whose units have maintenance history, or whose bookings have payment records: archive_listing retires it instead.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: { listingId: uuid('listing') },
   annotations: DESTRUCTIVE,
   handler: async ({ listingId }, ctx) => fromResult(await vendorListingTools.deleteListing(listingId, token(ctx)), () => ({ deleted: true, listingId })),
+});
+
+export const archiveListing = defineTool({
+  name: 'archive_listing',
+  title: 'Archive a listing',
+  description:
+    'Retire one of the vendor\'s listings: it leaves search and cannot be booked, but the listing and its history stay in the vendor\'s records. ' +
+    'Use it when delete_listing refuses because the listing has maintenance or payment history. It does not cancel existing bookings. ' +
+    'set_listing_published(true) brings it back.',
+  access: 'vendor',
+  scope: 'listings',
+  inputSchema: { listingId: uuid('listing') },
+  annotations: WRITE_IDEMPOTENT,
+  handler: async ({ listingId }, ctx) => fromResult(await vendorListingTools.archiveListing(listingId, token(ctx)), () => ({ archived: true, listingId })),
 });
 
 export const duplicateListing = defineTool({
@@ -311,7 +328,9 @@ export const addBlackoutDates = defineTool({
 export const removeBlackoutDate = defineTool({
   name: 'remove_blackout_date',
   title: 'Unblock dates',
-  description: 'Remove a blackout entry (by its id from list_blackout_dates) so those dates become bookable again.',
+  description:
+    'Remove a blackout entry (by its id from list_blackout_dates) so those dates become bookable again. ' +
+    'Removing a hold synced from a calendar feed (type "sync") also records a suppression so the next sync does not bring it back; clear_feed_suppression undoes that.',
   access: 'vendor',
   scope: 'listings',
   inputSchema: { blackoutId: uuid('blackout entry') },
@@ -502,6 +521,14 @@ const experienceFields = {
   requirements: z.string().max(2000).optional(),
   cancellationPolicy: z.string().max(500).optional(),
   imageUrls: z.array(z.string().url().max(2048)).max(20).optional(),
+  guidanceType: z
+    .enum(['self_guided', 'staff_guided'])
+    .optional()
+    .describe('staff_guided when a guide or instructor leads it; self_guided (the default) when guests go on their own.'),
+  pricingMode: z
+    .enum(['per_person', 'flat_rate'])
+    .optional()
+    .describe('per_person (the default) charges each guest; flat_rate charges one price per booking and needs guidanceType staff_guided.'),
 };
 
 export const createExperience = defineTool({
@@ -547,7 +574,7 @@ export const updateExperience = defineTool({
 export const setExperienceStatus = defineTool({
   name: 'set_experience_status',
   title: 'Publish / archive experience',
-  description: 'Publish an experience so guests can book it, or archive it to take it offline.',
+  description: 'Publish an experience so guests can book it, or archive it to take it offline (an archived experience keeps its bookings and history).',
   access: 'vendor',
   scope: 'experiences',
   inputSchema: { experienceId: uuid('experience'), action: z.enum(['publish', 'archive']) },
@@ -558,7 +585,9 @@ export const setExperienceStatus = defineTool({
 export const addExperienceSchedule = defineTool({
   name: 'add_experience_schedule',
   title: 'Add a schedule slot',
-  description: 'Add a bookable date/time slot to an experience (capacity and price override optional).',
+  description:
+    'Add a bookable date/time slot to an experience (capacity and price override optional). Times are the local time where the experience runs; there is no timezone. ' +
+    'get_experience_details lists the slots with their ids.',
   access: 'vendor',
   scope: 'experiences',
   inputSchema: {
@@ -583,6 +612,19 @@ export const deleteExperienceSchedule = defineTool({
   inputSchema: { experienceId: uuid('experience'), scheduleId: uuid('schedule slot') },
   annotations: DESTRUCTIVE,
   handler: async ({ experienceId, scheduleId }, ctx) => fromResult(await experienceTools.deleteSchedule(experienceId, scheduleId, token(ctx)), () => ({ deleted: true, scheduleId })),
+});
+
+export const deleteExperience = defineTool({
+  name: 'delete_experience',
+  title: 'Delete an experience',
+  description:
+    'Permanently delete one of the host\'s experiences, with its schedule slots. Confirm with the user first. ' +
+    'Splitt refuses (Conflict) while it has pending or confirmed bookings, or once it has payment history: set_experience_status(archive) takes it offline instead.',
+  access: 'vendor',
+  scope: 'experiences',
+  inputSchema: { experienceId: uuid('experience') },
+  annotations: DESTRUCTIVE,
+  handler: async ({ experienceId }, ctx) => fromResult(await experienceTools.deleteExperience(experienceId, token(ctx)), () => ({ deleted: true, experienceId })),
 });
 
 export const listExperienceHostBookings = defineTool({
@@ -613,6 +655,7 @@ export const vendorTools = [
   updateListing,
   setListingPublished,
   deleteListing,
+  archiveListing,
   duplicateListing,
   generateListingDraft,
   getListingPerformance,
@@ -636,6 +679,7 @@ export const vendorTools = [
   setExperienceStatus,
   addExperienceSchedule,
   deleteExperienceSchedule,
+  deleteExperience,
   listExperienceHostBookings,
   updateExperienceBookingStatus,
 ];

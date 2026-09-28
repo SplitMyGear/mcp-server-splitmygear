@@ -46,8 +46,10 @@ export type AutoUpdateFrequency = 'daily' | 'weekly' | 'manual';
 export interface DynamicPricingConfigInput {
   enabled?: boolean;
   autoUpdateEnabled?: boolean;
-  minPrice?: number;
-  maxPrice?: number;
+  /** null clears the floor (the column is nullable; SPLIT-1608). */
+  minPrice?: number | null;
+  /** null clears the ceiling. */
+  maxPrice?: number | null;
   customBasePrice?: number;
   adjustmentSensitivity?: AdjustmentSensitivity;
   autoUpdateFrequency?: AutoUpdateFrequency;

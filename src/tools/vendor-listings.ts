@@ -57,7 +57,13 @@ export const vendorListingTools = {
   },
 
   setPublished(listingId: string, published: boolean, token: string) {
-    return call('POST', `/rentals/${listingId}/${published ? 'publish' : 'unpublish'}`, { token, body: {} });
+    // Publishing indexes a listing that has no search embedding yet (AI), like a create.
+    return call('POST', `/rentals/${listingId}/${published ? 'publish' : 'unpublish'}`, { token, body: {}, timeoutMs: LISTING_WRITE_TIMEOUT_MS });
+  },
+
+  /** The web app's own archive path (the bulk toolbar); there is no single-listing route. */
+  archiveListing(listingId: string, token: string) {
+    return call('POST', '/rentals/bulk/status', { token, body: { listingIds: [listingId], status: 'archived' } });
   },
 
   deleteListing(listingId: string, token: string) {

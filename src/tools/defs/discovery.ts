@@ -217,13 +217,15 @@ export const searchExperiences = defineTool({
 export const getExperienceDetails = defineTool({
   name: 'get_experience_details',
   title: 'Get experience details',
-  description: 'Full details for an experience plus its upcoming schedule slots (scheduleId, date, start time, spots left, price). ' + UNTRUSTED_NOTE,
+  description:
+    'Full details for an experience plus its upcoming schedule slots (scheduleId, date, start time, spots left, price). ' +
+    'A host also sees their own draft or archived experience here, with its slots. ' + UNTRUSTED_NOTE,
   access: 'public',
   scope: 'read',
   inputSchema: { experienceId: uuid('experience') },
   annotations: READ,
-  handler: async ({ experienceId }) => {
-    const details = await experienceTools.getExperienceDetails(experienceId);
+  handler: async ({ experienceId }, ctx) => {
+    const details = await experienceTools.getExperienceDetails(experienceId, ctx.token);
     return details ? ok(details) : fail(`Experience ${experienceId} was not found.`);
   },
 });

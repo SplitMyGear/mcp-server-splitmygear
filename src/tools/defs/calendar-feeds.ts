@@ -43,6 +43,13 @@ const subscriptionView = (sub: CalendarSubscription) => ({
 
 // ── Inbound: feeds connected to a listing ────────────────────────────────────
 
+const freeAllDayField = z
+  .boolean()
+  .describe(
+    'Whether an all-day event the calendar marks as free still blocks the listing (Splitt\'s default is true). ' +
+      'Set false when the feed\'s free all-day entries, such as holidays in a shared calendar, should not block it (SPLIT-1608).',
+  );
+
 export const listCalendarFeeds = defineTool({
   name: 'list_calendar_feeds',
   title: 'List calendar feeds',
@@ -75,13 +82,14 @@ export const addCalendarFeed = defineTool({
     url: feedUrlField,
     label: labelField.optional(),
     unitsPerHold: unitsPerHoldField.optional(),
+    treatFreeAllDayAsBusy: freeAllDayField.optional(),
   },
   annotations: WRITE,
-  handler: async ({ listingId, url, label, unitsPerHold }, ctx) => {
+  handler: async ({ listingId, url, label, unitsPerHold, treatFreeAllDayAsBusy }, ctx) => {
     const feedUrl = normalizeCalendarUrl(url);
     if (!isHttpUrl(feedUrl)) return fail('url must be an absolute http://, https:// or webcal:// calendar link, e.g. https://www.airbnb.com/calendar/ical/123.ics?s=abc.');
     const trimmedLabel = label?.trim();
-    return fromResult(await calendarFeedApi.add(token(ctx), listingId, { url: feedUrl, label: trimmedLabel ? trimmedLabel : undefined, unitsPerHold }));
+    return fromResult(await calendarFeedApi.add(token(ctx), listingId, { url: feedUrl, label: trimmedLabel ? trimmedLabel : undefined, unitsPerHold, treatFreeAllDayAsBusy }));
   },
 });
 
@@ -91,7 +99,8 @@ export const syncCalendarFeed = defineTool({
   description:
     'Fetch one connected calendar feed right now and reconcile the listing\'s synced holds with it (new busy dates are added, vanished ones removed; blackout dates and bookings are never touched). ' +
     'Use it after the vendor changed something on the other platform instead of waiting for the nightly sync. Feed ids come from list_calendar_feeds. ' +
-    'Syncing does NOT turn an auto-disabled feed back on; use update_calendar_feed with isEnabled=true for that. Shares the connect limit of 10 calls per 10 minutes. ' +
+    'Syncing does NOT turn an auto-disabled feed back on; use update_calendar_feed with isEnabled=true for that. A paused feed can still be synced by hand; only the nightly sync skips it. ' +
+    'Shares the connect limit of 10 calls per 10 minutes. ' +
     'Returns the refreshed feed plus importedCount and removedCount. ' +
     FEED_TEXT_NOTE,
   access: 'vendor',
@@ -114,10 +123,11 @@ export const updateCalendarFeed = defineTool({
     label: labelField.optional(),
     isEnabled: z.boolean().optional().describe('false pauses syncing without disconnecting; true resumes it (and re-enables an auto-disabled feed).'),
     unitsPerHold: unitsPerHoldField.nullable().optional().describe('Units one busy block consumes (1 to 1000), or null so a block closes the whole listing.'),
+    treatFreeAllDayAsBusy: freeAllDayField.optional(),
   },
   annotations: WRITE_IDEMPOTENT,
   handler: async ({ feedId, ...rest }, ctx) => {
-    if (Object.values(rest).every((v) => v === undefined)) return fail('Pass at least one field to update (label, isEnabled or unitsPerHold).');
+    if (Object.values(rest).every((v) => v === undefined)) return fail('Pass at least one field to update (label, isEnabled, unitsPerHold or treatFreeAllDayAsBusy).');
     const label = rest.label === undefined ? undefined : rest.label.trim();
     if (label !== undefined && !label) return fail('label must not be blank; omit it to leave the label unchanged.');
     return fromResult(await calendarFeedApi.update(token(ctx), feedId, { ...rest, label }));

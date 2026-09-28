@@ -14,7 +14,7 @@ import { uuid, isoDate, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, LISTING_CATE
 const STAFF_NOTE = 'Vendor owner and manager seats can change pricing; vendor_staff seats cannot (Splitt returns 403).';
 const NIGHTLY_NOTE =
   'Seasonal rate rules apply to stays only (bookingType nightly); Splitt refuses them on gear listings (daily, hourly or both). ' +
-  'To price gear by weekday, season or demand, use the dynamic pricing tools (get_dynamic_pricing_config, set_dynamic_pricing_config, preview_dynamic_price).';
+  'To price gear by weekday, season or demand, use dynamic pricing instead: set_dynamic_pricing_config (applyWeekendPremium, applySeasonalPricing), preview_dynamic_price, apply_dynamic_pricing.';
 
 /** Rate rules may legitimately span several years (e.g. a multi-year "always" rule). */
 const MAX_RULE_SPAN_DAYS = 366 * 5;
@@ -199,8 +199,8 @@ export const setDynamicPricingConfig = defineTool({
     listingId: uuid('listing'),
     enabled: z.boolean().optional().describe('Master switch for dynamic pricing on this listing.'),
     autoUpdateEnabled: z.boolean().optional().describe('Let Splitt apply suggested prices automatically (requires enabled=true).'),
-    minPrice: z.number().min(0).max(1_000_000).optional().describe('Floor for suggested/auto-applied prices (USD per day).'),
-    maxPrice: z.number().min(0).max(1_000_000).optional().describe('Ceiling for suggested/auto-applied prices (USD per day).'),
+    minPrice: z.number().min(0).max(1_000_000).nullable().optional().describe('Floor for suggested/auto-applied prices (USD per day); null removes the floor.'),
+    maxPrice: z.number().min(0).max(1_000_000).nullable().optional().describe('Ceiling for suggested/auto-applied prices (USD per day); null removes the ceiling.'),
     customBasePrice: z.number().min(0).max(1_000_000).optional().describe('Base price the algorithm adjusts from, instead of the listing pricePerDay.'),
     adjustmentSensitivity: z.enum(['low', 'medium', 'high']).optional().describe('How strongly demand and competition move the price.'),
     autoUpdateFrequency: z.enum(['daily', 'weekly', 'manual']).optional(),
@@ -213,7 +213,7 @@ export const setDynamicPricingConfig = defineTool({
   annotations: WRITE_IDEMPOTENT,
   handler: async ({ listingId, ...input }, ctx) => {
     if (Object.values(input).every((v) => v === undefined)) return fail('Pass at least one setting to change.');
-    if (input.minPrice !== undefined && input.maxPrice !== undefined && input.minPrice > input.maxPrice) return fail('minPrice must not exceed maxPrice.');
+    if (typeof input.minPrice === 'number' && typeof input.maxPrice === 'number' && input.minPrice > input.maxPrice) return fail('minPrice must not exceed maxPrice.');
     return fromResult(await pricingRulesApi.setDynamicPricingConfig(token(ctx), listingId, input));
   },
 });

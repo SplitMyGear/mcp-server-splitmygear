@@ -73,6 +73,7 @@ export interface CreateCalendarFeedInput {
   url: string;
   label?: string;
   unitsPerHold?: number;
+  treatFreeAllDayAsBusy?: boolean;
 }
 
 /** `UpdateCalendarFeedDto`: `unitsPerHold: null` clears the setting (a hold closes the listing again). */
@@ -80,6 +81,7 @@ export interface UpdateCalendarFeedInput {
   label?: string;
   isEnabled?: boolean;
   unitsPerHold?: number | null;
+  treatFreeAllDayAsBusy?: boolean;
 }
 
 /**

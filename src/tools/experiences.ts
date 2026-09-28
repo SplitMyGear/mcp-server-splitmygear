@@ -77,13 +77,20 @@ export const experienceTools = {
     }
   },
 
+  /**
+   * `token` is optional: with the owner's, the backend also returns their own
+   * draft or archived experience and its slots, which anonymous reads 404
+   * (SPLIT-1608).
+   */
   async getExperienceDetails(
     experienceId: string,
+    token?: string,
   ): Promise<{ experience: ExperienceRecord; schedules: ExperienceRecord[] } | null> {
     try {
       const detail = await backendRequest<{ success: boolean; experience: ExperienceRecord }>(
         'GET',
         `/packages/${experienceId}`,
+        { token },
       );
       if (!detail?.experience) return null;
 
@@ -94,6 +101,7 @@ export const experienceTools = {
         const sched = await backendRequest<{ success: boolean; schedules: ExperienceRecord[] }>(
           'GET',
           `/packages/${experienceId}/schedules`,
+          { token },
         );
         schedules = Array.isArray(sched?.schedules) ? sched.schedules : [];
       } catch {
@@ -190,6 +198,10 @@ export const experienceTools = {
 
   deleteSchedule(experienceId: string, scheduleId: string, token: string) {
     return call('DELETE', `/packages/${experienceId}/schedules/${scheduleId}`, { token });
+  },
+
+  deleteExperience(experienceId: string, token: string) {
+    return call('DELETE', `/packages/${experienceId}`, { token });
   },
 
   listHostBookings(token: string) {
