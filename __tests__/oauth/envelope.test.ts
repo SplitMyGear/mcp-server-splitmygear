@@ -1,5 +1,6 @@
 export {};
 import crypto from 'crypto';
+import { NextRequest } from 'next/server';
 import { seal, open, ENVELOPE_PREFIX, looksLikeAccessEnvelope, nowSeconds } from '../../src/lib/oauth/envelope';
 import { oauthEnabled, deriveKey, publicBaseUrl, resourceUrl, validIp, _resetOAuthConfigForTests } from '../../src/lib/oauth/config';
 import { SCOPE_DESCRIPTIONS, TOOL_SCOPES, parseScopeParam, formatScope, isSubset, coerceScopes } from '../../src/lib/oauth/scopes';
@@ -111,6 +112,11 @@ describe('OAuth config', () => {
     expect(resourceUrl(req)).toBe('https://mcp.go-splitt.com/api/mcp');
     delete process.env.VERCEL_URL;
     delete process.env.VERCEL_ENV;
+  });
+
+  it('names a local server by the address it was reached at, not the "localhost" NextRequest rewrites it to', () => {
+    // RFC 8414 §3.3: a client checks the issuer against the address it fetched the metadata from.
+    expect(publicBaseUrl(new NextRequest('http://127.0.0.1:3000/.well-known/oauth-authorization-server'))).toBe('http://127.0.0.1:3000');
   });
 });
 

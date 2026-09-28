@@ -13,6 +13,7 @@
  */
 export {};
 import crypto from 'crypto';
+import { NextRequest } from 'next/server';
 
 const mockBackendRequest = jest.fn();
 jest.mock('../../src/lib/backend-client', () => {
@@ -84,10 +85,15 @@ function loginSucceeds(): void {
   });
 }
 /** Drive authorize (GET + password POST) and return the redirect Location. */
-async function signIn(clientId: string, redirectUri: string, extra: Record<string, string> = {}): Promise<{ location: URL; verifier: string }> {
+async function signIn(
+  clientId: string,
+  redirectUri: string,
+  extra: Record<string, string> = {},
+  makeRequest: (url: string) => Request = (url) => new Request(url),
+): Promise<{ location: URL; verifier: string }> {
   const { verifier, challenge } = pkce();
   loginSucceeds();
-  const page = await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: redirectUri, state: 's1', code_challenge: challenge, code_challenge_method: 'S256', ...extra })));
+  const page = await authorizeGet(makeRequest(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: redirectUri, state: 's1', code_challenge: challenge, code_challenge_method: 'S256', ...extra })));
   expect(page.status).toBe(200);
   const res = await authorizePost(form({ step: 'login', req: hidden(await page.text(), 'req'), email: 'v@x.test', password: 'pw' }, `${BASE}/oauth/authorize`));
   expect(res.status).toBe(302);
@@ -192,6 +198,48 @@ describe('OAuth client compatibility', () => {
       const hosted = await (await authorizeGet(new Request(authorizeUrl({ response_type: 'code', client_id: httpsClient, redirect_uri: HTTPS_REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' })))).text();
       expect(hosted).not.toContain('This app runs on your own computer');
       expect(hosted).toContain('you go back to <b>client.example</b>');
+    });
+
+    describe('through the NextRequest that Next.js hands the route in production', () => {
+      // NextRequest rewrites the first loopback address anywhere in its URL,
+      // query string included, to "localhost". On a public host that first
+      // address is the redirect_uri: on staging a client that registered only
+      // 127.0.0.1 was refused, and a localhost-only client was let through on
+      // 127.0.0.1. Plain Request objects never showed it.
+      const viaNext = (url: string) => new NextRequest(url);
+
+      it('signs in a client that registered only 127.0.0.1 (RFC 8252 §8.3) and returns to exactly that address', async () => {
+        const clientId = await registerClient(['http://127.0.0.1/callback'], 'Loopback IP client');
+        const redirect = 'http://127.0.0.1:33418/callback';
+        const { location, verifier } = await signIn(clientId, redirect, {}, viaNext);
+        expect(`${location.origin}${location.pathname}`).toBe(redirect);
+        const token = await tokenPost(form({ grant_type: 'authorization_code', code: location.searchParams.get('code')!, code_verifier: verifier, redirect_uri: redirect, client_id: clientId }));
+        expect(token.status).toBe(200);
+      });
+
+      it('sends a client that registered both forms back to the one it asked for', async () => {
+        const clientId = await registerClient(['http://localhost/callback', 'http://127.0.0.1/callback'], 'Claude Code');
+        const redirect = 'http://127.0.0.1:51234/callback';
+        const { location, verifier } = await signIn(clientId, redirect, {}, viaNext);
+        expect(`${location.origin}${location.pathname}`).toBe(redirect);
+        const token = await tokenPost(form({ grant_type: 'authorization_code', code: location.searchParams.get('code')!, code_verifier: verifier, redirect_uri: redirect, client_id: clientId }));
+        expect(token.status).toBe(200);
+      });
+
+      it('still refuses 127.0.0.1 for a client that registered only localhost', async () => {
+        const clientId = await registerClient(['http://localhost/callback']);
+        const { challenge } = pkce();
+        const res = await authorizeGet(viaNext(authorizeUrl({ response_type: 'code', client_id: clientId, redirect_uri: 'http://127.0.0.1:3118/callback', code_challenge: challenge, code_challenge_method: 'S256' })));
+        expect(res.status).toBe(400);
+        expect(res.headers.get('location')).toBeNull();
+      });
+
+      it('returns a state that contains a loopback address unchanged', async () => {
+        const clientId = await registerClient([HTTPS_REDIRECT]);
+        const state = 'next=http://127.0.0.1:8080/done';
+        const { location } = await signIn(clientId, HTTPS_REDIRECT, { state }, viaNext);
+        expect(location.searchParams.get('state')).toBe(state);
+      });
     });
   });
 

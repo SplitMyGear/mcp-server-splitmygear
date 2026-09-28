@@ -70,6 +70,30 @@ export default [
     },
   },
 
+  // NextRequest's `url` and `nextUrl` rewrite the first loopback address
+  // anywhere in the URL, query string included, to "localhost", which turned a
+  // client's `redirect_uri=http://127.0.0.1:PORT/…` into a different address.
+  // Server code reads request URLs through requestUrl() (src/lib/request-url.ts),
+  // the one place allowed to touch them.
+  {
+    files: ['src/**/*.ts'],
+    ignores: ['src/lib/request-url.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        ...['request', 'req'].map((object) => ({
+          object,
+          property: 'url',
+          message: 'Read it with requestUrl(request) from @/lib/request-url: NextRequest rewrites loopback addresses in its URL.',
+        })),
+        {
+          property: 'nextUrl',
+          message: 'Read it with requestUrl(request) from @/lib/request-url: nextUrl rewrites loopback addresses, query string included.',
+        },
+      ],
+    },
+  },
+
   // Tests drive the route through hand-built Web `Request` objects and stub
   // transports, which legitimately needs casts and `require`-style mocks that
   // production code must never use. Everything else still applies.

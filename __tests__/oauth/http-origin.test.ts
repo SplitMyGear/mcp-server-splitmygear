@@ -4,6 +4,7 @@
  * `no-referrer` policy; it passes only when the browser also says the request
  * is same-origin (Sec-Fetch-Site cannot be set by page script).
  */
+import { NextRequest } from 'next/server';
 import { isSameOriginPost } from '../../src/lib/oauth/http';
 
 const URL_ = 'https://mcp.test/oauth/authorize';
@@ -29,5 +30,11 @@ describe('isSameOriginPost', () => {
     expect(isSameOriginPost(post({ origin: 'https://attacker.example' }))).toBe(false);
     expect(isSameOriginPost(post({ 'sec-fetch-site': 'cross-site' }))).toBe(false);
     expect(isSameOriginPost(post({ origin: 'https://mcp.test.attacker.example', 'sec-fetch-site': 'same-origin' }))).toBe(false);
+  });
+
+  it('compares against the address the browser used, not the one NextRequest rewrites to "localhost"', () => {
+    const local = (origin: string) => new NextRequest('http://127.0.0.1:3000/oauth/authorize', { method: 'POST', headers: { origin, 'sec-fetch-site': 'same-origin' } });
+    expect(isSameOriginPost(local('http://127.0.0.1:3000'))).toBe(true);
+    expect(isSameOriginPost(local('http://localhost:3000'))).toBe(false);
   });
 });
