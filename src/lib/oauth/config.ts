@@ -2,8 +2,9 @@
  * OAuth 2.1 configuration for the MCP server (MCP authorization spec, RFC 9728
  * protected-resource metadata, RFC 8414 AS metadata, RFC 7591 DCR).
  *
- * The MCP server is BOTH the OAuth resource server (the `/api/mcp` endpoint)
- * and a thin, STATELESS authorization server that fronts the Splitt backend's
+ * The MCP server is BOTH the OAuth resource server (the MCP endpoint — see
+ * `mcpResourcePath()` for which path is canonical on this deployment) and a
+ * thin, STATELESS authorization server that fronts the Splitt backend's
  * own login (`POST /users/login`, email-OTP 2FA, `POST /auth/refresh`). It
  * never stores sessions: every artifact it hands out (authorization code,
  * access token, refresh token, registered client id, in-flight login request)
@@ -25,8 +26,48 @@ const MIN_SECRET_LENGTH = 32;
 /** A 32+ char secret with fewer distinct characters than this is a passphrase, not a key. */
 const MIN_DISTINCT_CHARS = 12;
 
-/** Path of the protected MCP resource, relative to the public base URL. */
-export const MCP_RESOURCE_PATH = '/api/mcp';
+/**
+ * The only two paths a deployment may serve the MCP endpoint at (SPLIT-1621).
+ * Both are ALWAYS live on every deployment (src/app/mcp/route.ts and
+ * src/app/api/mcp/route.ts are the same handler); `mcpResourcePath()` below
+ * only picks which one is CANONICAL.
+ */
+export const MCP_RESOURCE_PATHS = ['/api/mcp', '/mcp'] as const;
+type McpResourcePath = (typeof MCP_RESOURCE_PATHS)[number];
+const DEFAULT_RESOURCE_PATH: McpResourcePath = '/api/mcp';
+
+let invalidResourcePathWarned = false;
+
+/**
+ * Canonical path of the protected MCP resource, relative to the public base
+ * URL (`MCP_RESOURCE_PATH`, SPLIT-1621). This only selects which of the two
+ * always-served paths is CANONICAL — the one `resourceUrl()` names, the one
+ * the RFC 9728 metadata advertises as `resource`, and the one `isOwnResource`
+ * requires. Production sets `MCP_RESOURCE_PATH=/mcp`; every other deployment
+ * leaves it unset and keeps the original `/api/mcp`.
+ *
+ * FAILS CLOSED to the default on anything else, rather than trusting an
+ * arbitrary operator string as a URL path segment: an unrecognised value
+ * would make `resourceUrl()` advertise a spelling that is still reachable
+ * (both paths always answer) but was never meant to be the canonical one,
+ * confusing clients that compare it against what they configured for no
+ * visible reason. The bad value is logged once per cold instance — loud
+ * enough to show up in Vercel's function logs — naming the variable, so a
+ * typo (`/mcp/`, `mcp`, `/MCP`) is obvious instead of a silent mismatch.
+ */
+export function mcpResourcePath(): McpResourcePath {
+  const raw = process.env.MCP_RESOURCE_PATH;
+  if (raw === undefined) return DEFAULT_RESOURCE_PATH;
+  if ((MCP_RESOURCE_PATHS as readonly string[]).includes(raw)) return raw as McpResourcePath;
+  if (!invalidResourcePathWarned) {
+    invalidResourcePathWarned = true;
+    console.error(
+      `[oauth] MCP_RESOURCE_PATH=${JSON.stringify(raw)} is not ${MCP_RESOURCE_PATHS.map((p) => `"${p}"`).join(' or ')}; ` +
+        `using the default "${DEFAULT_RESOURCE_PATH}" instead. Fix or unset the variable.`,
+    );
+  }
+  return DEFAULT_RESOURCE_PATH;
+}
 
 export function oauthSigningSecret(): string | undefined {
   const secret = process.env.MCP_OAUTH_SIGNING_KEY;
@@ -68,9 +109,10 @@ function warnOAuthDisabledWithoutStore(): void {
   );
 }
 
-/** Test hook: forget the one-shot OAuth gate warning. */
+/** Test hook: forget this module's one-shot warnings (the OAuth/store gate, an invalid MCP_RESOURCE_PATH). */
 export function _resetOAuthConfigForTests(): void {
   storeGateWarned = false;
+  invalidResourcePathWarned = false;
 }
 
 /**
@@ -122,7 +164,7 @@ export function publicBaseUrl(request?: Request): string {
 }
 
 export function resourceUrl(request?: Request): string {
-  return `${publicBaseUrl(request)}${MCP_RESOURCE_PATH}`;
+  return `${publicBaseUrl(request)}${mcpResourcePath()}`;
 }
 
 /**
@@ -135,6 +177,11 @@ export function resourceUrl(request?: Request): string {
  * names the same audience; what must still fail is a DIFFERENT resource (a
  * token requested for another server), a fragment, or a value that is not a URL.
  * Host case is normalised by URL parsing; the path is compared exactly.
+ *
+ * SPLIT-1621: `own.pathname` is `resourceUrl`'s CANONICAL path, so when
+ * `MCP_RESOURCE_PATH` picks `/mcp` this rejects `/api/mcp` and vice versa,
+ * even though both are live endpoints on every deployment — a resource
+ * indicator names the canonical spelling, not every path that happens to work.
  */
 export function isOwnResource(value: string, request?: Request): boolean {
   let url: URL;

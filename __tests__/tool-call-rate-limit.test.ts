@@ -24,6 +24,7 @@ import { NextRequest } from 'next/server';
 import { RATE_LIMITS, countToolCalls, toolCallRateLimiter } from '../src/middleware/rate-limit';
 import { _resetSharedStoreForTests } from '../src/lib/shared-store';
 import { POST } from '../src/app/api/mcp/route';
+import { POST as mcpPathPost } from '../src/app/mcp/route';
 
 // Buckets are keyed per source address only where proxy headers are trusted
 // (Vercel, or this explicit opt-in); the cases below attribute each request
@@ -52,8 +53,8 @@ const INIT = {
 };
 
 /** A POST carrying `body`, attributed to `ip` so each test gets its own bucket. */
-function mcpRequest(body: unknown, ip: string, raw?: string): NextRequest {
-  const req = new Request('http://localhost/api/mcp', {
+function mcpRequest(body: unknown, ip: string, raw?: string, path = '/api/mcp'): NextRequest {
+  const req = new Request(`http://localhost${path}`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -65,7 +66,7 @@ function mcpRequest(body: unknown, ip: string, raw?: string): NextRequest {
   }) as NextRequest;
   // The route only reads `.method`, `.headers` and `.json()`; `nextUrl` is set
   // because NextRequest consumers elsewhere expect it to exist.
-  Object.defineProperty(req, 'nextUrl', { value: { pathname: '/api/mcp' } });
+  Object.defineProperty(req, 'nextUrl', { value: { pathname: path } });
   return req;
 }
 
@@ -246,6 +247,55 @@ describe('/api/mcp enforces the tool-call budget before dispatch', () => {
     const res = await POST(mcpRequest(undefined, '198.51.100.5', 'this is not json'));
     expect(res.status).toBe(400);
     expect(await res.text()).toContain('-32700');
+  });
+});
+
+/**
+ * SPLIT-1621: POST /mcp is the same handler as POST /api/mcp (the route file
+ * re-exports it), so the REAL limiter must run there too, over the SAME
+ * per-principal buckets. A client cannot double its allowance by alternating
+ * between the two paths.
+ */
+describe('/mcp enforces the same budgets as /api/mcp (SPLIT-1621)', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv, MCP_RATE_LIMIT_TIER: TIER, MCP_API_KEY: 'test-operator-key', ...TRUST_PROXY };
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    jest.restoreAllMocks();
+  });
+
+  it('dispatches a tool call, so the pre-read body reaches the transport on this path too', async () => {
+    const res = await mcpPathPost(mcpRequest(toolCall(1), '198.51.100.11', undefined, '/mcp'));
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('"result"');
+  });
+
+  it('refuses a batch larger than the whole tool-call allowance', async () => {
+    const oversized = TOOL_CALL_LIMIT + 1;
+    const res = await mcpPathPost(mcpRequest(batch(oversized), '198.51.100.12', undefined, '/mcp'));
+    expect(res.status).toBe(429);
+    expect(await errorOf(res)).toContain(`asked for ${oversized}`);
+  });
+
+  it('shares one request budget across both paths', async () => {
+    const ip = '198.51.100.13';
+    // Spend the whole per-minute request budget, alternating between the paths.
+    for (let i = 0; i < REQUEST_LIMIT; i++) {
+      const onMcp = i % 2 === 0;
+      const res = await (onMcp ? mcpPathPost : POST)(mcpRequest(INIT, ip, undefined, onMcp ? '/mcp' : '/api/mcp'));
+      expect(res.status).toBe(200);
+    }
+    // The next request is refused on EITHER path: one bucket, not one per path.
+    const viaMcp = await mcpPathPost(mcpRequest(INIT, ip, undefined, '/mcp'));
+    const viaApi = await POST(mcpRequest(INIT, ip, undefined, '/api/mcp'));
+    expect(viaMcp.status).toBe(429);
+    expect(viaApi.status).toBe(429);
+    expect(await errorOf(viaMcp)).toContain('requests per minute');
   });
 });
 

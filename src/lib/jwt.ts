@@ -49,10 +49,12 @@ const REQUIRED_ALG = 'HS256';
 
 /**
  * The identity probe runs BEFORE the tool's own backend call within one
- * function invocation (60s `maxDuration` for /api/mcp, vercel.json), so it gets
- * a tighter budget than the client's 15s default: an 8s probe plus the longest
- * tool budget (LISTING_WRITE_TIMEOUT_MS, 45s) still ends inside it, instead of
- * surfacing as an opaque 500 rather than a clean 401.
+ * function invocation (60s `maxDuration` for the MCP endpoint — `/api/mcp` and
+ * `/mcp` are both configured in vercel.json — see lib/oauth/config.ts
+ * `mcpResourcePath`), so it gets a tighter budget than the client's 15s
+ * default: an 8s probe plus the longest tool budget (LISTING_WRITE_TIMEOUT_MS,
+ * 45s) still ends inside it, instead of surfacing as an opaque 500 rather than
+ * a clean 401.
  */
 const IDENTITY_TIMEOUT_MS = 8_000;
 

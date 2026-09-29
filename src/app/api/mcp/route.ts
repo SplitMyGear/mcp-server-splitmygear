@@ -11,10 +11,10 @@ import {
 import { registerTools, type ToolContext } from '@/tools/registry';
 import { ALL_TOOLS } from '@/tools/defs';
 import { LISTING_CATEGORIES } from '@/tools/listing-categories';
-import { oauthEnabled, publicBaseUrl, MCP_RESOURCE_PATH } from '@/lib/oauth/config';
+import { oauthEnabled, publicBaseUrl, mcpResourcePath } from '@/lib/oauth/config';
 
 const SERVER_NAME = 'splitmygear-mcp';
-const SERVER_VERSION = '2.0.4';
+const SERVER_VERSION = '2.0.5';
 
 /**
  * CORS: the endpoint is bearer/API-key authenticated (never cookies), so a
@@ -111,7 +111,11 @@ function withHeaders(response: Response, extra: Record<string, string> = {}): Re
 function unauthorized(request: NextRequest, auth: AuthResult): Response {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (oauthEnabled()) {
-    const metadata = `${publicBaseUrl(request)}/.well-known/oauth-protected-resource${MCP_RESOURCE_PATH}`;
+    // SPLIT-1621: named by the CANONICAL path regardless of which live path
+    // (`/mcp` or `/api/mcp`) this 401 came from — this function is shared by
+    // both route files (see src/app/mcp/route.ts), so the challenge a client
+    // receives is identical either way.
+    const metadata = `${publicBaseUrl(request)}/.well-known/oauth-protected-resource${mcpResourcePath()}`;
     const parts = [`Bearer resource_metadata="${metadata}"`];
     if (auth.invalidCredentials) parts.push('error="invalid_token"', `error_description="${auth.error ?? 'Invalid token'}"`);
     headers['WWW-Authenticate'] = parts.join(', ');

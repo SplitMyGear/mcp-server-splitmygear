@@ -7,7 +7,7 @@ The official MCP (Model Context Protocol) server for [Splitt](https://go-splitt.
 - **Scoped access**: clients may request a subset of 12 scopes (`read profile bookings favorites messaging reviews listings vendor_bookings experiences finance claims files`); the sign-in page shows exactly what the app will be able to do, and tools outside the granted scopes are neither listed nor callable
 - **Thin, stateless client of the Splitt backend REST API**: no database or payment credentials live here ([ADR 0001](docs/adr/0001-mcp-is-a-backend-rest-client.md), [ADR 0002](docs/adr/0002-oauth-login-for-mcp-clients.md))
 
-Production endpoint: `https://mcp-server-splitmygear.vercel.app/api/mcp`
+Production endpoint: `https://mcp.go-splitt.com/mcp`
 
 ---
 
@@ -20,15 +20,15 @@ Add the server URL to any MCP client that supports OAuth (ChatGPT developer mode
 ```json
 {
   "mcpServers": {
-    "splitt": { "url": "https://mcp-server-splitmygear.vercel.app/api/mcp" }
+    "splitt": { "url": "https://mcp.go-splitt.com/mcp" }
   }
 }
 ```
 
-Enter the URL exactly as above (`https://mcp-server-splitmygear.vercel.app/api/mcp`, no trailing slash): Claude compares it with the `resource` this server advertises.
+Enter the URL exactly as above (`https://mcp.go-splitt.com/mcp`, no trailing slash): Claude compares it with the `resource` this server advertises.
 
 - **Claude** (claude.ai, Desktop, mobile): **Customize → Connectors → + → Add custom connector**, paste the URL, **Add**, then **Connect** on the connector and sign in. Team and Enterprise owners add it under **Organization settings → Connectors → Add → Custom → Web**; members then **Connect** it themselves. Leave the OAuth client ID and secret under Advanced settings empty: Claude registers itself.
-- **Claude Code**: `claude mcp add --transport http splitt https://mcp-server-splitmygear.vercel.app/api/mcp`, then run `/mcp` and choose Authenticate.
+- **Claude Code**: `claude mcp add --transport http splitt https://mcp.go-splitt.com/mcp`, then run `/mcp` and choose Authenticate.
 - **ChatGPT** (Plus, Pro, Business, Enterprise, Edu, on the web): turn on **Settings → Security and login → Developer mode**, open **Plugins**, press **+** to create an app for a remote MCP server, paste the URL and choose **OAuth**. ChatGPT asks you to confirm every tool that is not read-only.
 
 What the sign-in page does: your email and password go straight to Splitt's own login API (this server never stores them); if two-step verification is on, you enter the emailed code; the client receives short-lived tokens that wrap your Splitt session. Signed up with Google or Apple? Use the Continue with Google / Continue with Apple buttons (shown when Splitt has that provider configured): the round trip runs through Splitt's own provider login and ends back here, which then issues the client its code exactly as after a password sign-in. Two-step verification applies to social sign-in too.
@@ -39,7 +39,7 @@ What the sign-in page does: your email and password go straight to Splitt's own 
 {
   "mcpServers": {
     "splitt": {
-      "url": "https://mcp-server-splitmygear.vercel.app/api/mcp",
+      "url": "https://mcp.go-splitt.com/mcp",
       "headers": { "x-api-key": "your-operator-key" }
     }
   }
@@ -51,7 +51,7 @@ The operator key unlocks the public tools (search, details, availability, calend
 Or over plain HTTP:
 
 ```bash
-curl -X POST https://mcp-server-splitmygear.vercel.app/api/mcp \
+curl -X POST https://mcp.go-splitt.com/mcp \
   -H "Content-Type: application/json" \
   -H "x-api-key: $MCP_API_KEY" \
   -d '{
@@ -95,7 +95,7 @@ Payments never happen inside the MCP: booking tools return a Stripe-hosted `paym
 
 ## Security model
 
-- **Deny by default.** No credential, no service. A 401 carries `WWW-Authenticate` with the RFC 9728 resource-metadata URL so OAuth clients can start sign-in. Raw backend JWTs are verified before they authenticate — in-process against `MCP_BACKEND_JWT_SECRET` when it is set, otherwise against the backend itself (`GET /users/profile`, identity taken from the backend's answer, never from the client's claims); an unverifiable bearer is rejected, never decoded and trusted (SPLIT-1438). OAuth tokens prove their own provenance: the backend JWT inside a sealed envelope is the one this server received from the backend, so it is only decoded, and nothing in the request middleware ever decodes without verifying. `GET`/`DELETE` on `/api/mcp` answer 405 (stateless transport).
+- **Deny by default.** No credential, no service. A 401 carries `WWW-Authenticate` with the RFC 9728 resource-metadata URL so OAuth clients can start sign-in. Raw backend JWTs are verified before they authenticate — in-process against `MCP_BACKEND_JWT_SECRET` when it is set, otherwise against the backend itself (`GET /users/profile`, identity taken from the backend's answer, never from the client's claims); an unverifiable bearer is rejected, never decoded and trusted (SPLIT-1438). OAuth tokens prove their own provenance: the backend JWT inside a sealed envelope is the one this server received from the backend, so it is only decoded, and nothing in the request middleware ever decodes without verifying. `GET`/`DELETE` on the MCP endpoint (`/mcp` and `/api/mcp` both always answer; see `MCP_RESOURCE_PATH` below) answer 405 (stateless transport).
 - **The backend is the authority.** Every user-scoped call forwards the user's own Splitt JWT; the backend re-validates it and enforces role, ownership and lifecycle rules. This server never accepts a caller-supplied user id.
 - **Scopes.** Every tool belongs to one OAuth scope (see the Scopes table in docs/mcp-tools.md). Clients request scopes with the standard space-separated `scope` parameter on `/oauth/authorize`; a client that sends none is granted all scopes and the consent page says so in plain words. The `scope` member of the token response echoes the grant. A `refresh_token` request may pass `scope` to narrow the grant (never widen it), and the narrowed set persists in the new refresh token. The operator API key has `read` only; a verified raw backend JWT has every scope. Scopes never override the backend role model: granting `listings` to a renter account unlocks nothing, and the backend re-checks every forwarded call.
 - **Stateless OAuth.** Authorization codes, access tokens, refresh tokens, registered client ids and in-flight sign-in requests are AES-256-GCM envelopes sealed with `MCP_OAUTH_SIGNING_KEY` (purpose-bound keys, so a code can never be replayed as a token). PKCE S256 is mandatory; only `https` or loopback redirect URIs register; codes live 2 minutes and are single-use. Every redirect back to the app, success or error, carries `iss` (RFC 9207), and the metadata says so. Loopback redirects match on any port (RFC 8252 §7.3), which Claude Code needs: it registers `http://localhost/callback` and returns on a new port every session; https redirects match exactly. `resource` (RFC 8707) may name the MCP endpoint or this origin, with or without a trailing slash; any other resource is `invalid_target`.
@@ -131,7 +131,8 @@ npm run dev                  # http://localhost:3000/api/mcp
 |---|---|---|
 | `MCP_API_KEY` | for operator access | Operator key (`x-api-key`) for the public tools. Auth fails closed only when none of `MCP_API_KEY`, `MCP_OAUTH_SIGNING_KEY` and `MCP_BACKEND_JWT_SECRET` is configured. |
 | `MCP_OAUTH_SIGNING_KEY` | for sign-in | 32+ random bytes; seals every OAuth artifact. Rotating it invalidates all issued tokens. |
-| `MCP_PUBLIC_URL` | production | Public origin of this server (the OAuth issuer), e.g. `https://mcp-server-splitmygear.vercel.app`. Falls back to Vercel's production URL. |
+| `MCP_PUBLIC_URL` | production | Public origin of this server (the OAuth issuer), e.g. `https://mcp.go-splitt.com`. Falls back to Vercel's production URL. |
+| `MCP_RESOURCE_PATH` | no | Canonical path of the MCP endpoint, appended to `MCP_PUBLIC_URL` to form the OAuth `resource` (SPLIT-1621). Accepts exactly `/mcp` or `/api/mcp`; unset, or any other value, falls back to `/api/mcp` and logs an error once naming the variable. Both paths always answer on every deployment — this only selects which one is advertised as canonical. **Production: `/mcp`.** |
 | `MCP_BFF_RELAY_KEY` | recommended | The backend's `BFF_RELAY_KEY`; relays the end user's IP on login. |
 | `MCP_OAUTH_ALLOWED_REDIRECT_HOSTS` | **for any non-loopback client** | Comma-separated redirect targets allowed to register: a host (`claude.ai`), a host and its subdomains (`.claude.com`), or either followed by a path prefix that pins registrations to that callback. **Pin the paths in production** (RFC 9700 §4.1: registration is open to anyone, so a host-only entry would let a stranger register any page on that host). Production: `chatgpt.com/connector_platform_oauth_redirect,chatgpt.com/connector/oauth,claude.ai/api/mcp/auth_callback` (ChatGPT's stable and per-connection callbacks, Claude's single callback). Loopback is always allowed. **Unset = no https host may register** (fails closed, with an error naming this variable). Re-checked on every use, so narrowing it revokes ids already issued. |
 | `MCP_REQUIRE_SHARED_STORE` | no | `1` to refuse to enable OAuth at all unless a shared store is configured. Default off: the store's absence is logged loudly instead (see Security model). |
@@ -170,8 +171,8 @@ The backend must list this server's callback in `SOCIAL_AUTH_RETURN_ORIGINS` (se
 
 | Path | Purpose |
 |---|---|
-| `POST /api/mcp` | MCP Streamable HTTP (stateless, JSON responses) |
-| `GET /.well-known/oauth-protected-resource[/api/mcp]` | RFC 9728 protected-resource metadata |
+| `POST /mcp` · `POST /api/mcp` | MCP Streamable HTTP (stateless, JSON responses). Both always answer, on the same handler; only the canonical one (`MCP_RESOURCE_PATH`; production: `/mcp`) is advertised as the OAuth `resource` (SPLIT-1621). |
+| `GET /.well-known/oauth-protected-resource[/mcp\|/api/mcp]` | RFC 9728 protected-resource metadata. Answers for either path suffix; the document always names the canonical `resource`. |
 | `GET /.well-known/oauth-authorization-server` | RFC 8414 authorization-server metadata |
 | `POST /oauth/register` | RFC 7591 dynamic client registration (public clients) |
 | `GET/POST /oauth/authorize` | Hosted Splitt sign-in (authorization code + PKCE; optional `scope`) |

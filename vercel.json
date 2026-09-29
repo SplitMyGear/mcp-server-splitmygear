@@ -4,6 +4,9 @@
     "src/app/api/mcp/route.ts": {
       "maxDuration": 60
     },
+    "src/app/mcp/route.ts": {
+      "maxDuration": 60
+    },
     "src/app/oauth/authorize/route.ts": {
       "maxDuration": 30
     },
