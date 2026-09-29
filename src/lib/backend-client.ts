@@ -10,7 +10,8 @@ const DEFAULT_BASE_URL = 'https://splitmygear-backend.vercel.app/api/v1';
 
 /**
  * Per-request timeout. The functions' Vercel `maxDuration` is 30s (60s for
- * /api/mcp, whose listing writes take longer; see lib/timeouts.ts); without an
+ * the MCP endpoint — `/api/mcp` and `/mcp`, whose listing writes take longer;
+ * see lib/timeouts.ts); without an
  * explicit bound a hung/slow backend ties the whole invocation up until that
  * hard limit and then surfaces as an opaque 500. Aborting at 15s keeps a single
  * upstream stall well inside the budget (leaving room for the create-booking

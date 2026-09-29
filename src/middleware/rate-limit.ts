@@ -22,7 +22,8 @@ import { decrementWindow, incrementWindow, sharedStoreEnabled, warnIfNoSharedSto
  * it: N invocations in one POST cost exactly 1 unit. The tool-call budget is
  * charged per invocation, counting batch members individually. Counting needs
  * the parsed body, so the charge is applied by the route handler
- * (src/app/api/mcp/route.ts) — it parses once and hands the value to the
+ * (src/app/api/mcp/route.ts, also served byte-for-byte at src/app/mcp/route.ts
+ * — SPLIT-1621, same handler) — it parses once and hands the value to the
  * transport, which never reads the (single-use) body stream itself.
  *
  * TWO LAYERS, same accounting (`consume*` below), same result shape:

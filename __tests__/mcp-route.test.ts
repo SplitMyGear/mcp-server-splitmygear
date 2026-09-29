@@ -25,7 +25,8 @@ jest.mock('@/middleware/rate-limit', () => ({
 
 import fs from 'fs';
 import path from 'path';
-import { POST } from '../src/app/api/mcp/route';
+import { POST, GET, DELETE, OPTIONS } from '../src/app/api/mcp/route';
+import { POST as mcpPost, GET as mcpGet, DELETE as mcpDelete, OPTIONS as mcpOptions } from '../src/app/mcp/route';
 import { ALL_TOOLS } from '../src/tools/defs';
 
 const ROOT = path.join(__dirname, '..');
@@ -76,12 +77,49 @@ describe('/api/mcp route handler (M2 stateless transport)', () => {
     const pkg = readJson('package.json');
     const lock = readJson('package-lock.json');
     const manifest = readJson('manifest.json');
-    expect(pkg.version).toBe('2.0.4');
-    expect(lock.version).toBe('2.0.4');
-    expect(lock.packages[''].version).toBe('2.0.4');
-    expect(manifest.version).toBe('2.0.4');
+    expect(pkg.version).toBe('2.0.5');
+    expect(lock.version).toBe('2.0.5');
+    expect(lock.packages[''].version).toBe('2.0.5');
+    expect(manifest.version).toBe('2.0.5');
     const res = await POST(mcpRequest(INIT));
-    expect(await res.text()).toContain('2.0.4');
+    expect(await res.text()).toContain('2.0.5');
+  });
+
+  // SPLIT-1621: production advertises `/mcp` as canonical, but BOTH paths are
+  // always served on the exact same handler — src/app/mcp/route.ts re-exports
+  // the functions defined here. This proves the wiring, not just the config:
+  // a real request through the OTHER route module gets an identical result.
+  it('also completes the initialize handshake through POST /mcp (same handler as /api/mcp)', async () => {
+    const res = await mcpPost(mcpRequest(INIT));
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain('splitmygear-mcp');
+    expect(text).toContain('2.0.5');
+  });
+
+  it('rejects an unauthenticated request on /mcp too', async () => {
+    const res = await mcpPost(mcpRequest(INIT, false));
+    expect(res.status).toBe(401);
+  });
+
+  it('answers the CORS preflight identically on both paths', async () => {
+    const [a, b] = [await OPTIONS(), await mcpOptions()];
+    expect(a.status).toBe(204);
+    expect(b.status).toBe(204);
+    const headersOf = (r: Response) => [...r.headers.entries()].sort();
+    expect(headersOf(b)).toEqual(headersOf(a));
+    expect(b.headers.get('access-control-allow-headers')).toContain('mcp-session-id');
+  });
+
+  it('answers GET and DELETE 405 with the same Allow header on both paths (stateless transport)', async () => {
+    for (const [api, alias] of [[GET, mcpGet], [DELETE, mcpDelete]] as const) {
+      const a = await api();
+      const b = await alias();
+      expect(a.status).toBe(405);
+      expect(b.status).toBe(405);
+      expect(b.headers.get('allow')).toBe(a.headers.get('allow'));
+      expect(b.headers.get('access-control-allow-origin')).toBe('*');
+    }
   });
 
   // SPLIT-1604: the first request of each claude.ai connection got a 400 on

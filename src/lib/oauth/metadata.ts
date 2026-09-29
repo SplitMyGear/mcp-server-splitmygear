@@ -1,18 +1,20 @@
 /**
  * Discovery documents.
  *  - RFC 9728 Protected Resource Metadata: tells an MCP client which
- *    authorization server protects `/api/mcp`.
+ *    authorization server protects the MCP endpoint (`resource`, always the
+ *    CANONICAL path — see `mcpResourcePath()`, SPLIT-1621 — even though the
+ *    non-canonical path also answers).
  *  - RFC 8414 Authorization Server Metadata: where to register, authorize,
  *    exchange and revoke. Only PKCE-S256 public clients, code + refresh grants.
  *  Both list `scopes_supported` (RFC 8414 §2 / RFC 9728 §2) so clients can
  *  ask for a subset at sign-in; no `scope` means full access.
  */
-import { MCP_RESOURCE_PATH } from './config';
+import { mcpResourcePath } from './config';
 import { TOOL_SCOPES } from './scopes';
 
 export function protectedResourceMetadata(base: string) {
   return {
-    resource: `${base}${MCP_RESOURCE_PATH}`,
+    resource: `${base}${mcpResourcePath()}`,
     authorization_servers: [base],
     bearer_methods_supported: ['header'],
     scopes_supported: [...TOOL_SCOPES],
