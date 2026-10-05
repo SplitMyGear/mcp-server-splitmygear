@@ -57,7 +57,7 @@ export type LoginOutcome =
 
 /** The social providers the backend's web flow can start (`GET /auth/google|apple`). */
 export type SocialProvider = 'google' | 'apple';
-export const SOCIAL_PROVIDERS: readonly SocialProvider[] = ['google', 'apple'];
+const SOCIAL_PROVIDERS: readonly SocialProvider[] = ['google', 'apple'];
 
 export function isSocialProvider(value: unknown): value is SocialProvider {
   return typeof value === 'string' && (SOCIAL_PROVIDERS as readonly string[]).includes(value);

@@ -176,7 +176,7 @@ export interface LoginPageProps {
 const PROVIDER_LABEL: Record<SocialProvider, string> = { google: 'Google', apple: 'Apple' };
 
 /** Where "Continue with <provider>" sends the browser (same origin; the request rides along sealed). */
-export function socialStartPath(provider: SocialProvider, requestToken: string): string {
+function socialStartPath(provider: SocialProvider, requestToken: string): string {
   return `/oauth/social/start?provider=${provider}&req=${encodeURIComponent(requestToken)}`;
 }
 

@@ -18,8 +18,8 @@ import { uuid, isoDate, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, UNTRUSTED_NO
 /** The canonical listing categories (shared with search_listings / create_listing). */
 export const CATEGORY_NAMES = LISTING_CATEGORIES;
 
-export const EXPERIENCE_LEVELS = ['beginner', 'intermediate', 'advanced'] as const;
-export const TRIP_PLAN_SOURCES = ['board', 'fallback'] as const;
+const EXPERIENCE_LEVELS = ['beginner', 'intermediate', 'advanced'] as const;
+const TRIP_PLAN_SOURCES = ['board', 'fallback'] as const;
 
 /** The trip planner spans at most 30 days (backend MAX_TRIP_SPAN_DAYS). */
 const MAX_TRIP_DAYS = 30;

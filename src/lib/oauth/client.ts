@@ -18,7 +18,7 @@
 import crypto from 'crypto';
 import { allowedRedirectHosts, deriveKey, isAllowListedRedirect, isLoopbackHost } from './config';
 
-export const CLIENT_ID_PREFIX = 'smg_c';
+const CLIENT_ID_PREFIX = 'smg_c';
 const MAX_REDIRECT_URIS = 10;
 const MAX_NAME_LENGTH = 100;
 

@@ -69,7 +69,7 @@ export function mcpResourcePath(): McpResourcePath {
   return DEFAULT_RESOURCE_PATH;
 }
 
-export function oauthSigningSecret(): string | undefined {
+function oauthSigningSecret(): string | undefined {
   const secret = process.env.MCP_OAUTH_SIGNING_KEY;
   if (!secret || secret.length < MIN_SECRET_LENGTH) return undefined;
   if (new Set(secret).size < MIN_DISTINCT_CHARS) return undefined;

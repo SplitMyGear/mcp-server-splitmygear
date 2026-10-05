@@ -9,14 +9,14 @@ import { trustProxyHeaders, validIp } from './config';
  * body parser (form-urlencoded per spec, JSON accepted for convenience).
  */
 
-export const CORS_HEADERS: Record<string, string> = {
+const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, mcp-protocol-version',
   'Access-Control-Max-Age': '86400',
 };
 
-export const NO_STORE: Record<string, string> = {
+const NO_STORE: Record<string, string> = {
   'Cache-Control': 'no-store',
   Pragma: 'no-cache',
 };
@@ -52,7 +52,7 @@ export function preflight(): Response {
 }
 
 /** Largest form/JSON body any OAuth endpoint accepts (tokens are < 2 KB). */
-export const MAX_PARAMS_BYTES = 64 * 1024;
+const MAX_PARAMS_BYTES = 64 * 1024;
 
 /** True when the declared Content-Length exceeds `limit` (unknown length passes). */
 export function exceedsContentLength(request: Request, limit: number): boolean {

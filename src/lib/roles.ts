@@ -8,9 +8,9 @@
  * short-circuits every role gate. Vendor money endpoints (earnings, payouts,
  * Stripe Connect) additionally require an owner/manager seat.
  */
-export const VENDOR_FAMILY = ['vendor', 'vendor_owner', 'vendor_manager', 'vendor_staff'] as const;
+const VENDOR_FAMILY = ['vendor', 'vendor_owner', 'vendor_manager', 'vendor_staff'] as const;
 
-export function isAdmin(role?: string): boolean {
+function isAdmin(role?: string): boolean {
   return role === 'admin';
 }
 

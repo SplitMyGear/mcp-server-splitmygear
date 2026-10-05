@@ -59,7 +59,7 @@ export interface BlackoutQuery {
   offset?: number;
 }
 
-export const DEFAULT_BLACKOUT_PAGE = 50;
+const DEFAULT_BLACKOUT_PAGE = 50;
 
 /**
  * One page of a listing's blocks, inclusive days, sorted by first day. A feed

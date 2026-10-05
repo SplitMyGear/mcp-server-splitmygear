@@ -28,9 +28,9 @@ import { redeemOnce, sharedStoreEnabled, warnIfNoSharedStore } from '@/lib/share
 import { coerceScopes, formatScope, type ToolScope } from './scopes';
 import type { BackendUser } from './backend-auth';
 
-export const AUTH_CODE_TTL_S = 120;
+const AUTH_CODE_TTL_S = 120;
 /** Upper bound on how long a refresh envelope stays redeemable (backend enforces the real TTL). */
-export const REFRESH_TOKEN_TTL_S = 30 * 24 * 3600;
+const REFRESH_TOKEN_TTL_S = 30 * 24 * 3600;
 /** Fallback access lifetime if the backend JWT carries no exp (it always does). */
 const DEFAULT_ACCESS_TTL_S = 15 * 60;
 
