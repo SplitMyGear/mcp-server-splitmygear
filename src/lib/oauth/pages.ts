@@ -79,9 +79,6 @@ export function pageHeaders(redirectUri?: string): Record<string, string> {
   };
 }
 
-/** Headers for pages without a sign-in request (error pages): form-action 'self' only. */
-export const PAGE_HEADERS: Record<string, string> = pageHeaders();
-
 /**
  * Both hosted forms post to the authorize endpoint EXPLICITLY. `action=""`
  * posts back to whatever URL rendered the page — and the social callback

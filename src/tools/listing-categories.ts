@@ -73,8 +73,3 @@ export const LISTING_CATEGORIES: readonly ListingCategory[] = [
   { id: 'Other', name: 'Other', icon: '🎒' },
 ] as const;
 
-/** The nightly-booked subset, mirroring the backend's `STAY_CATEGORIES`. */
-export const STAY_CATEGORIES: readonly string[] = LISTING_CATEGORIES.filter(
-  (c) => c.stay,
-).map((c) => c.id);
-

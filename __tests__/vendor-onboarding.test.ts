@@ -11,7 +11,7 @@ jest.mock('../src/lib/backend-client', () => {
 });
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { vendorOnboardingApi, onboardingNextStep, VENDOR_ONBOARDING_STATUSES } from '../src/tools/vendor-onboarding';
+import { vendorOnboardingApi, onboardingNextStep } from '../src/tools/vendor-onboarding';
 import {
   vendorOnboardingTools,
   applyToBecomeVendor,
@@ -113,7 +113,8 @@ describe('vendorOnboardingApi', () => {
 
 describe('onboardingNextStep', () => {
   it('names the next tool for every backend status and has a fallback', () => {
-    const expectations: Record<(typeof VENDOR_ONBOARDING_STATUSES)[number], RegExp> = {
+    const STATUSES = ['not_started', 'applied', 'profile_pending', 'stripe_pending', 'waiver_pending', 'admin_review', 'active', 'rejected'] as const;
+    const expectations: Record<(typeof STATUSES)[number], RegExp> = {
       not_started: /apply_to_become_vendor|start_vendor_onboarding/,
       applied: /admit/,
       profile_pending: /complete_vendor_business_profile/,
@@ -123,7 +124,7 @@ describe('onboardingNextStep', () => {
       active: /active/,
       rejected: /start_vendor_onboarding/,
     };
-    for (const status of VENDOR_ONBOARDING_STATUSES) expect(onboardingNextStep(status)).toMatch(expectations[status]);
+    for (const status of STATUSES) expect(onboardingNextStep(status)).toMatch(expectations[status]);
     expect(onboardingNextStep(undefined)).toMatch(/get_vendor_onboarding_status/);
     expect(onboardingNextStep('weird')).toMatch(/get_vendor_onboarding_status/);
   });

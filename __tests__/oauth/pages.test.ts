@@ -9,8 +9,11 @@
  * guarded the escaper before this file existed.
  */
 export {};
-import { escapeHtml, renderConsent, renderLoginPage, renderOtpPage, renderErrorPage, PAGE_HEADERS, pageHeaders, SIGN_IN_FORM_ACTION } from '../../src/lib/oauth/pages';
+import { escapeHtml, renderConsent, renderLoginPage, renderOtpPage, renderErrorPage, pageHeaders, SIGN_IN_FORM_ACTION } from '../../src/lib/oauth/pages';
 import { TOOL_SCOPES } from '../../src/lib/oauth/scopes';
+
+/** Headers for pages without a sign-in request (error pages): form-action 'self' only. */
+const PAGE_HEADERS = pageHeaders();
 
 const XSS = '"><script>alert(1)</script>';
 

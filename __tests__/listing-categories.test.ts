@@ -1,7 +1,6 @@
 import {
   LISTING_CATEGORIES,
   LISTING_CATEGORY_IDS,
-  STAY_CATEGORIES,
 } from '@/tools/listing-categories';
 
 /**
@@ -60,7 +59,7 @@ describe('listing categories', () => {
   });
 
   it('flags exactly the nightly-booked stay categories', () => {
-    expect(STAY_CATEGORIES).toEqual(EXPECTED_STAY_CATEGORIES);
+    expect(LISTING_CATEGORIES.filter((c) => 'stay' in c && c.stay).map((c) => c.id)).toEqual(EXPECTED_STAY_CATEGORIES);
   });
 
   it('keeps Camping (gear) distinct from Campsites (a bookable site)', () => {

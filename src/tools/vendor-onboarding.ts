@@ -20,19 +20,6 @@
 import { isVendorFamily } from '@/lib/roles';
 import { call, compact } from './_shared';
 
-/** `VendorOnboardingStatus` on the backend user entity. */
-export const VENDOR_ONBOARDING_STATUSES = [
-  'not_started',
-  'applied',
-  'profile_pending',
-  'stripe_pending',
-  'waiver_pending',
-  'admin_review',
-  'active',
-  'rejected',
-] as const;
-export type VendorOnboardingStatus = (typeof VENDOR_ONBOARDING_STATUSES)[number];
-
 export interface VendorApplicationInput {
   businessName?: string;
   businessInterest?: string;
