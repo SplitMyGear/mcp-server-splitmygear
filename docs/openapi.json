@@ -4,7 +4,7 @@
   "info": {
     "title": "Splitt MCP Server",
     "description": "MCP (Model Context Protocol) server for Splitt, the outdoor gear rental marketplace. Exposes role-aware tools for renters and vendors over MCP Streamable HTTP, plus an OAuth 2.1 authorization server so MCP clients can sign users in with their Splitt account.",
-    "version": "2.0.0",
+    "version": "2.0.5",
     "contact": {
       "name": "Splitt",
       "url": "https://go-splitt.com"
@@ -236,7 +236,141 @@
     "/api/mcp": {
       "post": {
         "summary": "MCP Streamable HTTP endpoint",
-        "description": "JSON-RPC 2.0 over HTTP (stateless; JSON responses). The tool list returned by tools/list depends on the authenticated principal. A 401 carries WWW-Authenticate with the RFC 9728 resource_metadata URL.",
+        "description": "JSON-RPC 2.0 over HTTP (stateless; JSON responses). The tool list returned by tools/list depends on the authenticated principal. A 401 carries WWW-Authenticate with the RFC 9728 resource_metadata URL. Both /mcp and /api/mcp always answer with identical behavior; which one is canonical (the OAuth resource a client is told to use) is set per deployment by MCP_RESOURCE_PATH.",
+        "security": [
+          {
+            "operatorKey": []
+          },
+          {
+            "oauth": []
+          },
+          {
+            "backendJwt": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JsonRpcRequest"
+              },
+              "examples": {
+                "listTools": {
+                  "summary": "List available tools",
+                  "value": {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/list",
+                    "params": {}
+                  }
+                },
+                "searchListings": {
+                  "summary": "Search for listings",
+                  "value": {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {
+                      "name": "search_listings",
+                      "arguments": {
+                        "location": "Seattle",
+                        "category": "Camping"
+                      }
+                    }
+                  }
+                },
+                "createBooking": {
+                  "summary": "Create a booking",
+                  "value": {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {
+                      "name": "create_booking",
+                      "arguments": {
+                        "listingId": "11111111-1111-4111-8111-111111111111",
+                        "checkIn": "2024-06-01",
+                        "checkOut": "2024-06-03"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON-RPC response",
+            "headers": {
+              "X-RateLimit-Remaining": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonRpcResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "400": {
+            "description": "Malformed JSON-RPC request"
+          },
+          "406": {
+            "description": "Accept header must allow application/json"
+          },
+          "415": {
+            "description": "Content-Type must be application/json"
+          }
+        }
+      },
+      "get": {
+        "summary": "Not supported (stateless transport)",
+        "responses": {
+          "405": {
+            "description": "Method not allowed; use POST"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Not supported (stateless transport)",
+        "responses": {
+          "405": {
+            "description": "Method not allowed; use POST"
+          }
+        }
+      },
+      "options": {
+        "summary": "CORS preflight",
+        "responses": {
+          "204": {
+            "description": "No content"
+          }
+        }
+      }
+    },
+    "/mcp": {
+      "post": {
+        "summary": "MCP Streamable HTTP endpoint",
+        "description": "JSON-RPC 2.0 over HTTP (stateless; JSON responses). The tool list returned by tools/list depends on the authenticated principal. A 401 carries WWW-Authenticate with the RFC 9728 resource_metadata URL. Both /mcp and /api/mcp always answer with identical behavior; which one is canonical (the OAuth resource a client is told to use) is set per deployment by MCP_RESOURCE_PATH.",
         "security": [
           {
             "operatorKey": []
@@ -381,6 +515,19 @@
       }
     },
     "/.well-known/oauth-protected-resource/api/mcp": {
+      "get": {
+        "summary": "RFC 9728 metadata (path-aware variant)",
+        "responses": {
+          "200": {
+            "description": "Metadata"
+          },
+          "404": {
+            "description": "OAuth not enabled"
+          }
+        }
+      }
+    },
+    "/.well-known/oauth-protected-resource/mcp": {
       "get": {
         "summary": "RFC 9728 metadata (path-aware variant)",
         "responses": {
@@ -796,6 +943,19 @@
       }
     },
     "/.well-known/oauth-authorization-server/api/mcp": {
+      "get": {
+        "summary": "RFC 8414 metadata (path-aware variant)",
+        "responses": {
+          "200": {
+            "description": "Metadata"
+          },
+          "404": {
+            "description": "OAuth not enabled"
+          }
+        }
+      }
+    },
+    "/.well-known/oauth-authorization-server/mcp": {
       "get": {
         "summary": "RFC 8414 metadata (path-aware variant)",
         "responses": {
