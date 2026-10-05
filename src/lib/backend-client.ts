@@ -6,6 +6,8 @@
  * pricing and payments (ADR 0001, SPLIT-226).
  */
 
+import { extractErrorMessage } from './backend-error';
+
 const DEFAULT_BASE_URL = 'https://splitmygear-backend.vercel.app/api/v1';
 
 /**
@@ -103,20 +105,4 @@ export async function backendRequest<T = unknown>(
   }
 
   return parsed as T;
-}
-
-function extractErrorMessage(parsed: unknown, status: number): string {
-  if (parsed && typeof parsed === 'object') {
-    const body = parsed as { message?: unknown; error?: unknown };
-    if (Array.isArray(body.message)) {
-      return body.message.filter((m) => typeof m === 'string').join('; ') || `Request failed (${status})`;
-    }
-    if (typeof body.message === 'string') {
-      return body.message;
-    }
-    if (typeof body.error === 'string') {
-      return body.error;
-    }
-  }
-  return `Backend request failed (${status})`;
 }

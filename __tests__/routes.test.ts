@@ -141,12 +141,14 @@ describe('routesApi: GPX import (multipart)', () => {
     expect(await routesApi.importGpx(T, GPX)).toEqual({ ok: false, error: 'GPX file must be 2MB or smaller', status: 413 });
     mockFetch.mockResolvedValueOnce(makeResponse(false, 502, 'not json'));
     expect(await routesApi.importGpx(T, GPX)).toEqual({ ok: false, error: 'Backend request failed (502)', status: 502 });
+    mockFetch.mockResolvedValueOnce(makeResponse(false, 400, { message: [], error: 'Bad Request' }));
+    expect(await routesApi.importGpx(T, GPX)).toEqual({ ok: false, error: 'Request failed (400)', status: 400 });
     mockFetch.mockRejectedValueOnce(new Error('ECONNRESET'));
-    expect(await routesApi.importGpx(T, GPX)).toMatchObject({ ok: false, status: 502 });
+    expect(await routesApi.importGpx(T, GPX)).toEqual({ ok: false, error: 'GPX import failed (network error talking to Splitt).', status: 502 });
     const timeout = new Error('t');
     timeout.name = 'TimeoutError';
     mockFetch.mockRejectedValueOnce(timeout);
-    expect(await routesApi.importGpx(T, GPX)).toMatchObject({ ok: false, status: 504 });
+    expect(await routesApi.importGpx(T, GPX)).toEqual({ ok: false, error: 'GPX import timed out; try a smaller file.', status: 504 });
   });
 
   it('importGpxAsRoute parses then POSTs /routes with the draft geometry, source gpx and the overrides', async () => {

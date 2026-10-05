@@ -18,16 +18,23 @@ import {
   bookingVerificationTools,
   decodePhoto,
   decodePhotos,
-  postMultipart,
   sniffPhotoType,
   MAX_BATCH_BYTES,
   MAX_PHOTO_BYTES,
   MAX_PHOTOS_PER_UPLOAD,
 } from '../src/tools/booking-verification';
+import { postMultipart } from '../src/tools/_shared';
 import { bookingVerificationTools as defs, uploadHandoffPhotos, verifyHandoffToken } from '../src/tools/defs/booking-verification';
 import { TOOL_SCOPES } from '../src/tools/registry';
 
 const T = 'h.p.s';
+/** The options `uploadHandoffPhotos` passes to the shared multipart client. */
+const PHOTO_UPLOAD = {
+  timeoutMs: 20_000,
+  timeoutError: 'Upload to Splitt timed out; try fewer or smaller photos.',
+  networkError: 'Upload to Splitt failed (network error).',
+  label: 'Upload failed',
+};
 const B = '11111111-1111-4111-8111-111111111111';
 const { BackendApiError } = jest.requireMock('../src/lib/backend-client');
 
@@ -187,21 +194,32 @@ describe('multipart uploads', () => {
 
   it('maps backend error shapes, network failures and timeouts to Results', async () => {
     mockFetch.mockResolvedValueOnce(fetchResponse(false, 400, { statusCode: 400, message: ['File content does not match an allowed image or PDF type'] }));
-    expect(await postMultipart('/x', T, new FormData())).toEqual({ ok: false, error: 'File content does not match an allowed image or PDF type', status: 400 });
+    expect(await postMultipart('/x', T, new FormData(), PHOTO_UPLOAD)).toEqual({ ok: false, error: 'File content does not match an allowed image or PDF type', status: 400 });
     mockFetch.mockResolvedValueOnce(fetchResponse(false, 403, { message: 'Not authorized to verify this booking' }));
-    expect(await postMultipart('/x', T, new FormData())).toMatchObject({ ok: false, status: 403, error: 'Not authorized to verify this booking' });
+    expect(await postMultipart('/x', T, new FormData(), PHOTO_UPLOAD)).toMatchObject({ ok: false, status: 403, error: 'Not authorized to verify this booking' });
     mockFetch.mockResolvedValueOnce(fetchResponse(false, 413, { error: 'Payload Too Large' }));
-    expect(await postMultipart('/x', T, new FormData())).toMatchObject({ ok: false, status: 413, error: 'Payload Too Large' });
+    expect(await postMultipart('/x', T, new FormData(), PHOTO_UPLOAD)).toMatchObject({ ok: false, status: 413, error: 'Payload Too Large' });
     mockFetch.mockResolvedValueOnce(fetchResponse(false, 502, '<html>bad gateway</html>'));
-    expect(await postMultipart('/x', T, new FormData())).toEqual({ ok: false, error: 'Upload failed (502)', status: 502 });
+    expect(await postMultipart('/x', T, new FormData(), PHOTO_UPLOAD)).toEqual({ ok: false, error: 'Upload failed (502)', status: 502 });
     mockFetch.mockResolvedValueOnce(fetchResponse(true, 200, ''));
-    expect(await postMultipart('/x', T, new FormData())).toEqual({ ok: true, data: undefined });
+    expect(await postMultipart('/x', T, new FormData(), PHOTO_UPLOAD)).toEqual({ ok: true, data: undefined });
     mockFetch.mockRejectedValueOnce(new TypeError('fetch failed'));
-    expect(await postMultipart('/x', T, new FormData())).toMatchObject({ ok: false, status: 502, error: expect.stringMatching(/network/) });
+    expect(await postMultipart('/x', T, new FormData(), PHOTO_UPLOAD)).toMatchObject({ ok: false, status: 502, error: expect.stringMatching(/network/) });
     const timeout = new Error('aborted');
     timeout.name = 'TimeoutError';
     mockFetch.mockRejectedValueOnce(timeout);
-    expect(await postMultipart('/x', T, new FormData())).toMatchObject({ ok: false, status: 504, error: expect.stringMatching(/timed out/) });
+    expect(await postMultipart('/x', T, new FormData(), PHOTO_UPLOAD)).toMatchObject({ ok: false, status: 504, error: expect.stringMatching(/timed out/) });
+
+    // uploadHandoffPhotos passes exactly these options.
+    mockFetch.mockResolvedValueOnce(fetchResponse(false, 502, '<html>bad gateway</html>'));
+    expect(await bookingVerificationTools.uploadHandoffPhotos(T, B, 'PICKUP', decodedTwo())).toEqual({ ok: false, error: 'Upload failed (502)', status: 502 });
+    mockFetch.mockResolvedValueOnce(fetchResponse(false, 400, { message: [], error: 'Bad Request' }));
+    expect(await bookingVerificationTools.uploadHandoffPhotos(T, B, 'PICKUP', decodedTwo())).toEqual({ ok: false, error: 'Upload failed (400)', status: 400 });
+    mockFetch.mockRejectedValueOnce(new TypeError('fetch failed'));
+    expect(await bookingVerificationTools.uploadHandoffPhotos(T, B, 'PICKUP', decodedTwo())).toEqual({ ok: false, error: PHOTO_UPLOAD.networkError, status: 502 });
+    mockFetch.mockRejectedValueOnce(timeout);
+    expect(await bookingVerificationTools.uploadHandoffPhotos(T, B, 'PICKUP', decodedTwo())).toEqual({ ok: false, error: PHOTO_UPLOAD.timeoutError, status: 504 });
+    expect(mockFetch.mock.calls.at(-1)[1]).toMatchObject({ method: 'POST', headers: { Authorization: `Bearer ${T}` } });
   });
 });
 

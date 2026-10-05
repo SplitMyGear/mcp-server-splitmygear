@@ -121,6 +121,8 @@ describe('filesApi.uploadFile', () => {
     expect(await filesApi.uploadFile(T, { folder: 'claims', contentType: 'image/png', base64: PNG64 })).toEqual({ ok: false, error: 'Invalid upload folder', status: 400 });
     mockFetch.mockResolvedValueOnce(makeResponse(false, 400, { message: ['a', 'b'] }));
     expect(await filesApi.uploadFile(T, { folder: 'claims', contentType: 'image/png', base64: PNG64 })).toEqual({ ok: false, error: 'a; b', status: 400 });
+    mockFetch.mockResolvedValueOnce(makeResponse(false, 400, { message: [], error: 'Bad Request' }));
+    expect(await filesApi.uploadFile(T, { folder: 'claims', contentType: 'image/png', base64: PNG64 })).toEqual({ ok: false, error: 'Bad Request', status: 400 });
     mockFetch.mockResolvedValueOnce(makeResponse(false, 403, { error: 'Forbidden' }));
     expect(await filesApi.uploadFile(T, { folder: 'claims', contentType: 'image/png', base64: PNG64 })).toEqual({ ok: false, error: 'Forbidden', status: 403 });
     mockFetch.mockResolvedValueOnce(makeResponse(false, 413, '<html>too big</html>'));

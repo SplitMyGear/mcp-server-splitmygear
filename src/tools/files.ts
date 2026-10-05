@@ -12,8 +12,7 @@
  * accepted back by the matching process (a claim only accepts `claims/...`
  * URLs); listing / profile photos stay public.
  */
-import { backendBaseUrl } from '@/lib/backend-client';
-import type { Result } from './_shared';
+import { postMultipart, type MultipartOptions, type Result } from './_shared';
 
 export const UPLOAD_FOLDERS = [
   'disputes',
@@ -42,7 +41,13 @@ export const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
 /** Base64 expands 3 bytes to 4 chars; allow a little slack for padding/newlines. */
 export const MAX_BASE64_CHARS = Math.ceil((MAX_UPLOAD_BYTES * 4) / 3) + 64;
 
-const UPLOAD_TIMEOUT_MS = 20_000;
+const FILE_UPLOAD: MultipartOptions = {
+  timeoutMs: 20_000,
+  timeoutError: 'Upload timed out talking to Splitt',
+  networkError: 'Upload failed (network error)',
+  label: 'Upload failed',
+  emptyMessageFallsThroughToError: true,
+};
 
 const EXTENSIONS: Record<UploadContentType, string> = {
   'image/jpeg': 'jpg',
@@ -116,20 +121,6 @@ export function safeFilename(filename: string | undefined, contentType: UploadCo
   return `${base || 'upload'}.${ext}`;
 }
 
-/** Same error-shape parsing as the JSON client (`{ statusCode, error, message }`). */
-function errorMessageFrom(parsed: unknown, status: number): string {
-  if (parsed && typeof parsed === 'object') {
-    const body = parsed as { message?: unknown; error?: unknown };
-    if (Array.isArray(body.message)) {
-      const joined = body.message.filter((m): m is string => typeof m === 'string').join('; ');
-      if (joined) return joined;
-    }
-    if (typeof body.message === 'string') return body.message;
-    if (typeof body.error === 'string') return body.error;
-  }
-  return `Upload failed (${status})`;
-}
-
 export const filesApi = {
   /** POST /upload (multipart): returns the stored file URL. */
   async uploadFile(token: string, input: UploadInput): Promise<Result<UploadedFile>> {
@@ -152,32 +143,10 @@ export const filesApi = {
     form.append('folder', input.folder);
     form.append('file', new Blob([decoded.bytes], { type: input.contentType }), safeFilename(input.filename, input.contentType));
 
-    let response: Response;
-    try {
-      response = await fetch(`${backendBaseUrl()}/upload`, {
-        method: 'POST',
-        // No Content-Type: fetch sets the multipart boundary itself.
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
-        signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
-      });
-    } catch (err) {
-      const isTimeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
-      return isTimeout
-        ? { ok: false, error: 'Upload timed out talking to Splitt', status: 504 }
-        : { ok: false, error: 'Upload failed (network error)', status: 502 };
-    }
+    const uploaded = await postMultipart('/upload', token, form, FILE_UPLOAD);
+    if (!uploaded.ok) return uploaded;
 
-    const raw = await response.text();
-    let parsed: unknown;
-    try {
-      parsed = raw ? JSON.parse(raw) : undefined;
-    } catch {
-      parsed = undefined;
-    }
-    if (!response.ok) return { ok: false, error: errorMessageFrom(parsed, response.status), status: response.status };
-
-    const body = (parsed ?? {}) as { url?: unknown; key?: unknown; thumbnailUrl?: unknown };
+    const body = (uploaded.data ?? {}) as { url?: unknown; key?: unknown; thumbnailUrl?: unknown };
     if (typeof body.url !== 'string' || !body.url) return { ok: false, error: 'Upload succeeded but Splitt returned no file URL.' };
     const data: UploadedFile = { url: body.url };
     if (typeof body.key === 'string') data.key = body.key;

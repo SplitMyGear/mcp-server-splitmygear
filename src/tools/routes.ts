@@ -12,7 +12,7 @@
  * acting vendor is always the one the token belongs to.
  */
 import { backendBaseUrl } from '@/lib/backend-client';
-import { call, compact, qs, type Result } from './_shared';
+import { call, compact, postMultipart, qs, type MultipartOptions, type Result } from './_shared';
 
 // ── Backend enums (routes/route.entity.ts, listing/listing-route.entity.ts) ──
 
@@ -47,7 +47,11 @@ export const MAX_LINKED_ROUTES_PER_LISTING = 5;
 /** `POST /routes/import/gpx` multer limit and `RouteImportService` cap. */
 export const MAX_GPX_BYTES = 2 * 1024 * 1024;
 // GPX import may be followed by a route create in the same tool call; both must fit the function's 30 s budget.
-const UPLOAD_TIMEOUT_MS = 14_000;
+const GPX_UPLOAD: MultipartOptions = {
+  timeoutMs: 14_000,
+  timeoutError: 'GPX import timed out; try a smaller file.',
+  networkError: 'GPX import failed (network error talking to Splitt).',
+};
 const IMPORT_CREATE_TIMEOUT_MS = 10_000;
 
 // ── Input shapes (mirror routes/dto/route.dto.ts and listing/dto/listing-route.dto.ts) ──
@@ -219,19 +223,6 @@ function linkedLibraryRouteIds(rows: PublicRouteRow[]): string[] {
   return rows.filter((r) => r.source !== 'legacy').map((r) => r.id);
 }
 
-/** Mirrors `extractErrorMessage` in `@/lib/backend-client` for the multipart path. */
-function backendErrorMessage(parsed: unknown, status: number): string {
-  if (parsed && typeof parsed === 'object') {
-    const body = parsed as { message?: unknown; error?: unknown };
-    if (Array.isArray(body.message)) {
-      return body.message.filter((m) => typeof m === 'string').join('; ') || `Request failed (${status})`;
-    }
-    if (typeof body.message === 'string') return body.message;
-    if (typeof body.error === 'string') return body.error;
-  }
-  return `Backend request failed (${status})`;
-}
-
 // ── Route library (/routes) ─────────────────────────────────────────────────
 
 function listMine(token: string, includeArchived = false) {
@@ -267,33 +258,9 @@ async function importGpx(token: string, gpxXml: string): Promise<Result<GpxImpor
   const form = new FormData();
   form.append('file', new Blob([gpxXml], { type: 'application/gpx+xml' }), 'route.gpx');
 
-  let response: Response;
-  try {
-    response = await fetch(`${backendBaseUrl()}/routes/import/gpx`, {
-      method: 'POST',
-      // No Content-Type here: fetch sets the multipart boundary itself.
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-      signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
-    });
-  } catch (err) {
-    const isTimeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
-    return {
-      ok: false,
-      error: isTimeout ? 'GPX import timed out; try a smaller file.' : 'GPX import failed (network error talking to Splitt).',
-      status: isTimeout ? 504 : 502,
-    };
-  }
-
-  const raw = await response.text();
-  let parsed: unknown;
-  try {
-    parsed = raw ? JSON.parse(raw) : undefined;
-  } catch {
-    parsed = undefined;
-  }
-  if (!response.ok) return { ok: false, error: backendErrorMessage(parsed, response.status), status: response.status };
-  return { ok: true, data: (parsed ?? {}) as GpxImportResponse };
+  const imported = await postMultipart<GpxImportResponse>('/routes/import/gpx', token, form, GPX_UPLOAD);
+  if (!imported.ok) return imported;
+  return { ok: true, data: imported.data ?? {} };
 }
 
 /** Parse a GPX file and save the result as a new library route in one go (what the web Route Studio does). */

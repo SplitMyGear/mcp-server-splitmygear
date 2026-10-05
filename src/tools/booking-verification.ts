@@ -12,8 +12,7 @@
  * bytes exactly like the backend's `sniffFileType`), and their bytes are never
  * logged.
  */
-import { backendBaseUrl } from '@/lib/backend-client';
-import { call, compact, type Result } from './_shared';
+import { call, compact, postMultipart, type MultipartOptions } from './_shared';
 
 export type HandoffType = 'PICKUP' | 'RETURN';
 export const HANDOFF_TYPES = ['PICKUP', 'RETURN'] as const;
@@ -35,8 +34,6 @@ export const MAX_PHOTOS_PER_UPLOAD = 10;
 export const MAX_BATCH_BYTES = 3 * 1024 * 1024;
 /** Base64 characters needed for MAX_PHOTO_BYTES, plus room for a data: prefix and whitespace. */
 export const MAX_PHOTO_BASE64_CHARS = Math.ceil(MAX_PHOTO_BYTES / 3) * 4 + 4096;
-
-const UPLOAD_TIMEOUT_MS = 20_000;
 
 export interface ChecklistItemInput {
   label: string;
@@ -138,19 +135,6 @@ export function decodePhotos(photos: PhotoInput[]): { ok: true; photos: DecodedP
   return { ok: true, photos: decoded };
 }
 
-/** Same error-shape parsing as `backend-client.ts` (`{ statusCode, error, message: string | string[] }`). */
-function extractErrorMessage(parsed: unknown, status: number): string {
-  if (parsed && typeof parsed === 'object') {
-    const body = parsed as { message?: unknown; error?: unknown };
-    if (Array.isArray(body.message)) {
-      return body.message.filter((m) => typeof m === 'string').join('; ') || `Upload failed (${status})`;
-    }
-    if (typeof body.message === 'string') return body.message;
-    if (typeof body.error === 'string') return body.error;
-  }
-  return `Upload failed (${status})`;
-}
-
 function toBlob(photo: DecodedPhoto): Blob {
   // Copy into a plain ArrayBuffer-backed view so the Blob never aliases a pooled Buffer slice.
   const copy = new Uint8Array(photo.bytes.byteLength);
@@ -158,35 +142,12 @@ function toBlob(photo: DecodedPhoto): Blob {
   return new Blob([copy], { type: photo.contentType });
 }
 
-/**
- * POST a multipart body with the caller's JWT. `fetch` sets the multipart
- * boundary itself, so no Content-Type header is passed. Never logs the body.
- */
-export async function postMultipart<T = unknown>(path: string, token: string, form: FormData): Promise<Result<T>> {
-  let response: Response;
-  try {
-    response = await fetch(`${backendBaseUrl()}${path}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-      signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
-    });
-  } catch (err) {
-    const isTimeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
-    return isTimeout
-      ? { ok: false, error: 'Upload to Splitt timed out; try fewer or smaller photos.', status: 504 }
-      : { ok: false, error: 'Upload to Splitt failed (network error).', status: 502 };
-  }
-  const raw = await response.text();
-  let parsed: unknown;
-  try {
-    parsed = raw ? JSON.parse(raw) : undefined;
-  } catch {
-    parsed = undefined;
-  }
-  if (!response.ok) return { ok: false, error: extractErrorMessage(parsed, response.status), status: response.status };
-  return { ok: true, data: parsed as T };
-}
+const PHOTO_UPLOAD: MultipartOptions = {
+  timeoutMs: 20_000,
+  timeoutError: 'Upload to Splitt timed out; try fewer or smaller photos.',
+  networkError: 'Upload to Splitt failed (network error).',
+  label: 'Upload failed',
+};
 
 export const bookingVerificationTools = {
   /** Both stages' verification rows (photos as short-lived signed URLs, checklist, readings, status). */
@@ -235,6 +196,6 @@ export const bookingVerificationTools = {
   uploadHandoffPhotos(token: string, bookingId: string, type: HandoffType, photos: DecodedPhoto[]) {
     const form = new FormData();
     for (const photo of photos) form.append('files', toBlob(photo), photo.filename);
-    return postMultipart(`/booking-verification/${bookingId}/${type.toLowerCase()}`, token, form);
+    return postMultipart(`/booking-verification/${bookingId}/${type.toLowerCase()}`, token, form, PHOTO_UPLOAD);
   },
 };

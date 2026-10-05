@@ -4,7 +4,8 @@
  * error reaches the model as a structured `isError` result), plus tiny query
  * string / date helpers used across domains.
  */
-import { backendRequest, BackendApiError } from '@/lib/backend-client';
+import { backendBaseUrl, backendRequest, BackendApiError } from '@/lib/backend-client';
+import { extractErrorMessage, type ErrorMessageOptions } from '@/lib/backend-error';
 
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string; status?: number };
 
@@ -30,6 +31,44 @@ export async function call<T = unknown>(
     }
     return { ok: false, error: 'Unexpected error talking to Splitt' };
   }
+}
+
+export interface MultipartOptions extends ErrorMessageOptions {
+  /** Upload budget (ms); the caller sizes it to its tool's function budget. */
+  timeoutMs: number;
+  /** Error text on a timeout abort (status 504). */
+  timeoutError: string;
+  /** Error text on any other fetch failure (status 502). */
+  networkError: string;
+}
+
+/**
+ * POST a multipart body with the caller's JWT. `fetch` sets the multipart
+ * boundary itself, so no Content-Type header is passed. Never logs the body.
+ * The success data is the parsed JSON body (undefined when empty or not JSON).
+ */
+export async function postMultipart<T = unknown>(path: string, token: string, form: FormData, options: MultipartOptions): Promise<Result<T>> {
+  let response: Response;
+  try {
+    response = await fetch(`${backendBaseUrl()}${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+      signal: AbortSignal.timeout(options.timeoutMs),
+    });
+  } catch (err) {
+    const isTimeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
+    return isTimeout ? { ok: false, error: options.timeoutError, status: 504 } : { ok: false, error: options.networkError, status: 502 };
+  }
+  const raw = await response.text();
+  let parsed: unknown;
+  try {
+    parsed = raw ? JSON.parse(raw) : undefined;
+  } catch {
+    parsed = undefined;
+  }
+  if (!response.ok) return { ok: false, error: extractErrorMessage(parsed, response.status, options), status: response.status };
+  return { ok: true, data: parsed as T };
 }
 
 /**
