@@ -41,7 +41,7 @@
  * Either way the backend's own per-IP / per-email login throttle is the real
  * control: it is fed the end-user IP via the trusted relay headers.
  */
-import { decrementWindow, getCount, incrementWindow, sharedStoreEnabled, warnIfNoSharedStore } from '@/lib/shared-store';
+import { decrementWindow, incrementWindow, sharedStoreEnabled, warnIfNoSharedStore } from '@/lib/shared-store';
 
 const WINDOW_MS = 10 * 60 * 1000;
 const WINDOW_S = WINDOW_MS / 1000;
@@ -52,12 +52,6 @@ const attempts = new Map<string, { count: number; resetAt: number }>();
 
 function sharedKey(key: string, now: number): string {
   return `mcp:login:${key}:${Math.floor(now / WINDOW_MS)}`;
-}
-
-function locallyThrottled(key: string, now: number): boolean {
-  const entry = attempts.get(key);
-  if (!entry || now > entry.resetAt) return false;
-  return entry.count >= MAX_ATTEMPTS;
 }
 
 /** Increment the per-instance counter and return the count AFTER this hit. */
@@ -79,23 +73,6 @@ function refundLocally(key: string, now: number): void {
   const entry = attempts.get(key);
   if (!entry || now > entry.resetAt) return;
   entry.count = Math.max(0, entry.count - 1);
-}
-
-/**
- * Has `key` accumulated too many FAILURES in the current window?
- *
- * ADVISORY READ ONLY — never gate a sign-in attempt on this. It is a plain GET,
- * so between it and whatever you do next any number of concurrent requests can
- * read the same value and be waved through. Use `claimAttempt`, which consumes
- * the slot in the same atomic step as the decision. This stays exported for
- * diagnostics and for asserting a counter's state in tests.
- */
-export async function isThrottled(key: string, now = Date.now()): Promise<boolean> {
-  if (sharedStoreEnabled()) {
-    const count = await getCount(sharedKey(key, now));
-    if (count !== null) return count >= MAX_ATTEMPTS;
-  }
-  return locallyThrottled(key, now);
 }
 
 /**
@@ -142,18 +119,6 @@ export async function refundAttempt(key: string, now = Date.now()): Promise<void
   if (sharedStoreEnabled()) {
     await decrementWindow(sharedKey(key, now), WINDOW_S);
   }
-}
-
-/** Record a FAILED attempt against `key` in the shared window (when available) and locally. */
-export async function recordAttempt(key: string, now = Date.now()): Promise<void> {
-  recordLocally(key, now);
-  if (sharedStoreEnabled()) {
-    await incrementWindow(sharedKey(key, now), WINDOW_S);
-  }
-}
-
-export function clearAttempts(key: string): void {
-  attempts.delete(key);
 }
 
 /** Test hook. */

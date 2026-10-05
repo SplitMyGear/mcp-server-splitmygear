@@ -5,7 +5,7 @@
  * store is unavailable.
  */
 export {};
-import { isThrottled, recordAttempt, claimAttempt, refundAttempt, clearAttempts, _resetThrottle } from '../../src/lib/oauth/throttle';
+import { claimAttempt, refundAttempt, _resetThrottle } from '../../src/lib/oauth/throttle';
 import { markCodeRedeemed } from '../../src/lib/oauth/tokens';
 import { _resetSharedStoreForTests } from '../../src/lib/shared-store';
 
@@ -55,106 +55,59 @@ describe('sign-in throttle', () => {
   });
 
   describe('in-memory (no shared store configured)', () => {
-    it('trips after MAX_ATTEMPTS recorded failures, per key, without touching the network', async () => {
-      const now = 1_700_000_000_000;
-      expect(await isThrottled('ip:203.0.113.9', now)).toBe(false);
-      for (let i = 0; i < MAX_ATTEMPTS - 1; i++) await recordAttempt('ip:203.0.113.9', now);
-      expect(await isThrottled('ip:203.0.113.9', now)).toBe(false);
-      await recordAttempt('ip:203.0.113.9', now);
-      expect(await isThrottled('ip:203.0.113.9', now)).toBe(true);
-      // Checks do not consume budget locally, and other keys are unaffected.
-      expect(await isThrottled('ip:203.0.113.9', now)).toBe(true);
-      expect(await isThrottled('ip:203.0.113.10', now)).toBe(false);
-      expect(await isThrottled('email:victim@x.test', now)).toBe(false);
-      expect(mockFetch).not.toHaveBeenCalled();
-    });
-
     it('forgets a key once its ten-minute window has passed, and restarts the count', async () => {
       const now = 1_700_000_000_000;
-      for (let i = 0; i < MAX_ATTEMPTS; i++) await recordAttempt('ip:1.1.1.1', now);
-      expect(await isThrottled('ip:1.1.1.1', now + WINDOW_MS - 1)).toBe(true);
-      expect(await isThrottled('ip:1.1.1.1', now + WINDOW_MS + 1)).toBe(false);
-      await recordAttempt('ip:1.1.1.1', now + WINDOW_MS + 1);
-      expect(await isThrottled('ip:1.1.1.1', now + WINDOW_MS + 2)).toBe(false);
-    });
-
-    it('supports clearing one key and resetting everything (test hook)', async () => {
-      const now = Date.now();
-      for (let i = 0; i < MAX_ATTEMPTS; i++) {
-        await recordAttempt('a', now);
-        await recordAttempt('b', now);
-      }
-      clearAttempts('a');
-      expect(await isThrottled('a', now)).toBe(false);
-      expect(await isThrottled('b', now)).toBe(true);
-      _resetThrottle();
-      expect(await isThrottled('b', now)).toBe(false);
+      for (let i = 0; i < MAX_ATTEMPTS; i++) expect(await claimAttempt('ip:1.1.1.1', now)).toBe(true);
+      expect(await claimAttempt('ip:1.1.1.1', now + WINDOW_MS - 1)).toBe(false);
+      expect(await claimAttempt('ip:1.1.1.1', now + WINDOW_MS + 1)).toBe(true);
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 
   describe('shared store', () => {
-    it('reads the window counter on a check (GET, no increment) and refuses at the failure budget', async () => {
-      enableStore();
-      const now = 1_700_000_000_000;
-      const windowId = Math.floor(now / WINDOW_MS);
-      mockFetch.mockResolvedValueOnce(single(null));
-      expect(await isThrottled('ip:203.0.113.9', now)).toBe(false);
-      expect(call(0).url).toBe(STORE_URL);
-      expect(call(0).headers.Authorization).toBe(`Bearer ${STORE_TOKEN}`);
-      expect(call(0).body).toEqual(['GET', `mcp:login:ip:203.0.113.9:${windowId}`]);
-
-      mockFetch.mockResolvedValueOnce(single(MAX_ATTEMPTS - 1));
-      expect(await isThrottled('ip:203.0.113.9', now)).toBe(false); // nine failures: still allowed
-      mockFetch.mockResolvedValueOnce(single(MAX_ATTEMPTS));
-      expect(await isThrottled('ip:203.0.113.9', now)).toBe(true);
-      mockFetch.mockResolvedValueOnce(single('500'));
-      expect(await isThrottled('email:victim@x.test', now)).toBe(true);
-      expect(call(3).body).toEqual(['GET', `mcp:login:email:victim@x.test:${windowId}`]);
-    });
-
-    it('records a FAILURE with INCR + EXPIRE NX on the window key, and locally too', async () => {
+    it('claims a slot with INCR + EXPIRE NX on the window key', async () => {
       enableStore();
       const now = 1_700_000_000_000;
       const windowId = Math.floor(now / WINDOW_MS);
       mockFetch.mockResolvedValueOnce(pipelineCount(1));
-      await recordAttempt('ip:9.9.9.9', now);
+      expect(await claimAttempt('ip:9.9.9.9', now)).toBe(true);
       expect(call(0).url).toBe(`${STORE_URL}/pipeline`);
+      expect(call(0).headers.Authorization).toBe(`Bearer ${STORE_TOKEN}`);
       expect(call(0).body).toEqual([
         ['INCR', `mcp:login:ip:9.9.9.9:${windowId}`],
         ['EXPIRE', `mcp:login:ip:9.9.9.9:${windowId}`, 600, 'NX'],
       ]);
-      // Successful sign-ins never touch the store: only the caller's explicit failure records do.
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it('keys the counter on the ten-minute window', async () => {
       enableStore();
       const now = 1_700_000_000_000;
-      mockFetch.mockResolvedValue(single(0));
-      await isThrottled('k', now);
-      await isThrottled('k', now + WINDOW_MS);
-      const key = (i: number) => (call(i).body as string[])[1];
+      mockFetch.mockResolvedValue(pipelineCount(1));
+      await claimAttempt('k', now);
+      await claimAttempt('k', now + WINDOW_MS);
+      const key = (i: number) => (call(i).body as string[][])[0][1];
       expect(key(0)).toBe(`mcp:login:k:${Math.floor(now / WINDOW_MS)}`);
       expect(key(1)).toBe(`mcp:login:k:${Math.floor(now / WINDOW_MS) + 1}`);
       expect(key(0)).not.toBe(key(1));
     });
 
-    it('falls back to the per-instance failure count when the store is unavailable', async () => {
+    it('falls back to the per-instance count when the store is unavailable', async () => {
       enableStore();
       const now = Date.now();
       mockFetch.mockRejectedValue(new Error('ECONNRESET'));
-      expect(await isThrottled('ip:5.5.5.5', now)).toBe(false);
-      for (let i = 0; i < MAX_ATTEMPTS; i++) await recordAttempt('ip:5.5.5.5', now);
-      expect(await isThrottled('ip:5.5.5.5', now)).toBe(true);
-      expect(await isThrottled('ip:6.6.6.6', now)).toBe(false);
+      for (let i = 0; i < MAX_ATTEMPTS; i++) expect(await claimAttempt('ip:5.5.5.5', now)).toBe(true);
+      expect(await claimAttempt('ip:5.5.5.5', now)).toBe(false);
+      expect(await claimAttempt('ip:6.6.6.6', now)).toBe(true);
 
       // A non-2xx answer, a command error and a malformed reply are all "unavailable".
+      mockFetch.mockReset();
       mockFetch.mockResolvedValueOnce(makeResponse(false, 500, {}));
-      expect(await isThrottled('ip:5.5.5.5', now)).toBe(true);
-      mockFetch.mockResolvedValueOnce(makeResponse(true, 200, { error: 'WRONGTYPE' }));
-      expect(await isThrottled('ip:6.6.6.6', now)).toBe(false);
-      mockFetch.mockResolvedValueOnce(makeResponse(true, 200, { result: 'not-a-number' }));
-      expect(await isThrottled('ip:6.6.6.6', now)).toBe(false);
+      expect(await claimAttempt('ip:5.5.5.5', now)).toBe(false);
+      mockFetch.mockResolvedValueOnce(makeResponse(true, 200, [{ error: 'WRONGTYPE' }, { result: 1 }]));
+      expect(await claimAttempt('ip:5.5.5.5', now)).toBe(false);
+      mockFetch.mockResolvedValueOnce(makeResponse(true, 200, [{ result: 'not-a-number' }, { result: 1 }]));
+      expect(await claimAttempt('ip:5.5.5.5', now)).toBe(false);
     });
   });
 });
@@ -238,7 +191,6 @@ describe('sign-in throttle: concurrency', () => {
     const keys = new Map<string, number>();
     const run = (cmd: (string | number)[]): { result?: unknown; error?: string } => {
       const [op, key] = cmd as [string, string];
-      if (op === 'GET') return { result: keys.has(key) ? String(keys.get(key)) : null };
       if (op === 'INCR') return { result: keys.set(key, (keys.get(key) ?? 0) + 1).get(key) };
       if (op === 'DECR') return { result: keys.set(key, (keys.get(key) ?? 0) - 1).get(key) };
       if (op === 'EXPIRE') return { result: 1 };
@@ -256,14 +208,6 @@ describe('sign-in throttle: concurrency', () => {
 
   /** Stand-in for the backend round-trip that sits between check and record. */
   const backendCall = () => new Promise((r) => setImmediate(r));
-
-  /** The SHAPE THIS TICKET REMOVED: read the counter, do the work, then record. */
-  async function attemptTheOldWay(key: string, now: number): Promise<'allowed' | 'refused'> {
-    if (await isThrottled(key, now)) return 'refused';
-    await backendCall();
-    await recordAttempt(key, now);
-    return 'allowed';
-  }
 
   /** The shape now in use: the claim IS the check. */
   async function attemptTheNewWay(key: string, now: number): Promise<'allowed' | 'refused'> {
@@ -286,17 +230,11 @@ describe('sign-in throttle: concurrency', () => {
     jest.restoreAllMocks();
   });
 
-  it('holds the ceiling against a parallel burst, per instance (the old shape does not)', async () => {
+  it('holds the ceiling against a parallel burst, per instance', async () => {
     const now = 1_700_000_000_000;
     (global as unknown as { fetch: jest.Mock }).fetch = jest.fn();
 
-    // Baseline: this is what the vulnerability looked like. Every request in
-    // the burst reads the same pre-burst counter and is waved through.
-    const old = await Promise.all(Array.from({ length: BURST }, () => attemptTheOldWay('ip:198.51.100.1', now)));
-    expect(allowed(old)).toBe(BURST);
-    expect(allowed(old)).toBeGreaterThan(MAX_ATTEMPTS);
-
-    // The fix: exactly the budget gets through, no matter how they interleave.
+    // Exactly the budget gets through, no matter how they interleave.
     const fixed = await Promise.all(Array.from({ length: BURST }, () => attemptTheNewWay('ip:198.51.100.2', now)));
     expect(allowed(fixed)).toBe(MAX_ATTEMPTS);
   });
@@ -307,9 +245,6 @@ describe('sign-in throttle: concurrency', () => {
     (global as unknown as { fetch: jest.Mock }).fetch = fetchMock as unknown as jest.Mock;
     process.env.UPSTASH_REDIS_REST_URL = STORE_URL_C;
     process.env.UPSTASH_REDIS_REST_TOKEN = 'test-store-token';
-
-    const old = await Promise.all(Array.from({ length: BURST }, () => attemptTheOldWay('ip:203.0.113.1', now)));
-    expect(allowed(old)).toBe(BURST); // every GET saw the same zero
 
     _resetThrottle(); // the local layer must not be what saves us
     const fixed = await Promise.all(Array.from({ length: BURST }, () => attemptTheNewWay('ip:203.0.113.2', now)));
@@ -335,12 +270,10 @@ describe('sign-in throttle: concurrency', () => {
       await refundAttempt('ip:203.0.113.5', now);
     }
     expect(keys.get(key)).toBe(0);
-    expect(await isThrottled('ip:203.0.113.5', now)).toBe(false);
 
     // Failures still accumulate normally afterwards.
     for (let i = 0; i < MAX_ATTEMPTS; i++) expect(await claimAttempt('ip:203.0.113.5', now)).toBe(true);
     expect(await claimAttempt('ip:203.0.113.5', now)).toBe(false);
-    expect(await isThrottled('ip:203.0.113.5', now)).toBe(true);
   });
 
   it('refunds locally too, one slot at a time, and never inflates the budget', async () => {

@@ -294,29 +294,6 @@ async function stepWindow(command: 'INCR' | 'DECR', key: string, windowSeconds: 
 }
 
 /**
- * Read a counter without touching it (`GET key`). Returns 0 for a missing key,
- * `null` when the store is unavailable. Lets callers separate "check" from
- * "record" so a throttle can count failures only.
- */
-export async function getCount(key: string): Promise<number | null> {
-  const cfg = storeConfig();
-  if (!cfg) return null;
-  const reply = await execute(cfg, ['GET', namespacedKey(key)], 'getCount');
-  if (!reply) return null;
-  if ('error' in reply && reply.error) {
-    warnUnavailable('getCount', reply.error);
-    return null;
-  }
-  if (reply.result === null || reply.result === undefined) return 0;
-  const count = asCount(reply.result);
-  if (count === null) {
-    warnUnavailable('getCount', 'non-numeric reply');
-    return null;
-  }
-  return count;
-}
-
-/**
  * Create `key` with a TTL only if it does not exist (`SET key 1 EX ttl NX`).
  * Returns true when this call created the key, false when it already existed,
  * `null` when the store is unavailable (use the local fallback).

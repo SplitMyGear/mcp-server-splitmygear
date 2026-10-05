@@ -5,7 +5,6 @@ import {
   redeemOnce,
   setIfAbsent,
   sharedStoreEnabled,
-  getCount,
 } from '../src/lib/shared-store';
 
 const STORE_URL = 'https://example-redis.upstash.io';
@@ -323,21 +322,4 @@ describe('shared store (Upstash Redis REST)', () => {
     });
   });
 
-  describe('getCount', () => {
-    it('reads a counter with GET, treats a missing key as 0, and fails open', async () => {
-      enableUpstash();
-      mockFetch.mockResolvedValueOnce(makeResponse(true, 200, { result: null }));
-      expect(await getCount('login:k')).toBe(0);
-      expect(call(0).url).toBe(STORE_URL);
-      expect(call(0).body).toEqual(['GET', 'mcp:login:k']);
-      mockFetch.mockResolvedValueOnce(makeResponse(true, 200, { result: 7 }));
-      expect(await getCount('mcp:login:k')).toBe(7);
-      mockFetch.mockResolvedValueOnce(makeResponse(true, 200, { result: 'nope' }));
-      expect(await getCount('login:k')).toBeNull();
-      mockFetch.mockRejectedValueOnce(new Error('down'));
-      expect(await getCount('login:k')).toBeNull();
-      for (const name of ['UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN']) delete process.env[name];
-      expect(await getCount('login:k')).toBeNull();
-    });
-  });
 });
