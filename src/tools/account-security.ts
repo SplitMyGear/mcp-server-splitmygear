@@ -76,14 +76,6 @@ function summariseExport(data: Record<string, unknown>) {
 export const accountSecurityTools = {
   // ── Security ─────────────────────────────────────────────────────────────
 
-  getTwoFactorStatus(token: string) {
-    return call('GET', '/auth/2fa/status', { token });
-  },
-
-  listSessions(token: string) {
-    return call<{ sessions?: unknown[] }>('GET', '/auth/sessions', { token });
-  },
-
   /** 2FA state + active sessions in one read; partial failures are reported, not fatal. */
   async getSecurityStatus(token: string): Promise<Result<unknown>> {
     const [twoFactor, sessions] = await Promise.all([
@@ -160,14 +152,6 @@ export const accountSecurityTools = {
   },
 
   // ── Identity verification (KYC), read-only ───────────────────────────────
-
-  getVerificationStatus(token: string) {
-    return call('GET', '/verifications/status', { token });
-  },
-
-  listMyVerifications(token: string) {
-    return call('GET', '/verifications/my-verifications', { token });
-  },
 
   /** Aggregate flags + per-document detail (rejection reasons, expiry) in one read. */
   async getIdentityVerificationStatus(token: string): Promise<Result<unknown>> {

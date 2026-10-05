@@ -38,14 +38,6 @@ beforeEach(() => {
 });
 
 describe('accountSecurityTools (backend module)', () => {
-  it('reads 2FA status and sessions individually', async () => {
-    await accountSecurityTools.getTwoFactorStatus(T);
-    expect(lastCall()).toMatchObject({ method: 'GET', path: '/auth/2fa/status', opts: { token: T } });
-    expect(lastCall().opts.body).toBeUndefined();
-    await accountSecurityTools.listSessions(T);
-    expect(lastCall()).toMatchObject({ method: 'GET', path: '/auth/sessions', opts: { token: T } });
-  });
-
   it('merges 2FA status + sessions, tolerating one side failing', async () => {
     mockBackendRequest.mockImplementation(async (_m: string, path: string) => {
       if (path === '/auth/2fa/status') return { enabled: true, passkeys: [] };
@@ -171,11 +163,6 @@ describe('accountSecurityTools (backend module)', () => {
   });
 
   it('reads KYC status and per-document summaries, merged', async () => {
-    await accountSecurityTools.getVerificationStatus(T);
-    expect(lastCall()).toMatchObject({ method: 'GET', path: '/verifications/status', opts: { token: T } });
-    await accountSecurityTools.listMyVerifications(T);
-    expect(lastCall()).toMatchObject({ method: 'GET', path: '/verifications/my-verifications', opts: { token: T } });
-
     mockBackendRequest.mockImplementation(async (_m: string, path: string) => {
       if (path === '/verifications/status') return { verified: false, pending: true };
       if (path === '/verifications/my-verifications') return [{ id: 'v1', status: 'PENDING_REVIEW' }];
