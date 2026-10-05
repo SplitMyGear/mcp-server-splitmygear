@@ -160,16 +160,14 @@ async function handleRequest(request: NextRequest) {
     // times as before.
     let parsedBody: unknown;
     let bodyParsed = false;
-    if (request.method === 'POST') {
-      try {
-        parsedBody = await request.json();
-        bodyParsed = true;
-      } catch {
-        // Unparseable body: charge nothing and pass no `parsedBody`, so the
-        // transport answers with its own canonical -32700 parse error instead
-        // of a second, divergent one from here. (Its `req.json()` retry rejects
-        // on the already-consumed stream and lands in that same branch.)
-      }
+    try {
+      parsedBody = await request.json();
+      bodyParsed = true;
+    } catch {
+      // Unparseable body: charge nothing and pass no `parsedBody`, so the
+      // transport answers with its own canonical -32700 parse error instead
+      // of a second, divergent one from here. (Its `req.json()` retry rejects
+      // on the already-consumed stream and lands in that same branch.)
     }
 
     if (bodyParsed) {
