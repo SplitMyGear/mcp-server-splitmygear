@@ -9,7 +9,8 @@
  *  Both list `scopes_supported` (RFC 8414 §2 / RFC 9728 §2) so clients can
  *  ask for a subset at sign-in; no `scope` means full access.
  */
-import { mcpResourcePath } from './config';
+import { mcpResourcePath, oauthEnabled, publicBaseUrl, MCP_RESOURCE_PATHS } from './config';
+import { json } from './http';
 import { TOOL_SCOPES } from './scopes';
 
 export function protectedResourceMetadata(base: string) {
@@ -44,4 +45,24 @@ export function authorizationServerMetadata(base: string) {
     revocation_endpoint_auth_methods_supported: ['none'],
     service_documentation: 'https://github.com/SplitMyGear/mcp-server-splitmygear#readme',
   };
+}
+
+/** `MCP_RESOURCE_PATHS` without their leading slash, as a well-known suffix appears. */
+const KNOWN_SUFFIXES = MCP_RESOURCE_PATHS.map((p) => p.slice(1));
+
+/**
+ * Shared GET for the two `.well-known` routes: 404 when OAuth is off or the
+ * path-aware suffix is not one of ours, else the document `build` makes.
+ */
+export async function wellKnownGet(
+  request: Request,
+  context: { params: Promise<{ path?: string[] }> },
+  build: (base: string) => object,
+): Promise<Response> {
+  if (!oauthEnabled()) return json({ error: 'not_found', error_description: 'OAuth is not enabled on this server' }, 404);
+  // RFC 8414 / 9728 path-aware discovery: only the root document and the ones
+  // for our two live resource paths exist; any other suffix is not ours to answer.
+  const suffix = ((await context.params).path ?? []).join('/');
+  if (suffix !== '' && !KNOWN_SUFFIXES.includes(suffix)) return json({ error: 'not_found' }, 404);
+  return json(build(publicBaseUrl(request)), 200, { 'Cache-Control': 'public, max-age=300' });
 }
