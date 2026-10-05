@@ -18,8 +18,6 @@
  */
 import { call, compact, qs } from './_shared';
 
-export const DISPUTE_STATUSES = ['open', 'under_review', 'resolved_renter', 'resolved_vendor', 'compromise', 'closed'] as const;
-
 export const CLAIM_STATES = ['draft', 'submitted', 'renter_response', 'admin_review', 'resolved_approved', 'resolved_partial', 'resolved_denied', 'settled'] as const;
 export type ClaimState = (typeof CLAIM_STATES)[number];
 

@@ -198,8 +198,3 @@ export function registerTools(server: McpServer, ctx: ToolContext, defs: Readonl
   }
   return registered;
 }
-
-/** Widen a typed def to the registry's element type (keeps `defineTool` inference at the call site). */
-export function toolList(...defs: Array<ToolDef<ZodRawShape>>): ToolDef<ZodRawShape>[] {
-  return defs;
-}

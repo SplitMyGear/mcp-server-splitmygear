@@ -42,7 +42,6 @@ import type { paths, components } from '@/generated/api-types.gen';
 
 /* ── Generated entity schemas (element types for the tool layer) ──────────────── */
 export type Listing = components['schemas']['Listing'];
-export type BookingResponseDto = components['schemas']['BookingResponseDto'];
 export type Conversation = components['schemas']['Conversation'];
 
 /**

@@ -278,7 +278,3 @@ ${p.error ? `<div class="error" role="alert">${escapeHtml(p.error)}</div>` : ''}
 export function renderErrorPage(title: string, message: string): string {
   return shell(title, `<h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p>`);
 }
-
-export function renderDonePage(title: string, message: string): string {
-  return shell(title, `<h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p>`);
-}
