@@ -1,5 +1,5 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
-import { call, compact } from './_shared';
+import { call, compact, qs } from './_shared';
 
 /**
  * Experience tools are thin clients of the backend REST API (SPLIT-226). The
@@ -59,21 +59,12 @@ function toMessage(error: unknown, fallback: string): string {
   return error instanceof BackendApiError ? error.message : fallback;
 }
 
-function queryString(params: Record<string, string | undefined>): string {
-  const usp = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
-    if (v) usp.set(k, v);
-  }
-  const s = usp.toString();
-  return s ? `?${s}` : '';
-}
-
 export const experienceTools = {
   async searchExperiences(filters: { location?: string; category?: string }): Promise<ExperienceRecord[]> {
     try {
       const result = await backendRequest<{ success: boolean; experiences: ExperienceRecord[] }>(
         'GET',
-        `/packages${queryString({ location: filters.location, category: filters.category, limit: '50' })}`,
+        `/packages${qs({ location: filters.location, category: filters.category, limit: 50 })}`,
       );
       return Array.isArray(result?.experiences) ? result.experiences : [];
     } catch (error) {

@@ -1,5 +1,6 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
 import type { GetResponse, Listing } from '@/lib/api-contract';
+import { qs } from './_shared';
 
 /**
  * Pricing tools read anonymized market aggregates from the public backend
@@ -42,15 +43,6 @@ const EMPTY_ANALYSIS: PricingAnalysis = {
 
 function confidenceFor(count: number): PricingAnalysis['confidence'] {
   return count > 10 ? 'high' : count > 3 ? 'medium' : 'low';
-}
-
-function qs(params: Record<string, string | undefined>): string {
-  const usp = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
-    if (v) usp.set(k, v);
-  }
-  const s = usp.toString();
-  return s ? `?${s}` : '';
 }
 
 export const pricingTools = {

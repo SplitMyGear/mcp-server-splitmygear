@@ -1,5 +1,6 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
 import type { GetResponse, Listing } from '@/lib/api-contract';
+import { qs } from './_shared';
 
 /**
  * Listing read tools are thin clients of the public backend REST API (SPLIT-226)
@@ -40,15 +41,6 @@ interface SearchFilters {
 
 function toMessage(error: unknown, fallback: string): string {
   return error instanceof BackendApiError ? error.message : fallback;
-}
-
-function qs(params: Record<string, string | number | undefined>): string {
-  const usp = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
-  }
-  const s = usp.toString();
-  return s ? `?${s}` : '';
 }
 
 export const listingTools = {
