@@ -106,11 +106,11 @@ export function onboardingNextStep(status: string | null | undefined): string {
     case 'applied':
       return 'Application filed; Splitt must admit it before the wizard unlocks. Check back with get_vendor_onboarding_status.';
     case 'profile_pending':
-      return 'Call complete_vendor_business_profile with the storefront name, business phone, business address and description.';
+      return STEP_ACTIONS.profile;
     case 'stripe_pending':
-      return 'Call start_vendor_stripe_onboarding, have the user finish on Stripe, then check_vendor_stripe_status and confirm_vendor_stripe.';
+      return STEP_ACTIONS.stripe;
     case 'waiver_pending':
-      return 'Call get_vendor_agreement, show the user the terms, then sign_vendor_agreement once they explicitly agree.';
+      return STEP_ACTIONS.waiver;
     case 'admin_review':
       return 'All steps are complete; Splitt is reviewing the application. Nothing more to do until approval.';
     case 'active':
