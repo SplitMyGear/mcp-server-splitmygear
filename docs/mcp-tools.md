@@ -279,4 +279,4 @@ Every tool belongs to exactly one OAuth scope. Clients request scopes with the s
 
 | URI | Description |
 |---|---|
-| `splitmygear://categories` | The 19 canonical Title-Case gear categories |
+| `splitmygear://categories` | The 24 canonical Title-Case listing categories |

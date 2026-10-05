@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { ALL_TOOLS } from '../src/tools/defs';
 import { TOOL_SCOPES, type ToolAccess } from '../src/tools/registry';
 import { SCOPE_DESCRIPTIONS } from '../src/lib/oauth/scopes';
+import { LISTING_CATEGORY_IDS } from '../src/tools/listing-categories';
 
 const ROOT = path.join(__dirname, '..');
 const UPDATE = process.env.UPDATE_DOCS === '1';
@@ -62,7 +63,7 @@ function renderMarkdown(): string {
     }
     md += `\n`;
   }
-  md += `## Resources\n\n| URI | Description |\n|---|---|\n| \`splitmygear://categories\` | The 19 canonical Title-Case gear categories |\n`;
+  md += `## Resources\n\n| URI | Description |\n|---|---|\n| \`splitmygear://categories\` | The ${LISTING_CATEGORY_IDS.length} canonical Title-Case listing categories |\n`;
   return md;
 }
 
