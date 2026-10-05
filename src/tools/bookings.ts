@@ -1,6 +1,6 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
 import type { GetResponse, PostResponse, PutResponse } from '@/lib/api-contract';
-import { call, compact, qs, type Result } from './_shared';
+import { call, compact, qs, toMessage, type Result } from './_shared';
 
 /**
  * Booking tools call the SplitMyGear backend REST API (/api/v1) forwarding the
@@ -19,10 +19,6 @@ type CreatedBooking = PostResponse<'/api/v1/bookings'>;
 type FetchedBooking = GetResponse<'/api/v1/bookings/{id}'>;
 /** PUT /bookings/{id}/status returns the updated booking (spec-bound, 200). */
 type UpdatedBooking = PutResponse<'/api/v1/bookings/{id}/status'>;
-
-function toMessage(error: unknown, fallback: string): string {
-  return error instanceof BackendApiError ? error.message : fallback;
-}
 
 /**
  * SPLIT-1503. A booking made through create_booking starts as a DRAFT: an

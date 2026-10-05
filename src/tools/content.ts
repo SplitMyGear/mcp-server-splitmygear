@@ -1,7 +1,7 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
 import { AI_GENERATION_TIMEOUT_MS } from '@/lib/timeouts';
 import type { PostResponse } from '@/lib/api-contract';
-import { aiUnavailableMessage, isAiUnavailable, type AiText } from './_shared';
+import { aiUnavailableMessage, isAiUnavailable, isAuthError, type AiText } from './_shared';
 
 /**
  * Content tools are thin clients of the backend AI (SPLIT-277). The backend owns
@@ -24,11 +24,6 @@ type TitleResponse = PostResponse<'/api/v1/ai/improve-title'>;
 
 const AUTH_REQUIRED =
   'Authentication required: call with a user Bearer token (obtained from POST /api/v1/users/login) to use AI content tools.';
-
-/** A backend auth rejection — the caller's JWT is missing, invalid or expired. */
-function isAuthError(error: unknown): error is BackendApiError {
-  return error instanceof BackendApiError && (error.status === 401 || error.status === 403);
-}
 
 function sameTitle(a: string, b: string): boolean {
   const norm = (t: string) => t.trim().replace(/\s+/g, ' ').toLowerCase();

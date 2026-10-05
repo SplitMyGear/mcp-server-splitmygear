@@ -74,6 +74,16 @@ export function qs(params: Record<string, string | number | boolean | undefined 
   return s ? `?${s}` : '';
 }
 
+/** The backend's own message for a backend error, else `fallback`. */
+export function toMessage(error: unknown, fallback: string): string {
+  return error instanceof BackendApiError ? error.message : fallback;
+}
+
+/** A backend auth rejection: the caller's JWT is missing, invalid or expired. */
+export function isAuthError(error: unknown): error is BackendApiError {
+  return error instanceof BackendApiError && (error.status === 401 || error.status === 403);
+}
+
 /** Drop undefined values so bodies only carry fields the caller actually set
  *  (the backend's global ValidationPipe rejects unknown/undeclared fields). */
 export function compact<T extends object>(obj: T): Partial<T> {

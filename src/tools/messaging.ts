@@ -1,7 +1,7 @@
-import { backendRequest, BackendApiError } from '@/lib/backend-client';
+import { backendRequest } from '@/lib/backend-client';
 import { AI_GENERATION_TIMEOUT_MS } from '@/lib/timeouts';
 import type { Conversation, PostResponse } from '@/lib/api-contract';
-import { aiUnavailableMessage, call, compact, isAiUnavailable, qs, type AiText } from './_shared';
+import { aiUnavailableMessage, call, compact, isAiUnavailable, isAuthError, qs, toMessage, type AiText } from './_shared';
 
 /**
  * `sendMessage` / `getConversations` call the backend REST API forwarding the
@@ -23,15 +23,6 @@ type SentMessage = PostResponse<'/api/v1/chat/conversations/{conversationId}/mes
 
 const AUTH_REQUIRED =
   'Authentication required: call with a user Bearer token (obtained from POST /api/v1/users/login).';
-
-function toMessage(error: unknown, fallback: string): string {
-  return error instanceof BackendApiError ? error.message : fallback;
-}
-
-/** A backend auth rejection — the caller's JWT is missing, invalid or expired. */
-function isAuthError(error: unknown): error is BackendApiError {
-  return error instanceof BackendApiError && (error.status === 401 || error.status === 403);
-}
 
 /**
  * Resolve (or create) the conversation to post into.

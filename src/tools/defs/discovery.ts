@@ -9,9 +9,8 @@ import { reviewTools } from '../reviews';
 import { bookingTools } from '../bookings';
 import { experienceTools } from '../experiences';
 import { experienceCategorySchema } from '../experience-categories';
-import { BackendApiError } from '@/lib/backend-client';
 import { isVendorFamily } from '@/lib/roles';
-import { dateRangeError } from '../_shared';
+import { dateRangeError, toMessage } from '../_shared';
 import { uuid, isoDate, READ, LISTING_CATEGORIES, PROTECTION_PLANS, UNTRUSTED_NOTE } from './common';
 
 export const searchListings = defineTool({
@@ -107,7 +106,7 @@ export const getListingCalendar = defineTool({
       if (oneDay && Array.isArray(days)) return ok(days.filter((row) => isoDay((row as { startDate?: unknown } | null)?.startDate) === day));
       return ok(days);
     } catch (error) {
-      return fail(error instanceof BackendApiError ? error.message : 'Could not load the calendar');
+      return fail(toMessage(error, 'Could not load the calendar'));
     }
   },
 });
@@ -198,7 +197,7 @@ export const analyzeCompetitorPricing = defineTool({
     try {
       return ok(await pricingTools.analyzeCompetitorPricing(listingId));
     } catch (error) {
-      return fail(error instanceof BackendApiError ? error.message : 'Could not analyze pricing');
+      return fail(toMessage(error, 'Could not analyze pricing'));
     }
   },
 });

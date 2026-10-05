@@ -1,6 +1,6 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
 import type { GetResponse, Listing } from '@/lib/api-contract';
-import { qs } from './_shared';
+import { qs, toMessage } from './_shared';
 
 /**
  * Listing read tools are thin clients of the public backend REST API (SPLIT-226)
@@ -37,10 +37,6 @@ interface SearchFilters {
   minPrice?: number;
   maxPrice?: number;
   query?: string;
-}
-
-function toMessage(error: unknown, fallback: string): string {
-  return error instanceof BackendApiError ? error.message : fallback;
 }
 
 export const listingTools = {

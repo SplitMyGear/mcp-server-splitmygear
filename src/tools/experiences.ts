@@ -1,5 +1,5 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
-import { call, compact, qs } from './_shared';
+import { call, compact, qs, toMessage } from './_shared';
 
 /**
  * Experience tools are thin clients of the backend REST API (SPLIT-226). The
@@ -53,10 +53,6 @@ export interface ExperienceInput {
   imageUrls?: string[];
   guidanceType?: 'self_guided' | 'staff_guided';
   pricingMode?: 'per_person' | 'flat_rate';
-}
-
-function toMessage(error: unknown, fallback: string): string {
-  return error instanceof BackendApiError ? error.message : fallback;
 }
 
 export const experienceTools = {
