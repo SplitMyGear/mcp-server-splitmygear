@@ -16,7 +16,7 @@
  * desktop apps that run a local callback listener (RFC 8252 §7.3).
  */
 import crypto from 'crypto';
-import { allowedRedirectHosts, deriveKey, isAllowListedRedirect, isLoopbackHost } from './config';
+import { allowedRedirectEntries, deriveKey, isAllowListedRedirect, isLoopbackHost } from './config';
 
 const CLIENT_ID_PREFIX = 'smg_c';
 const MAX_REDIRECT_URIS = 10;
@@ -92,7 +92,7 @@ export function registerClient(metadata: unknown): RegisteredClient | Registrati
         // Name the environment variable: an empty allow-list now rejects every
         // https host, and an operator staring at a registration failure needs
         // to know it is policy, not a malformed URI.
-        error_description: allowedRedirectHosts().length
+        error_description: allowedRedirectEntries().length
           ? 'redirect_uris must be http://localhost loopback URLs or https:// URLs allow-listed (host, optionally with a path) in MCP_OAUTH_ALLOWED_REDIRECT_HOSTS'
           : 'No redirect hosts are allow-listed on this server, so only http://localhost loopback URLs may register. The operator must set MCP_OAUTH_ALLOWED_REDIRECT_HOSTS.',
       };

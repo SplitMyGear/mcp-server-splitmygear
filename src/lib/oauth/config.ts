@@ -263,14 +263,6 @@ export function allowedRedirectEntries(): RedirectAllowEntry[] {
     .filter((entry) => entry.host.length > 0);
 }
 
-/** The configured entries as written (for error messages and docs). */
-export function allowedRedirectHosts(): string[] {
-  return (process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS || '')
-    .split(',')
-    .map((h) => h.trim().toLowerCase())
-    .filter(Boolean);
-}
-
 export function isLoopbackHost(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 }
