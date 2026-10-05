@@ -79,26 +79,26 @@ export const experienceTools = {
     token?: string,
   ): Promise<{ experience: ExperienceRecord; schedules: ExperienceRecord[] } | null> {
     try {
-      const detail = await backendRequest<{ success: boolean; experience: ExperienceRecord }>(
-        'GET',
-        `/packages/${experienceId}`,
-        { token },
-      );
-      if (!detail?.experience) return null;
-
       // Schedules are a separate public endpoint; an empty/failed schedules
-      // fetch must not null out the whole detail response.
-      let schedules: ExperienceRecord[] = [];
-      try {
-        const sched = await backendRequest<{ success: boolean; schedules: ExperienceRecord[] }>(
-          'GET',
-          `/packages/${experienceId}/schedules`,
-          { token },
-        );
-        schedules = Array.isArray(sched?.schedules) ? sched.schedules : [];
-      } catch {
-        schedules = [];
-      }
+      // fetch must not null out the whole detail response. The two reads are
+      // independent, so they run together; the schedules promise never rejects.
+      const loadSchedules = async (): Promise<ExperienceRecord[]> => {
+        try {
+          const sched = await backendRequest<{ success: boolean; schedules: ExperienceRecord[] }>(
+            'GET',
+            `/packages/${experienceId}/schedules`,
+            { token },
+          );
+          return Array.isArray(sched?.schedules) ? sched.schedules : [];
+        } catch {
+          return [];
+        }
+      };
+      const [detail, schedules] = await Promise.all([
+        backendRequest<{ success: boolean; experience: ExperienceRecord }>('GET', `/packages/${experienceId}`, { token }),
+        loadSchedules(),
+      ]);
+      if (!detail?.experience) return null;
 
       return { experience: detail.experience, schedules };
     } catch (error) {
