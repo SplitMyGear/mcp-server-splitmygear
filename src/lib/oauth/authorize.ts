@@ -47,7 +47,7 @@ import {
 import { pageHeaders, renderErrorPage, renderLoginPage, renderOtpPage } from './pages';
 import { coerceScopes, parseScopeParam, type ToolScope } from './scopes';
 import { claimAttempt, refundAttempt } from './throttle';
-import { clientIp, isSameOriginPost, readParams, type OAuthErrorCode } from './http';
+import { clientContext, isSameOriginPost, readParams, type OAuthErrorCode } from './http';
 
 /** How long a rendered sign-in page stays submittable. */
 /** RFC 6749 leaves `state` unbounded; cap it so the sealed request (and the social return_to built from it) stays a sane size. */
@@ -202,10 +202,6 @@ function bridgeErrorMessage(error: unknown, fallback: string): string {
 /** The caller's context plus the client they are signing in to, so the backend session names it (SPLIT-1603). */
 function forClient(ctx: ClientContext, rq: Pick<AuthorizeRequest, 'cn'>): ClientContext {
   return { ...ctx, clientName: rq.cn };
-}
-
-function clientContext(request: Request): ClientContext {
-  return { ip: clientIp(request), userAgent: request.headers.get('user-agent') ?? undefined };
 }
 
 export async function handleAuthorizeGet(request: Request): Promise<Response> {

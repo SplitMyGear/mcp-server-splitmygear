@@ -10,7 +10,7 @@ import { openAuthorizationCode, markCodeRedeemed, issueTokens, openRefreshToken,
 import { isOwnResource, oauthEnabled, resourceUrl } from './config';
 import { formatScope, isSubset, parseScopeParam, type ToolScope } from './scopes';
 import { backendRefresh, AuthBridgeError, type ClientContext } from './backend-auth';
-import { json, oauthError, readParams, clientIp } from './http';
+import { json, oauthError, readParams, clientContext } from './http';
 import { resolveClient } from './client';
 import { withRefreshGrace, type RotationOutcome } from './refresh-grace';
 
@@ -30,7 +30,7 @@ function clientRevoked(clientId: string): Response | null {
 export async function handleTokenPost(request: Request): Promise<Response> {
   if (!oauthEnabled()) return oauthError('temporarily_unavailable', 'OAuth is not enabled on this server', 503);
   const p = await readParams(request);
-  const ctx: ClientContext = { ip: clientIp(request), userAgent: request.headers.get('user-agent') ?? undefined };
+  const ctx = clientContext(request);
 
   switch (p.grant_type) {
     case 'authorization_code':

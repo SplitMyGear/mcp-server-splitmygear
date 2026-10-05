@@ -1,5 +1,6 @@
 import { requestUrl } from '@/lib/request-url';
 import { trustProxyHeaders, validIp } from './config';
+import type { ClientContext } from './backend-auth';
 
 /**
  * Small HTTP helpers shared by the OAuth route handlers: JSON + OAuth error
@@ -94,6 +95,11 @@ export async function readParams(request: Request): Promise<Record<string, strin
 export function clientIp(request: Request): string | undefined {
   if (!trustProxyHeaders()) return undefined;
   return validIp(request.headers.get('x-real-ip')) ?? validIp(request.headers.get('x-forwarded-for'));
+}
+
+/** The caller's IP (when trustworthy) and user agent, as relayed to the backend. */
+export function clientContext(request: Request): ClientContext {
+  return { ip: clientIp(request), userAgent: request.headers.get('user-agent') ?? undefined };
 }
 
 /**

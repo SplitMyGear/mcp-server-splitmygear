@@ -6,9 +6,9 @@
  * 200, as the RFC requires for unknown/unsupported tokens.
  */
 import { openRefreshToken } from './tokens';
-import { backendRefresh, backendLogout, type ClientContext } from './backend-auth';
+import { backendRefresh, backendLogout } from './backend-auth';
 import { oauthEnabled } from './config';
-import { oauthError, readParams, clientIp, json } from './http';
+import { oauthError, readParams, clientContext, json } from './http';
 
 export async function handleRevokePost(request: Request): Promise<Response> {
   if (!oauthEnabled()) return oauthError('temporarily_unavailable', 'OAuth is not enabled on this server', 503);
@@ -16,7 +16,7 @@ export async function handleRevokePost(request: Request): Promise<Response> {
   if (!p.token) return oauthError('invalid_request', 'token is required');
   // RFC 7009 §2.1: public clients must identify themselves.
   if (!p.client_id) return oauthError('invalid_request', 'client_id is required');
-  const ctx: ClientContext = { ip: clientIp(request), userAgent: request.headers.get('user-agent') ?? undefined };
+  const ctx = clientContext(request);
 
   const rt = openRefreshToken(p.token);
   // A token of another client, an access token (stateless backend JWT: nothing
