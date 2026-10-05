@@ -13,7 +13,6 @@ jest.mock('../src/lib/backend-client', () => {
 import { discoveryExtrasTools as extras, POI_RECIPES, SEARCH_ALERT_FREQUENCIES } from '../src/tools/discovery-extras';
 import {
   discoveryExtrasTools as defs,
-  CATEGORY_NAMES,
   listSearchAlerts,
   createSearchAlert,
   updateSearchAlert,
@@ -195,7 +194,6 @@ describe('discovery-extras tool defs', () => {
     expect(defs.find((t) => t.name === 'email_trip_plan')?.annotations.idempotentHint).toBe(false);
     expect(SEARCH_ALERT_FREQUENCIES).toEqual(['instant', 'daily', 'weekly']);
     expect(POI_RECIPES).toEqual(['trails-bike', 'trails-hike', 'food-drink', 'on-water', 'parks-views', 'camping']);
-    expect(CATEGORY_NAMES).toEqual(expect.arrayContaining(['Kayaking', 'ATVs', 'Cabins', 'Campsites', 'RV Sites', 'Glamping', 'Other']));
   });
 
   it('list_search_alerts lists or fetches one, unwrapping the envelope', async () => {

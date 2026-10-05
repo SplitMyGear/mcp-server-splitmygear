@@ -9,15 +9,6 @@ import { discoveryExtrasTools as extras, POI_RECIPES, SEARCH_ALERT_FREQUENCIES }
 import { dateError } from '../_shared';
 import { uuid, isoDate, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, UNTRUSTED_NOTE, token, LISTING_CATEGORIES } from './common';
 
-/**
- * The backend's canonical listing categories (listing/listing-categories.ts),
- * which the trip planner and alert matcher validate against. Includes the
- * stays categories (Cabins, Campsites, RV Sites, Glamping) and ATVs that the
- * older shared LISTING_CATEGORIES list predates.
- */
-/** The canonical listing categories (shared with search_listings / create_listing). */
-export const CATEGORY_NAMES = LISTING_CATEGORIES;
-
 const EXPERIENCE_LEVELS = ['beginner', 'intermediate', 'advanced'] as const;
 const TRIP_PLAN_SOURCES = ['board', 'fallback'] as const;
 
@@ -300,7 +291,7 @@ export const planTrip = defineTool({
   scope: 'read',
   inputSchema: {
     destination: z.string().min(2).max(120).describe('Where the trip is, e.g. "Yosemite National Park, CA" or a label from suggest_locations.'),
-    activities: z.array(z.enum(CATEGORY_NAMES)).min(1).max(6).describe('1 to 6 listing categories the trip is about, e.g. ["Kayaking", "Camping"].'),
+    activities: z.array(z.enum(LISTING_CATEGORIES)).min(1).max(6).describe('1 to 6 listing categories the trip is about, e.g. ["Kayaking", "Camping"].'),
     start: z.string().max(10).optional().describe('Trip start day, YYYY-MM-DD.'),
     end: z.string().max(10).optional().describe('Trip end day, YYYY-MM-DD (requires start; at most 30 days after it). Alternatively pass start with days.'),
     days: z.number().int().min(1).max(MAX_TRIP_DAYS).optional().describe('Trip length in days when no dates are fixed (1 to 30).'),
