@@ -46,6 +46,7 @@ describe('_shared', () => {
     expect(compact({ a: 1, b: undefined })).toEqual({ a: 1 });
     expect(dateRangeError('2026-07-01', '2026-07-03')).toBeNull();
     expect(dateRangeError('2026-07-03', '2026-07-01')).toMatch(/after/);
+    expect(dateRangeError('2026-07-01', '2026-07-01')).toMatch(/after/);
     expect(dateRangeError('nope', '2026-07-01')).toMatch(/Invalid startDate/);
     expect(dateRangeError('2026-01-01', '2027-06-01')).toMatch(/too long/);
   });
