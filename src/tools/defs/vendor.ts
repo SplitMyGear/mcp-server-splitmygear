@@ -7,6 +7,7 @@ import { vendorBookingTools } from '../vendor-bookings';
 import { vendorFinanceTools } from '../vendor-finance';
 import { reviewTools } from '../reviews';
 import { experienceTools } from '../experiences';
+import { experienceCategorySchema } from '../experience-categories';
 import { dateRangeError } from '../_shared';
 import { isoDay, pageBlackouts, shiftDay, toInclusiveBlackout } from '../blackout-dates';
 import { uuid, isoDate, pagination, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, LISTING_CATEGORIES, CANCELLATION_POLICIES, UNTRUSTED_NOTE, token } from './common';
@@ -538,7 +539,7 @@ export const listMyExperiences = defineTool({
 
 const experienceFields = {
   shortDescription: z.string().max(300).optional(),
-  category: z.enum(['tours', 'food', 'outdoor', 'arts', 'fitness', 'wellness', 'music', 'sports', 'workshop', 'photography', 'other']).optional(),
+  category: experienceCategorySchema.optional(),
   minGuests: z.number().int().min(1).optional(),
   maxGuests: z.number().int().min(1).optional(),
   pricePerChild: z.number().min(0).optional(),
