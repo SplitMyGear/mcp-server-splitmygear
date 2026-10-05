@@ -1,4 +1,4 @@
-# CI for the Splitt MCP server: every push and pull request must lint,
+# CI for the Splitt MCP server: every pull request (and manual dispatch) must lint,
 # type-check, pass the unit/route tests, and produce a Next.js build. Vercel's
 # Git integration deploys `main` only after this is green (branch protection).
 name: CI

@@ -2,7 +2,7 @@
 
 The official MCP (Model Context Protocol) server for [Splitt](https://go-splitt.com), the outdoor gear rental marketplace. It lets AI assistants (ChatGPT, Claude, Cursor, Windsurf, custom agents) act for Splitt **renters** and **vendors**: search and book gear and experiences, manage bookings, message the other party, list and price gear, run a vendor's calendar and see payouts. Everything a person can do in the Splitt web app that makes sense for an agent, with the same permissions.
 
-- **219 tools**, filtered by who is signed in and what they granted (see [docs/mcp-tools.md](docs/mcp-tools.md))
+- **222 tools**, filtered by who is signed in and what they granted (see [docs/mcp-tools.md](docs/mcp-tools.md))
 - **Sign in with your Splitt account** from any OAuth-capable MCP client (OAuth 2.1 + PKCE; email one-time-code 2FA; Continue with Google / Apple)
 - **Scoped access**: clients may request a subset of 12 scopes (`read profile bookings favorites messaging reviews listings vendor_bookings experiences finance claims files`); the sign-in page shows exactly what the app will be able to do, and tools outside the granted scopes are neither listed nor callable
 - **Thin, stateless client of the Splitt backend REST API**: no database or payment credentials live here ([ADR 0001](docs/adr/0001-mcp-is-a-backend-rest-client.md), [ADR 0002](docs/adr/0002-oauth-login-for-mcp-clients.md))
@@ -84,7 +84,7 @@ The tool list a client receives already reflects the signed-in account and the g
 | Anyone (operator key or user) | 24 | search, listing details, availability calendar, price quotes, reviews, market pricing, experiences and services, public routes, destinations, categories, trip planning |
 | Signed-in user | +89 | profile and security settings, notifications, bookings (list, cancel with refund preview, reschedule responses, protection plan), pickup/return photos and inspection checklists, reviews, favorites, saved searches and trips, conversations and messages, experience and service bookings, waivers, disputes, damage-claim responses, incidental charges, evidence uploads, trust score, vendor onboarding, AI drafting helpers |
 | Renter | +2 | `create_booking` (server-priced draft plus a Stripe Checkout `paymentUrl`), `get_payment_link` |
-| Vendor seat (`vendor`, `vendor_owner`, `vendor_manager`, `vendor_staff`) | +98 | listings (create, update, publish, duplicate, delete, AI draft, performance), blackout dates, seasonal rate rules and dynamic pricing, fleet units, calendar feeds and iCal, routes and GPX import, insurance and waivers, message templates, incoming bookings, overdue / return status, reschedule proposals, private notes, damage claims and incidental charges, review responses, dashboard, experiences hosting, services, promotions, auto-approve, report subscriptions, tax summary |
+| Vendor seat (`vendor`, `vendor_owner`, `vendor_manager`, `vendor_staff`) | +101 | listings (create, update, publish, duplicate, delete, AI draft, performance), blackout dates, seasonal rate rules and dynamic pricing, fleet units, calendar feeds and iCal, routes and GPX import, insurance and waivers, message templates, incoming bookings, overdue / return status, reschedule proposals, private notes, damage claims and incidental charges, review responses, dashboard, experiences hosting, services, promotions, auto-approve, report subscriptions, tax summary |
 | Vendor owner | +6 | `get_vendor_earnings`, `get_vendor_payouts`, `get_payout_details`, `get_stripe_connect_status`, `start_stripe_connect_onboarding`, `request_payout` (the backend grants the payouts permission to the owner seat only) |
 
 Full reference with every argument: [docs/mcp-tools.md](docs/mcp-tools.md) (generated from the code by `npm run gen:docs`).
@@ -155,7 +155,7 @@ npm run gen:docs    # regenerate docs/mcp-tools.md + manifest.json from the tool
 npm run gen:api     # regenerate backend API types from openapi/openapi.json
 ```
 
-CI (`.github/workflows/ci.yml`) runs the same on every push and pull request. Vercel's Git integration deploys `main`.
+CI (`.github/workflows/ci.yml`) runs the same on every pull request (and on manual dispatch). Vercel's Git integration deploys `main`.
 
 ### Distributed rate limiting (Upstash)
 
