@@ -91,13 +91,6 @@ describe('Experience Tools (backend REST)', () => {
       );
     });
 
-    it('requires a token', async () => {
-      const result = await experienceTools.bookExperience({ experienceId: 'e1', guests: 2, token: '' });
-      expect(result.success).toBe(false);
-      expect(result.error).toMatch(/Authentication required/);
-      expect(mockBackendRequest).not.toHaveBeenCalled();
-    });
-
     it('surfaces a capacity error from the backend', async () => {
       const { BackendApiError } = jest.requireMock('../src/lib/backend-client');
       mockBackendRequest.mockRejectedValue(new BackendApiError(409, 'Not enough spots available'));

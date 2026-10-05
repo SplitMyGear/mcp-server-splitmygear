@@ -141,10 +141,5 @@ describe('Listing Tools (backend REST)', () => {
         { token: TOKEN },
       );
     });
-
-    it('returns [] without a token (never queries the backend)', async () => {
-      expect(await listingTools.getPersonalizedRecommendations('', 5)).toEqual([]);
-      expect(mockBackendRequest).not.toHaveBeenCalled();
-    });
   });
 });

@@ -61,7 +61,6 @@ export const messagingTools = {
     bookingId?: string;
     token: string;
   }): Promise<{ success: boolean; message?: SentMessage; conversationId?: string; error?: string }> {
-    if (!params.token) return { success: false, error: AUTH_REQUIRED };
     try {
       let convId = params.conversationId;
       if (!convId) {
@@ -96,7 +95,6 @@ export const messagingTools = {
   },
 
   async getConversations(token: string): Promise<Conversation[]> {
-    if (!token) return [];
     try {
       const result = await backendRequest<Conversation[]>('GET', '/chat/conversations', { token });
       return Array.isArray(result) ? result : [];

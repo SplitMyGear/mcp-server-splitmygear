@@ -55,9 +55,6 @@ export interface ExperienceInput {
   pricingMode?: 'per_person' | 'flat_rate';
 }
 
-const AUTH_REQUIRED =
-  'Authentication required: call with a user Bearer token (obtained from POST /api/v1/users/login).';
-
 function toMessage(error: unknown, fallback: string): string {
   return error instanceof BackendApiError ? error.message : fallback;
 }
@@ -134,7 +131,6 @@ export const experienceTools = {
     withPaymentLink?: boolean;
     token: string;
   }): Promise<{ success: boolean; booking?: Record<string, unknown>; bookingId?: string; paymentUrl?: string; paymentError?: string; error?: string }> {
-    if (!params.token) return { success: false, error: AUTH_REQUIRED };
     try {
       const result = await backendRequest<{ success: boolean; booking: { id: string; [k: string]: unknown } }>(
         'POST',

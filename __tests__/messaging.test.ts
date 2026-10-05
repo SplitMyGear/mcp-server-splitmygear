@@ -83,13 +83,6 @@ describe('Messaging Tools', () => {
       expect(result.success).toBe(false);
       expect(result.error).toMatch(/yourself/);
     });
-
-    it('requires a token', async () => {
-      const result = await messagingTools.sendMessage({ recipientId: RECIPIENT, content: 'hi', token: '' });
-      expect(result.success).toBe(false);
-      expect(result.error).toMatch(/Authentication required/);
-      expect(mockBackendRequest).not.toHaveBeenCalled();
-    });
   });
 
   describe('getConversations (backend REST)', () => {

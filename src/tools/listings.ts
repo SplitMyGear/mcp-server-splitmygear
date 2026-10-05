@@ -154,7 +154,6 @@ export const listingTools = {
   },
 
   async getPersonalizedRecommendations(token: string, limit = 5): Promise<ListingRecord[]> {
-    if (!token) return [];
     try {
       // The backend derives the user from the forwarded JWT (no caller-supplied
       // id — closes the IDOR). Endpoint returns Listing[]; tolerate a wrapped shape.

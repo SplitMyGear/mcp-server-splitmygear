@@ -66,18 +66,6 @@ describe('Booking Tools (backend REST)', () => {
     expect(post?.[2].body).not.toHaveProperty('guests');
   });
 
-  it('requires a token to create a booking', async () => {
-    const result = await bookingTools.createBooking({
-      listingId: 'listing-1',
-      checkIn: '2026-07-01',
-      checkOut: '2026-07-03',
-      token: '',
-    });
-    expect(result.success).toBe(false);
-    expect(result.error).toMatch(/Authentication required/);
-    expect(mockBackendRequest).not.toHaveBeenCalled();
-  });
-
   it('rejects checkOut before checkIn client-side without calling the backend', async () => {
     const result = await bookingTools.createBooking({
       listingId: 'listing-1',
@@ -198,12 +186,6 @@ describe('Booking Tools (backend REST)', () => {
       expect(result.error).toMatch(/flagged as not returned/);
       expect(mockBackendRequest).toHaveBeenCalledTimes(1);
     });
-  });
-
-  it('requires a token to cancel a booking', async () => {
-    const result = await bookingTools.cancelBooking('booking-1', '');
-    expect(result.success).toBe(false);
-    expect(result.error).toMatch(/Authentication required/);
   });
 
   it('fetches booking status via GET /bookings/:id with the token', async () => {

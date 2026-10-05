@@ -20,9 +20,6 @@ type FetchedBooking = GetResponse<'/api/v1/bookings/{id}'>;
 /** PUT /bookings/{id}/status returns the updated booking (spec-bound, 200). */
 type UpdatedBooking = PutResponse<'/api/v1/bookings/{id}/status'>;
 
-const AUTH_REQUIRED =
-  'Authentication required: call with a user Bearer token (obtained from POST /api/v1/users/login).';
-
 /** Upper bound on a single rental window. Anything longer is almost certainly a
  *  caller mistake (e.g. swapped year), so we reject it client-side with a clear
  *  message rather than sending a nonsensical estimate to the backend. */
@@ -99,7 +96,6 @@ export const bookingTools = {
     bringingPets?: boolean;
     withPaymentLink?: boolean;
   }): Promise<{ success: boolean; booking?: CreatedBooking; quote?: unknown; paymentUrl?: string; paymentError?: string; error?: string }> {
-    if (!data.token) return { success: false, error: AUTH_REQUIRED };
     const dateError = validateBookingDates(data.checkIn, data.checkOut);
     if (dateError) return { success: false, error: dateError };
     try {
@@ -199,7 +195,6 @@ export const bookingTools = {
     token: string,
     reason?: 'severe_weather',
   ): Promise<{ success: boolean; booking?: UpdatedBooking; message?: string; error?: string }> {
-    if (!token) return { success: false, error: AUTH_REQUIRED };
     try {
       // The backend decides who may cancel and handles any refund: the renter
       // or the listing's vendor may cancel a PENDING or CONFIRMED booking.
@@ -222,7 +217,6 @@ export const bookingTools = {
     bookingId: string,
     token: string,
   ): Promise<{ success: boolean; booking?: FetchedBooking; error?: string }> {
-    if (!token) return { success: false, error: AUTH_REQUIRED };
     try {
       // GET /bookings/:id is ownership-gated server-side (renter/vendor/admin).
       const booking = await backendRequest<FetchedBooking>('GET', `/bookings/${bookingId}`, { token });
