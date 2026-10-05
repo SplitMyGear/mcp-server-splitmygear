@@ -46,9 +46,7 @@ export interface BackendSession {
 
 export interface TwoFactorChallenge {
   challengeToken: string;
-  methods: string[];
   maskedEmail: string;
-  expiresAt: string;
 }
 
 export type LoginOutcome =
@@ -138,9 +136,7 @@ function toLoginOutcome(result: unknown, unexpected: string): LoginOutcome {
       kind: 'two_factor',
       challenge: {
         challengeToken: r.challengeToken,
-        methods: Array.isArray(r.methods) ? (r.methods as string[]) : ['email_otp'],
         maskedEmail: typeof r.maskedEmail === 'string' ? r.maskedEmail : '',
-        expiresAt: typeof r.expiresAt === 'string' ? r.expiresAt : '',
       },
     };
   }

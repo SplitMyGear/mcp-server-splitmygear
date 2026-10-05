@@ -84,7 +84,6 @@ export interface BackendJwtClaims {
   role?: string;
   email?: string;
   exp?: number;
-  typ?: string;
 }
 
 /** The only two fields this server reads off the backend's authenticated-profile projection. */
@@ -261,13 +260,12 @@ export function decodeSealedBackendJwtClaims(token: string): BackendJwtClaims | 
   const decoded = decodeJwt(token);
   if (!decoded) return null;
   if (rejectedUpFront(decoded.payload, Date.now())) return null;
-  const { sub, role, email, exp, typ } = decoded.payload;
+  const { sub, role, email, exp } = decoded.payload;
   if (typeof sub !== 'string' || !sub) return null;
   return {
     sub,
     role: typeof role === 'string' ? role : undefined,
     email: typeof email === 'string' ? email : undefined,
     exp: typeof exp === 'number' ? exp : undefined,
-    typ: typeof typ === 'string' ? typ : undefined,
   };
 }

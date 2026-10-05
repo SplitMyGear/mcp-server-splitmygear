@@ -241,7 +241,7 @@ describe('verifyBackendJwt', () => {
 describe('decodeSealedBackendJwtClaims (tokens out of an AES-GCM envelope only)', () => {
   it('decodes claims WITHOUT a signature check — which is exactly why it is reserved for sealed tokens', () => {
     const claims = decodeSealedBackendJwtClaims(makeToken({ sub: 'u1', role: 'vendor', email: 'v@x.test', typ: 'access', exp: FUTURE }));
-    expect(claims).toEqual({ sub: 'u1', role: 'vendor', email: 'v@x.test', typ: 'access', exp: FUTURE });
+    expect(claims).toEqual({ sub: 'u1', role: 'vendor', email: 'v@x.test', exp: FUTURE });
   });
 
   it('rejects non-access token types, a missing sub, an expired token and a malformed token', () => {
