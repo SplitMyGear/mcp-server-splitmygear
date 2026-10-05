@@ -71,6 +71,7 @@ describe('helpers', () => {
 
 describe('filesApi.uploadFile', () => {
   it('posts multipart to /upload with the folder, a typed file and the bearer token (no JSON content type)', async () => {
+    const budget = jest.spyOn(AbortSignal, 'timeout');
     const result = await filesApi.uploadFile(T, { folder: 'claims', contentType: 'image/png', base64: PNG64, filename: 'tent damage.png' });
     expect(result).toEqual({ ok: true, data: { url: 'https://x.private.blob.vercel-storage.com/claims/abc.png', key: 'claims/abc.png' } });
     const { url, init } = lastRequest();
@@ -78,6 +79,8 @@ describe('filesApi.uploadFile', () => {
     expect(init.method).toBe('POST');
     expect(init.headers).toEqual({ Authorization: `Bearer ${T}` });
     expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(budget).toHaveBeenCalledWith(20_000);
+    budget.mockRestore();
     expect(init.body).toBeInstanceOf(FormData);
     expect(init.body.get('folder')).toBe('claims');
     const file = init.body.get('file') as File;

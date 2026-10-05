@@ -111,6 +111,8 @@ describe('routesApi: library', () => {
 describe('routesApi: GPX import (multipart)', () => {
   it('posts the GPX as multipart field "file" with a Bearer header and no manual Content-Type', async () => {
     mockFetch.mockResolvedValue(makeResponse(true, 201, { success: true, draft: { name: 'Ridge', geometry: [[1, 2], [3, 4]], preview: { distanceM: 5 } } }));
+    // The import shares the function's 30 s budget with the route create that may follow.
+    const budget = jest.spyOn(AbortSignal, 'timeout');
     const res = await routesApi.importGpx(T, GPX);
     expect(res).toEqual({ ok: true, data: { success: true, draft: { name: 'Ridge', geometry: [[1, 2], [3, 4]], preview: { distanceM: 5 } } } });
     expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -119,6 +121,8 @@ describe('routesApi: GPX import (multipart)', () => {
     expect(init.method).toBe('POST');
     expect(init.headers).toEqual({ Authorization: `Bearer ${T}` });
     expect(init.signal).toBeDefined();
+    expect(budget).toHaveBeenCalledWith(14_000);
+    budget.mockRestore();
     expect(init.body).toBeInstanceOf(FormData);
     const file = init.body.get('file') as Blob & { name?: string };
     expect(file).toBeInstanceOf(Blob);

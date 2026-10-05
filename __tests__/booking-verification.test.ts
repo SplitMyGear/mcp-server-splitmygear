@@ -174,6 +174,7 @@ describe('multipart uploads', () => {
 
   it('posts pickup/return photos as multipart "files" with the Bearer token and no manual Content-Type', async () => {
     mockFetch.mockResolvedValue(fetchResponse(true, 201, { id: 'v1', type: 'PICKUP', status: 'VERIFIED', imageKeys: ['k1', 'k2'] }));
+    const budget = jest.spyOn(AbortSignal, 'timeout');
     const res = await bookingVerificationTools.uploadHandoffPhotos(T, B, 'PICKUP', decodedTwo());
     expect(res).toEqual({ ok: true, data: { id: 'v1', type: 'PICKUP', status: 'VERIFIED', imageKeys: ['k1', 'k2'] } });
     const [url, init] = mockFetch.mock.calls[0];
@@ -181,6 +182,8 @@ describe('multipart uploads', () => {
     expect(init.method).toBe('POST');
     expect(init.headers).toEqual({ Authorization: `Bearer ${T}` });
     expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(budget).toHaveBeenCalledWith(PHOTO_UPLOAD.timeoutMs);
+    budget.mockRestore();
     expect(init.body).toBeInstanceOf(FormData);
     const files = (init.body as FormData).getAll('files') as File[];
     expect(files).toHaveLength(2);

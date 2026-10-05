@@ -80,6 +80,16 @@ describe('sign-in throttle', () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
+    it('decides on the shared count, so failures recorded by other instances refuse here too', async () => {
+      enableStore();
+      const now = 1_700_000_000_000;
+      // This instance has seen only these two claims; the store has seen the whole fleet's.
+      mockFetch.mockResolvedValueOnce(pipelineCount(MAX_ATTEMPTS));
+      expect(await claimAttempt('ip:7.7.7.7', now)).toBe(true);
+      mockFetch.mockResolvedValueOnce(pipelineCount(MAX_ATTEMPTS + 1));
+      expect(await claimAttempt('ip:7.7.7.7', now)).toBe(false);
+    });
+
     it('keys the counter on the ten-minute window', async () => {
       enableStore();
       const now = 1_700_000_000_000;
@@ -100,14 +110,22 @@ describe('sign-in throttle', () => {
       expect(await claimAttempt('ip:5.5.5.5', now)).toBe(false);
       expect(await claimAttempt('ip:6.6.6.6', now)).toBe(true);
 
-      // A non-2xx answer, a command error and a malformed reply are all "unavailable".
+      // A non-2xx answer, a command error and a malformed reply are all "unavailable":
+      // the spent key stays refused (the reply is not read as a count of 1) and the
+      // fresh key stays allowed (unavailable does not fail closed).
       mockFetch.mockReset();
-      mockFetch.mockResolvedValueOnce(makeResponse(false, 500, {}));
-      expect(await claimAttempt('ip:5.5.5.5', now)).toBe(false);
-      mockFetch.mockResolvedValueOnce(makeResponse(true, 200, [{ error: 'WRONGTYPE' }, { result: 1 }]));
-      expect(await claimAttempt('ip:5.5.5.5', now)).toBe(false);
-      mockFetch.mockResolvedValueOnce(makeResponse(true, 200, [{ result: 'not-a-number' }, { result: 1 }]));
-      expect(await claimAttempt('ip:5.5.5.5', now)).toBe(false);
+      const unavailable = [
+        () => makeResponse(false, 500, {}),
+        () => makeResponse(true, 200, [{ error: 'WRONGTYPE' }, { result: 1 }]),
+        () => makeResponse(true, 200, [{ result: 'not-a-number' }, { result: 1 }]),
+      ];
+      for (const reply of unavailable) {
+        mockFetch.mockResolvedValueOnce(reply());
+        expect(await claimAttempt('ip:5.5.5.5', now)).toBe(false);
+        mockFetch.mockResolvedValueOnce(reply());
+        expect(await claimAttempt('ip:6.6.6.6', now)).toBe(true);
+      }
+      expect(mockFetch).toHaveBeenCalledTimes(2 * unavailable.length);
     });
   });
 });
