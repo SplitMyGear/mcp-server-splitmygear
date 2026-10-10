@@ -10,6 +10,19 @@
         },
         "type": "object"
       },
+      "AcceptTtdTermsDto": {
+        "properties": {
+          "termsVersion": {
+            "maxLength": 40,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "termsVersion"
+        ],
+        "type": "object"
+      },
       "AddEvidenceDto": {
         "properties": {
           "bookingVerificationId": {
@@ -67,6 +80,16 @@
           "pricePerDay": {
             "minimum": 0,
             "type": "number"
+          },
+          "pricing": {
+            "enum": [
+              "per_day",
+              "per_booking"
+            ],
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -117,7 +140,7 @@
       "ApiErrorResponse": {
         "properties": {
           "code": {
-            "description": "Optional machine-readable error code for domain errors with a stable identifier (e.g. `LIFECYCLE_ILLEGAL_TRANSITION`). Omitted otherwise.",
+            "description": "Optional machine-readable error code for domain errors with a stable identifier (e.g. `LIFECYCLE_ILLEGAL_TRANSITION`). Omitted otherwise. Authentication failures (401) carry one of `TOKEN_MISSING`, `TOKEN_EXPIRED`, `TOKEN_INVALID` (the access token), `REFRESH_INVALID` (the refresh token: the session is over) or `ACCOUNT_SUSPENDED`; the `message` text is unchanged and clients that ignore `code` are unaffected.",
             "example": "LIFECYCLE_ILLEGAL_TRANSITION",
             "type": "string"
           },
@@ -191,6 +214,11 @@
           },
           "lastName": {
             "maxLength": 100,
+            "type": "string"
+          },
+          "nonce": {
+            "description": "SPLIT security review 2026-09-11 — the RAW nonce the client generated for\nthis authorization request. The client sends SHA-256(rawNonce) to Apple as\nthe request's `nonce`, Apple echoes it verbatim into the id_token's `nonce`\nclaim, and posting the PRE-IMAGE here is what proves the token was minted\nfor this app's own live request: a replayed identity token (lifted from\nlogs, a compromised device, or another relying party) carries a nonce whose\npre-image the attacker does not have. Verified in\nSocialAuthController.appleSignIn.\n\nOPTIONAL on purpose, and this is the whole shape of the change: the\ncurrently shipped iOS build sets no nonce and posts none, and the global\npipe runs `forbidNonWhitelisted`, so a REQUIRED field would 400 every\nexisting install while an unknown field would 400 the new one. Backend\nships first and accepts both; the client half follows. Until the old build\nis off the floor an attacker can still down-grade by simply omitting this\nfield — making it REQUIRED is the follow-up that actually closes replay,\nand it cannot happen before the minimum supported app version is raised.\n\n`@ValidateIf` rather than `@IsOptional` so an explicitly-null nonce is a\n400 instead of being silently treated as absent — a client that sends the\nfield at all must send a real value. `@StrictString` for the same reason\none step further in: the pipe's enableImplicitConversion would otherwise\nturn `42` into `\"42\"` and `{}` into `\"[object Object]\"` and let @IsString\npass, so a malformed nonce would be hashed and compared rather than\nrejected (SPLIT-1325 class). It fails closed either way — a junk nonce\nsimply will not match Apple's claim — but a 400 names the real problem.",
+            "maxLength": 256,
             "type": "string"
           }
         },
@@ -385,6 +413,59 @@
         "required": [
           "startDate",
           "endDate"
+        ],
+        "type": "object"
+      },
+      "BlockResponseDto": {
+        "properties": {
+          "blocked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "blocked"
+        ],
+        "type": "object"
+      },
+      "BlockUserDto": {
+        "properties": {
+          "userId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId"
+        ],
+        "type": "object"
+      },
+      "BlockedUserDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "description": "\"First L.\", the same shape a review author is shown under.",
+            "type": "string"
+          },
+          "profileImageUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "userId": {
+            "description": "Only for a directly created block; omitted for one made from a review.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "profileImageUrl",
+          "createdAt"
         ],
         "type": "object"
       },
@@ -583,6 +664,12 @@
             "description": "fix(review) FIX-G: in-flight date-change settlement breadcrumb ({seq, deltaCents, amount, at}); non-null only during a settlement or after a crash mid-settlement (orphaned-charge suspect).",
             "nullable": true,
             "type": "object"
+          },
+          "policyAnchorStartDate": {
+            "example": "2026-06-20",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
           },
           "priceBreakdown": {
             "additionalProperties": true,
@@ -820,6 +907,35 @@
         ],
         "type": "object"
       },
+      "BookingAttributionDto": {
+        "properties": {
+          "campaign": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "funnel": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "medium": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "optionId": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "source": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "surface": {
+            "maxLength": 100,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "BookingCoverageDetailsDto": {
         "properties": {
           "deductible": {
@@ -839,6 +955,59 @@
           "deductible",
           "maxCoverage",
           "isLiabilityIncluded"
+        ],
+        "type": "object"
+      },
+      "BookingRefundDto": {
+        "properties": {
+          "amount": {
+            "description": "Refunded amount (DECIMAL string).",
+            "example": "195.00",
+            "format": "decimal",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "The refund transaction id.",
+            "type": "string"
+          },
+          "incidentalChargeId": {
+            "description": "The refunded incidental charge, when `kind` is `incidental`.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`incidental` = a refund of a post-trip charge; `rental` = every other refund on the booking.",
+            "enum": [
+              "rental",
+              "incidental"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "description": "Renter-visible free-text reason, when supplied.",
+            "type": "string"
+          },
+          "reasonCode": {
+            "description": "Why the vendor or admin refunded. Absent on an automatic refund (cancellation, shortened dates).",
+            "enum": [
+              "early_return",
+              "unused_days",
+              "service_issue",
+              "goodwill",
+              "overcharge",
+              "other"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "createdAt",
+          "kind"
         ],
         "type": "object"
       },
@@ -975,6 +1144,13 @@
             "nullable": true,
             "type": "string"
           },
+          "refunds": {
+            "description": "SPLIT-1670: the booking's refunds and adjustments (\"Refunds & adjustments\"), oldest first: every COMPLETED refund of the rental, an extension or a post-trip charge. Present on the DETAIL read (GET /bookings/:id and the mutations that return it) only; absent from the list endpoints.",
+            "items": {
+              "$ref": "#/components/schemas/BookingRefundDto"
+            },
+            "type": "array"
+          },
           "renter": {
             "allOf": [
               {
@@ -995,6 +1171,16 @@
             ],
             "type": "string"
           },
+          "renterCard": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RenterCardDto"
+              }
+            ],
+            "description": "SPLIT-1460: renter context for a VENDOR-context read (absent on renter-facing reads). Carries NO contact values. Those come from GET /bookings/:id/renter-contact, which audits every call.",
+            "nullable": true,
+            "type": "object"
+          },
           "renterId": {
             "description": "Renter user id (FK scalar, always present).",
             "type": "string"
@@ -1003,18 +1189,6 @@
             "description": "Free-text notes from the renter to the vendor, or null.",
             "nullable": true,
             "type": "string"
-          },
-          "riskScore": {
-            "description": "Computed risk score (0+).",
-            "type": "number"
-          },
-          "riskSignals": {
-            "description": "Risk signal codes raised at booking time.",
-            "items": {
-              "type": "string"
-            },
-            "nullable": true,
-            "type": "array"
           },
           "selectedAddOns": {
             "additionalProperties": true,
@@ -1156,7 +1330,6 @@
           "depositStatus",
           "protectionPlan",
           "protectionPremium",
-          "riskScore",
           "selectedAddOns",
           "priceBreakdown",
           "createdAt",
@@ -2310,6 +2483,14 @@
       },
       "CreateBookingDto": {
         "properties": {
+          "attribution": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BookingAttributionDto"
+              }
+            ],
+            "description": "SPLIT-1575 — where the booking came from (the Google Things to do landing\nparameters). Optional; recorded best-effort in `booking_attribution` after\nthe booking exists and never read by pricing, availability or payment."
+          },
           "bringingPets": {
             "type": "boolean"
           },
@@ -2348,6 +2529,11 @@
             "maximum": 10,
             "minimum": 1,
             "type": "number"
+          },
+          "renterNotes": {
+            "description": "SPLIT-1466 — the renter's own note to the vendor (\"gate code is 4821\",\n\"arriving around 9am with two kids\").\n\nThe `booking.renterNotes` COLUMN and the vendor-side renderers shipped in\nSPLIT-1464, but no DTO ever accepted the field, so `POST /bookings` 400'd\non it and the only way a note could exist was direct SQL. The vendor was\nshown a labelled surface that could never be anything but empty.\n\nBounded at 500 characters: long enough for pickup logistics, short enough\nthat it cannot be used as free storage or to bury a vendor's booking card.\nThe column is `text`, so the cap is a product decision enforced here.\n\nSAFE TO RENDER, and deliberately NOT safe to email. React escapes it on the\nweb and Compose cannot interpret markup, so the rendered surfaces are inert\n(verified with an `<img onerror>` payload during SPLIT-1460 validation).\nIt must NOT be interpolated into any transactional email: renter-authored\ntext in DKIM-signed mail is the SPLIT-1189 / SPLIT-1374 injection class.\nVendor mail stays name-only and links to the booking.",
+            "maxLength": 500,
+            "type": "string"
           },
           "selectedAddOns": {
             "items": {
@@ -2661,6 +2847,14 @@
       },
       "CreateExperienceBookingDto": {
         "properties": {
+          "attribution": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BookingAttributionDto"
+              }
+            ],
+            "description": "SPLIT-1575 — landing-page attribution; see CreateBookingDto.attribution."
+          },
           "experienceId": {
             "format": "uuid",
             "type": "string"
@@ -3062,7 +3256,7 @@
             "type": "string"
           },
           "description": {
-            "description": "Itemized renter-facing explanation of the charge.",
+            "description": "Itemized renter-facing explanation of the charge. May be omitted or blank ONLY when `lineItems` is sent: the server then generates it from the lines (SPLIT-1670).",
             "maxLength": 2000,
             "type": "string"
           },
@@ -3073,6 +3267,14 @@
             },
             "type": "array"
           },
+          "lineItems": {
+            "description": "SPLIT-1670: itemised lines. `amount` must equal the sum of the lines (each recomputed server-side as round2(quantity x unitRate)).",
+            "items": {
+              "$ref": "#/components/schemas/IncidentalLineItemDto"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
           "type": {
             "description": "Charge category.",
             "enum": [
@@ -3081,6 +3283,7 @@
               "cleaning",
               "late_return",
               "mileage",
+              "generator_hours",
               "other"
             ],
             "type": "string"
@@ -3089,8 +3292,7 @@
         "required": [
           "bookingId",
           "type",
-          "amount",
-          "description"
+          "amount"
         ],
         "type": "object"
       },
@@ -3194,7 +3396,8 @@
               "$ref": "#/components/schemas/AddOnDto"
             },
             "maxItems": 30,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
           },
           "address": {
             "type": "string"
@@ -3390,12 +3593,16 @@
               "format": "uri",
               "type": "string"
             },
+            "maxItems": 30,
             "type": "array"
           },
           "images": {
+            "description": "Legacy alias the frontend still sends. `ListingService.createListing`\npersists `imageUrls: images || rest.imageUrls`, so whatever arrives HERE\noutranks the field above and lands verbatim in the publicly-rendered\n`listing.imageUrls` column.\n\nSPLIT-1490 #26: it used to carry only `@IsString({ each: true })`, so\nsending `images` instead of `imageUrls` bypassed the only URL validation\non the create path entirely - any string at all (arbitrary external host,\n`data:` payload, non-URL garbage) was persisted. The alias is kept for\nback-compat but now carries the IDENTICAL validators as `imageUrls`, so\nwhich of the two the client sends can no longer change what is enforced.",
             "items": {
+              "format": "uri",
               "type": "string"
             },
+            "maxItems": 30,
             "type": "array"
           },
           "instantBook": {
@@ -3480,6 +3687,9 @@
             "minimum": 1,
             "type": "number"
           },
+          "requiresBoaterLicense": {
+            "type": "boolean"
+          },
           "requiresIdVerification": {
             "type": "boolean"
           },
@@ -3514,10 +3724,31 @@
             "minimum": 1,
             "type": "number"
           },
+          "timezone": {
+            "nullable": true,
+            "type": "string"
+          },
+          "usagePolicy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UsagePolicyDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
           "vendorId": {
             "description": "Create on behalf of this vendor (curators only). Omit to create as yourself.",
             "format": "uuid",
             "type": "string"
+          },
+          "videoEmbeds": {
+            "description": "SPLIT-1700 - up to 3 YouTube links, `{ url }` only. The server resolves\neach into the stored object (id, title, orientation, thumbnail, addedBy);\na client-sent `title`/`status`/`addedBy` is a 400. Full replace on every PUT\nthat includes the field (`[]` or `null` clears); omitting it leaves the column\nalone.\nNot a pricing field.",
+            "items": {
+              "$ref": "#/components/schemas/VideoEmbedInputDto"
+            },
+            "nullable": true,
+            "type": "array"
           },
           "weatherPolicy": {
             "enum": [
@@ -3732,6 +3963,10 @@
           "payoutId": {
             "description": "Stripe payout id (po_...).",
             "type": "string"
+          },
+          "replay": {
+            "description": "SPLIT audit 2026-09-07 fix-5: true only when this call answered a same-key/same-amount replay from the durable attempt record instead of moving new money. Absent (falsy) on a fresh payout.",
+            "type": "boolean"
           },
           "safeAmount": {
             "description": "The safe amount this payout was checked against.",
@@ -3993,6 +4228,7 @@
         "properties": {
           "activityType": {
             "enum": [
+              "other",
               "road_cycling",
               "gravel",
               "ebike",
@@ -4003,8 +4239,7 @@
               "snowmobile",
               "jet_ski",
               "kayak_paddle",
-              "ski_tour",
-              "other"
+              "ski_tour"
             ],
             "type": "string"
           },
@@ -4701,6 +4936,21 @@
       },
       "DeleteAccountDto": {
         "properties": {
+          "appleAuthorizationCode": {
+            "description": "Optional one-time authorization code from the same Apple authorization,\nused to revoke the account's Sign in with Apple grant after deletion.",
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "appleIdentityToken": {
+            "description": "Apple identity token (JWT) from a Sign in with Apple authorization the user\ncompleted within the last 10 minutes. Replaces `password` and `code`.",
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "appleNonce": {
+            "description": "The RAW nonce whose SHA-256 the client sent Apple as the authorization\nrequest's nonce. Required with `appleIdentityToken`.",
+            "maxLength": 256,
+            "type": "string"
+          },
           "code": {
             "description": "Exactly 6 digits. Validated for SHAPE only — whether it is the *right* code\nis decided by the constant-time-ish bcrypt compare in\n`TwoFactorService.verifyStepUpCode`, never here.",
             "maxLength": 6,
@@ -4712,10 +4962,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "password",
-          "code"
-        ],
         "type": "object"
       },
       "DeleteDeviceTokenDto": {
@@ -5430,6 +5676,60 @@
         ],
         "type": "object"
       },
+      "FuelPolicyDto": {
+        "properties": {
+          "policy": {
+            "enum": [
+              "none",
+              "return_same_level",
+              "prepaid"
+            ],
+            "type": "string"
+          },
+          "refuelFlatFee": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "refuelRatePerPct": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "policy"
+        ],
+        "type": "object"
+      },
+      "FuelUsageSummaryDto": {
+        "properties": {
+          "pickupPct": {
+            "nullable": true,
+            "type": "number"
+          },
+          "policy": {
+            "enum": [
+              "return_same_level",
+              "prepaid",
+              "none"
+            ],
+            "type": "string"
+          },
+          "returnPct": {
+            "nullable": true,
+            "type": "number"
+          },
+          "suggestedAmount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "pickupPct",
+          "returnPct",
+          "policy",
+          "suggestedAmount"
+        ],
+        "type": "object"
+      },
       "GenerateDescriptionDto": {
         "properties": {
           "category": {
@@ -5576,10 +5876,89 @@
         ],
         "type": "object"
       },
+      "GeneratorPolicyDto": {
+        "properties": {
+          "includedHoursPerDay": {
+            "minimum": 0,
+            "nullable": true,
+            "type": "number"
+          },
+          "overageRate": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "includedHoursPerDay",
+          "overageRate"
+        ],
+        "type": "object"
+      },
+      "GeneratorUsageSummaryDto": {
+        "properties": {
+          "included": {
+            "nullable": true,
+            "type": "number"
+          },
+          "includedHoursPerDay": {
+            "nullable": true,
+            "type": "number"
+          },
+          "overage": {
+            "nullable": true,
+            "type": "number"
+          },
+          "overageRate": {
+            "description": "USD per hour over the allowance.",
+            "type": "number"
+          },
+          "pickup": {
+            "nullable": true,
+            "type": "number"
+          },
+          "pickupPhotoUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "return": {
+            "nullable": true,
+            "type": "number"
+          },
+          "returnPhotoUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "suggestedAmount": {
+            "type": "number"
+          },
+          "used": {
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "required": [
+          "pickup",
+          "return",
+          "used",
+          "includedHoursPerDay",
+          "included",
+          "overage",
+          "overageRate",
+          "suggestedAmount",
+          "pickupPhotoUrl",
+          "returnPhotoUrl"
+        ],
+        "type": "object"
+      },
       "GoogleSignInDto": {
         "properties": {
           "idToken": {
             "maxLength": 4096,
+            "type": "string"
+          },
+          "nonce": {
+            "description": "SPLIT security review 2026-09-11 — the RAW nonce the client generated for\nthis sign-in request, exactly as on {@link AppleSignInDto}. The client\nsends SHA-256(rawNonce) to Google as the request's `nonce`, Google echoes\nit verbatim into the id_token's `nonce` claim, and posting the PRE-IMAGE\nhere proves the token was minted for this app's own live request.\n\nWithout it a Google ID token is accepted on iss + aud + email_verified\nalone for its full ~1h life — so one lifted from logs, a compromised\ndevice, or another relying party sharing our audience is a complete\naccount takeover.\n\nPosting the nonce VERBATIM would prove nothing: an attacker holding a\nstolen token also holds its `nonce` claim. Only the pre-image is evidence.\n\nOPTIONAL for the same compatibility reason as Apple's — and this field is\nwhy the Google half had to ship in the SAME wave: the DTO whitelists its\nfields under `forbidNonWhitelisted`, so a client that started sending a\nnonce would have been 400'd until a SECOND backend deploy nobody knew was\nneeded. That is exactly the trap the Apple change was written to avoid.\nMaking it REQUIRED is the follow-up that actually closes replay, and cannot\nhappen before the minimum supported app version is raised.\n\nSPLIT-1695: omission is now accepted ONLY for an ID token that carries no\n`nonce` claim. A token that does carry one (iOS, Google One Tap) and is\nposted without this field is a 401, so the binding can no longer be dodged\nby dropping the field. The claim must equal SHA-256 (lowercase hex) of this\nvalue, so the client sends sha256(raw) to Google as the request nonce and\nthe RAW value here.",
+            "maxLength": 256,
             "type": "string"
           }
         },
@@ -5647,7 +6026,7 @@
             "type": "string"
           },
           "depositCapturedAmount": {
-            "description": "Portion captured from the held security deposit.",
+            "description": "RESERVED (always 0): deposit-first capture is not built (design §6.6).",
             "example": "195.00",
             "format": "decimal",
             "type": "string"
@@ -5693,8 +6072,23 @@
           "id": {
             "type": "string"
           },
+          "lineItems": {
+            "additionalProperties": true,
+            "description": "SPLIT-1670. Itemised lines: Array<{ kind, label, quantity, unit?, unitRate, amount, source? }>. `amount` is round2(quantity x unitRate); the charge amount equals their sum. Null for a lump-sum charge.",
+            "items": {
+              "type": "object"
+            },
+            "nullable": true,
+            "type": "array"
+          },
           "offSessionCapturedAmount": {
             "description": "Portion captured off-session from the renter's saved card.",
+            "example": "195.00",
+            "format": "decimal",
+            "type": "string"
+          },
+          "refundedAmount": {
+            "description": "SPLIT-1670 (design 7.3): total refunded back to the renter so far, via\n`POST /incidental-charges/:id/refund`. A refund may never exceed\n`capturedAmount - refundedAmount`. Written only under this row's FOR UPDATE\nlock (`PaymentService.refundIncidentalCharge`), and handed back when a\nrefund bounces (`handleRefundUpdated`).",
             "example": "195.00",
             "format": "decimal",
             "type": "string"
@@ -5767,6 +6161,7 @@
               "cleaning",
               "late_return",
               "mileage",
+              "generator_hours",
               "other"
             ],
             "type": "string"
@@ -5779,8 +6174,10 @@
         "required": [
           "amount",
           "capturedAmount",
+          "refundedAmount",
           "depositCapturedAmount",
           "offSessionCapturedAmount",
+          "lineItems",
           "id",
           "bookingId",
           "booking",
@@ -5807,6 +6204,60 @@
         ],
         "type": "object"
       },
+      "IncidentalLineItemDto": {
+        "properties": {
+          "amount": {
+            "description": "Ignored: the server recomputes round2(quantity x unitRate).",
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "mileage",
+              "generator_hours",
+              "fuel",
+              "late_return",
+              "cleaning",
+              "custom"
+            ],
+            "type": "string"
+          },
+          "label": {
+            "description": "Renter-facing line label.",
+            "maxLength": 80,
+            "type": "string"
+          },
+          "quantity": {
+            "description": "Units charged (miles, hours, %).",
+            "maximum": 1000000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "source": {
+            "enum": [
+              "readings",
+              "manual"
+            ],
+            "type": "string"
+          },
+          "unit": {
+            "description": "mi, km, hr, %, day...",
+            "maxLength": 16,
+            "type": "string"
+          },
+          "unitRate": {
+            "description": "USD per unit.",
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "quantity",
+          "unitRate"
+        ],
+        "type": "object"
+      },
       "IncludedItemDto": {
         "properties": {
           "description": {
@@ -5817,7 +6268,6 @@
             "enum": [
               "map",
               "storage",
-              "guide",
               "safety-gear",
               "helmet",
               "life-jacket",
@@ -5832,6 +6282,7 @@
               "lock",
               "charger",
               "permit",
+              "guide",
               "insurance"
             ],
             "type": "string"
@@ -6027,6 +6478,10 @@
             "nullable": true,
             "type": "string"
           },
+          "icalFeedToken": {
+            "nullable": true,
+            "type": "string"
+          },
           "icalUrl": {
             "type": "string"
           },
@@ -6165,6 +6620,9 @@
             "nullable": true,
             "type": "string"
           },
+          "requiresBoaterLicense": {
+            "type": "boolean"
+          },
           "requiresIdVerification": {
             "type": "boolean"
           },
@@ -6244,6 +6702,21 @@
             "format": "date-time",
             "type": "string"
           },
+          "usagePolicy": {
+            "additionalProperties": true,
+            "description": "SPLIT-1670. Usage allowance: { mileage?{includedPerDay|null, overageRate, unit mi|km, capPerBooking?}, generator?{includedHoursPerDay|null, overageRate}, fuel?{policy return_same_level|prepaid|none, refuelRatePerPct?, refuelFlatFee?} }. Rates are USD per unit. Vendor-editable, public.",
+            "nullable": true,
+            "type": "object"
+          },
+          "videoEmbeds": {
+            "additionalProperties": true,
+            "description": "SPLIT-1699. Video embeds: Array<{ provider youtube; videoId; url; title|null; authorName|null; thumbnailUrl|null; orientation portrait|landscape; durationSeconds|null; addedBy vendor|staff; addedAt; status active|unavailable; lastCheckedAt|null }>. Public readers receive only status=active entries.",
+            "items": {
+              "type": "object"
+            },
+            "nullable": true,
+            "type": "array"
+          },
           "videoUrls": {
             "items": {
               "type": "string"
@@ -6271,6 +6744,8 @@
           "depositAmount",
           "careGuide",
           "includedItems",
+          "usagePolicy",
+          "videoEmbeds",
           "estimatedValue",
           "id",
           "name",
@@ -6303,6 +6778,7 @@
           "minAge",
           "instantBook",
           "requiresIdVerification",
+          "requiresBoaterLicense",
           "cancellationPolicy",
           "weatherPolicy",
           "deliveryAvailable",
@@ -6338,7 +6814,8 @@
           "featuredUntil",
           "isSponsored",
           "sponsoredUntil",
-          "sponsorTier"
+          "sponsorTier",
+          "icalFeedToken"
         ],
         "type": "object"
       },
@@ -6770,7 +7247,7 @@
       "LogoutDto": {
         "properties": {
           "refreshToken": {
-            "description": "The opaque refresh token to revoke for this session.",
+            "description": "The opaque refresh token of the session to sign out. The whole session is ended, every token rotated from it included.",
             "type": "string"
           }
         },
@@ -7025,6 +7502,106 @@
         ],
         "type": "object"
       },
+      "MileagePolicyDto": {
+        "properties": {
+          "capPerBooking": {
+            "minimum": 0,
+            "nullable": true,
+            "type": "number"
+          },
+          "includedPerDay": {
+            "minimum": 0,
+            "nullable": true,
+            "type": "number"
+          },
+          "overageRate": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "unit": {
+            "enum": [
+              "mi",
+              "km"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "includedPerDay",
+          "overageRate",
+          "unit"
+        ],
+        "type": "object"
+      },
+      "MileageUsageSummaryDto": {
+        "properties": {
+          "driven": {
+            "description": "return minus pickup; null when a reading is missing/invalid.",
+            "nullable": true,
+            "type": "number"
+          },
+          "included": {
+            "description": "Included for the whole trip (days x perDay, capped by capPerBooking); null = unlimited.",
+            "nullable": true,
+            "type": "number"
+          },
+          "includedPerDay": {
+            "description": "Per-day allowance; null = unlimited.",
+            "nullable": true,
+            "type": "number"
+          },
+          "overage": {
+            "description": "Units over the allowance; null when `driven` is unknown.",
+            "nullable": true,
+            "type": "number"
+          },
+          "overageRate": {
+            "description": "USD per unit over the allowance.",
+            "type": "number"
+          },
+          "pickup": {
+            "nullable": true,
+            "type": "number"
+          },
+          "pickupPhotoUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "return": {
+            "nullable": true,
+            "type": "number"
+          },
+          "returnPhotoUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "suggestedAmount": {
+            "description": "round2(overage x overageRate); a PREFILL, nothing is charged.",
+            "type": "number"
+          },
+          "unit": {
+            "enum": [
+              "mi",
+              "km"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "unit",
+          "pickup",
+          "return",
+          "driven",
+          "includedPerDay",
+          "included",
+          "overage",
+          "overageRate",
+          "suggestedAmount",
+          "pickupPhotoUrl",
+          "returnPhotoUrl"
+        ],
+        "type": "object"
+      },
       "ModerateReviewDto": {
         "properties": {},
         "type": "object"
@@ -7119,7 +7696,11 @@
               "PACKAGE_STAFF_ASSIGNMENT_APPROVED",
               "PACKAGE_STAFF_ASSIGNMENT_REJECTED",
               "LISTING_PUBLISHED_BY_STAFF",
-              "PAYOUT_ALERT"
+              "LISTING_VIDEO_UNAVAILABLE",
+              "LISTING_VIDEO_ADDED_BY_STAFF",
+              "PAYOUT_ALERT",
+              "BOATER_LICENSE_REMINDER",
+              "INCIDENTAL_CHARGE"
             ],
             "type": "string"
           }
@@ -7248,6 +7829,19 @@
         },
         "required": [
           "name"
+        ],
+        "type": "object"
+      },
+      "PauseTtdVendorDto": {
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 5,
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
         ],
         "type": "object"
       },
@@ -7427,6 +8021,7 @@
               "kayaking"
             ],
             "items": {
+              "maxLength": 60,
               "type": "string"
             },
             "maxItems": 10,
@@ -7495,6 +8090,10 @@
             "description": "Payout currency (always 'usd' today).",
             "type": "string"
           },
+          "inFlightPlatformPayout": {
+            "description": "SPLIT audit 2026-09-07 fix-2: this admin surface's OWN recently-accepted platform payouts, netted out defensively on top of Stripe's own balance. See the service's PLATFORM_PAYOUT_INFLIGHT_WINDOW_MS doc for why this is a bounded, self-expiring margin, never a standing liability.",
+            "type": "number"
+          },
           "keyMode": {
             "description": "Which Stripe key mode produced these numbers.",
             "enum": [
@@ -7509,22 +8108,26 @@
             "type": "number"
           },
           "reservedBreakdown": {
-            "description": "Up to 200 reserved rows, oldest rental end date first.",
+            "description": "Up to 200 reserved rows, oldest rental end date first (experience rows last).",
             "items": {
               "$ref": "#/components/schemas/ReservedVendorPayoutRowDto"
             },
             "type": "array"
           },
           "reservedCount": {
-            "description": "How many rows that sum covers.",
+            "description": "How many rows the reservedVendorPayout/reservedTax sums cover.",
+            "type": "number"
+          },
+          "reservedTax": {
+            "description": "SPLIT audit 2026-09-07 fix-3b: unremitted Stripe Tax collected on the SAME reserved rows, owed to a tax authority, never Splitt's to withdraw.",
             "type": "number"
           },
           "reservedVendorPayout": {
-            "description": "Sum of every untransferred vendor cut, over ALL rows (not just the capped breakdown below).",
+            "description": "Sum of every untransferred vendor/host cut (rental + experience; SPLIT audit 2026-09-07 fix-1), over ALL rows (not just the capped breakdown below).",
             "type": "number"
           },
           "safeAmount": {
-            "description": "available minus reservedVendorPayout, clamped at zero. The ceiling the POST route enforces.",
+            "description": "available minus reservedVendorPayout minus reservedTax minus inFlightPlatformPayout, clamped at zero. The ceiling the POST route enforces.",
             "type": "number"
           },
           "success": {
@@ -7539,7 +8142,9 @@
           "available",
           "pending",
           "reservedVendorPayout",
+          "reservedTax",
           "reservedCount",
+          "inFlightPlatformPayout",
           "safeAmount",
           "reservedBreakdown"
         ],
@@ -7687,6 +8292,20 @@
             "type": "string"
           },
           "reason": {
+            "description": "Renter-visible free-text reason (max 500 characters); shown on the booking and emailed.",
+            "maxLength": 500,
+            "type": "string"
+          },
+          "reasonCode": {
+            "description": "Why the refund was issued. REQUIRED for a vendor-family caller (400 otherwise); an admin may omit it.",
+            "enum": [
+              "early_return",
+              "unused_days",
+              "service_issue",
+              "goodwill",
+              "overcharge",
+              "other"
+            ],
             "type": "string"
           }
         },
@@ -8181,6 +8800,54 @@
         ],
         "type": "object"
       },
+      "RefundIncidentalChargeDto": {
+        "properties": {
+          "amount": {
+            "description": "Dollars to refund (at most two decimals). Omit to refund everything still refundable (captured - already refunded).",
+            "minimum": 1,
+            "type": "number"
+          },
+          "reason": {
+            "description": "Renter-visible reason for the refund (max 500 characters).",
+            "maxLength": 500,
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "RefundableBalanceResponseDto": {
+        "properties": {
+          "charged": {
+            "description": "The captured rental charge, pre-tax (what a refund is clamped against). 0 when the booking is unpaid.",
+            "example": 450,
+            "type": "number"
+          },
+          "currency": {
+            "example": "usd",
+            "type": "string"
+          },
+          "refundable": {
+            "description": "charged - refunded (never negative): the largest amount `POST /payments/refund` accepts now. 0 when unpaid.",
+            "example": 410,
+            "type": "number"
+          },
+          "refunded": {
+            "description": "Completed refunds already issued against that charge.",
+            "example": 40,
+            "type": "number"
+          }
+        },
+        "required": [
+          "charged",
+          "refunded",
+          "refundable",
+          "currency"
+        ],
+        "type": "object"
+      },
       "RegisterDeviceTokenDto": {
         "properties": {
           "environment": {
@@ -8270,6 +8937,167 @@
         ],
         "type": "object"
       },
+      "RenterBoaterLicenseDto": {
+        "properties": {
+          "expiresAt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "issuingState": {
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "VERIFIED",
+              "PENDING_REVIEW",
+              "EXPIRED",
+              "NONE"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "RenterCardDto": {
+        "properties": {
+          "averageRating": {
+            "nullable": true,
+            "type": "number"
+          },
+          "boaterLicense": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RenterBoaterLicenseDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "completedRentals": {
+            "description": "Bookings this renter has COMPLETED platform-wide.",
+            "type": "number"
+          },
+          "contactAvailableUntil": {
+            "description": "ISO instant contact access closes (rental end + 7 days).",
+            "nullable": true,
+            "type": "string"
+          },
+          "disclosureTier": {
+            "enum": [
+              "NONE",
+              "REQUEST",
+              "CONTACT",
+              "PICKUP",
+              "RECORD"
+            ],
+            "type": "string"
+          },
+          "hasPhoneOnFile": {
+            "description": "Whether a phone number exists at all, so the UI can say \"no phone on file\" rather than render an empty reveal.",
+            "type": "boolean"
+          },
+          "isIdVerified": {
+            "type": "boolean"
+          },
+          "isPhoneVerified": {
+            "type": "boolean"
+          },
+          "memberSince": {
+            "description": "ISO date the renter joined.",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "memberSince",
+          "completedRentals",
+          "averageRating",
+          "isIdVerified",
+          "isPhoneVerified",
+          "hasPhoneOnFile",
+          "boaterLicense",
+          "disclosureTier",
+          "contactAvailableUntil"
+        ],
+        "type": "object"
+      },
+      "RenterContactResponseDto": {
+        "properties": {
+          "bookingId": {
+            "description": "The booking this disclosure was made for.",
+            "type": "string"
+          },
+          "disclosedUntil": {
+            "description": "ISO instant this access closes (rental end + 7 days). The UI renders it so the vendor knows the window is finite.",
+            "nullable": true,
+            "type": "string"
+          },
+          "email": {
+            "description": "The renter's email address.",
+            "nullable": true,
+            "type": "string"
+          },
+          "phone": {
+            "description": "The renter's phone number, or null when they have none on file (phone is optional at registration and checkout).",
+            "nullable": true,
+            "type": "string"
+          },
+          "phoneVerified": {
+            "description": "Whether that phone number has been verified by Splitt.",
+            "type": "boolean"
+          },
+          "purposeNotice": {
+            "description": "Purpose limitation shown to the vendor at the moment of disclosure.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bookingId",
+          "email",
+          "phone",
+          "phoneVerified",
+          "disclosedUntil",
+          "purposeNotice"
+        ],
+        "type": "object"
+      },
+      "ReportReviewDto": {
+        "properties": {
+          "details": {
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "spam",
+              "harassment",
+              "inappropriate",
+              "scam",
+              "other"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "ReportReviewResponseDto": {
+        "properties": {
+          "reported": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reported"
+        ],
+        "type": "object"
+      },
       "RequestDeletionCodeDto": {
         "properties": {
           "password": {
@@ -8310,11 +9138,19 @@
       "ReservedVendorPayoutRowDto": {
         "properties": {
           "bookingId": {
-            "description": "Booking the cut belongs to.",
+            "description": "The rental booking or experience booking id the cut belongs to. See `bookingKind`.",
+            "type": "string"
+          },
+          "bookingKind": {
+            "description": "Which table `bookingId` names: `booking` (rental) or `experience_booking` (package).",
+            "enum": [
+              "rental",
+              "experience"
+            ],
             "type": "string"
           },
           "bookingStatus": {
-            "description": "Booking status. CONFIRMED rows are reserved too: the money is already in the platform balance and already promised to the vendor.",
+            "description": "Booking (or experience booking) status. CONFIRMED rows are reserved too: the money is already in the platform balance and already promised to the payee.",
             "enum": [
               "draft",
               "pending",
@@ -8326,26 +9162,27 @@
             "type": "string"
           },
           "endDate": {
-            "description": "Rental end date (YYYY-MM-DD), oldest first.",
+            "description": "Rental end date (YYYY-MM-DD), oldest first. Null for an experience row, which sorts last (after every dated rental row), never ahead of one.",
             "nullable": true,
             "type": "string"
           },
           "transactionId": {
-            "description": "Ledger transaction id holding the vendor cut.",
+            "description": "Ledger transaction id holding the cut.",
             "type": "string"
           },
           "vendorId": {
-            "description": "Listing owner who is owed the payout.",
+            "description": "Listing owner (rental) or experience host (package) who is owed the payout.",
             "type": "string"
           },
           "vendorPayout": {
-            "description": "Vendor cut still owed, in dollars.",
+            "description": "Payee cut still owed, in dollars.",
             "type": "number"
           }
         },
         "required": [
           "transactionId",
           "bookingId",
+          "bookingKind",
           "bookingStatus",
           "vendorId",
           "vendorPayout",
@@ -8485,6 +9322,15 @@
             "format": "date-time",
             "type": "string"
           },
+          "hiddenAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "hiddenReason": {
+            "nullable": true,
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -8545,6 +9391,8 @@
           "listing",
           "reviewedUser",
           "publishedAt",
+          "hiddenAt",
+          "hiddenReason",
           "createdAt",
           "updatedAt"
         ],
@@ -8945,6 +9793,15 @@
             "format": "date-time",
             "type": "string"
           },
+          "hiddenAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "hiddenReason": {
+            "nullable": true,
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -8976,6 +9833,8 @@
           "reviewerId",
           "rating",
           "comment",
+          "hiddenAt",
+          "hiddenReason",
           "createdAt",
           "updatedAt"
         ],
@@ -9147,6 +10006,44 @@
         ],
         "type": "object"
       },
+      "SetTtdEnabledDto": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "type": "object"
+      },
+      "SetTtdIncludedDto": {
+        "properties": {
+          "included": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "included"
+        ],
+        "type": "object"
+      },
+      "SetTtdPlaceStatusDto": {
+        "properties": {
+          "status": {
+            "enum": [
+              "auto",
+              "pinned",
+              "removed"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
       "SetUserAccessDto": {
         "properties": {
           "entitlements": {
@@ -9242,11 +10139,12 @@
           "bookingId": {
             "format": "uuid",
             "type": "string"
+          },
+          "experienceBookingId": {
+            "format": "uuid",
+            "type": "string"
           }
         },
-        "required": [
-          "bookingId"
-        ],
         "type": "object"
       },
       "StayBedTypeDto": {
@@ -9822,7 +10720,8 @@
               "deposit",
               "deposit_release",
               "deposit_claim",
-              "date_change"
+              "date_change",
+              "incidental"
             ],
             "type": "string"
           },
@@ -9918,7 +10817,8 @@
               "deposit",
               "deposit_release",
               "deposit_claim",
-              "date_change"
+              "date_change",
+              "incidental"
             ],
             "type": "string"
           }
@@ -10004,6 +10904,21 @@
         ],
         "type": "object"
       },
+      "TriggerTtdRunDto": {
+        "properties": {
+          "mode": {
+            "enum": [
+              "dry_run",
+              "upload"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "type": "object"
+      },
       "TripGuideDto": {
         "properties": {
           "activities": {
@@ -10012,6 +10927,7 @@
               "camping"
             ],
             "items": {
+              "maxLength": 60,
               "type": "string"
             },
             "maxItems": 10,
@@ -10493,6 +11409,13 @@
             "minimum": 0,
             "type": "number"
           },
+          "postTripCommissionRate": {
+            "description": "SPLIT-1670: flat platform commission (percent) on post-trip / incidental\ncharges. `null` CLEARS it (post-trip charges then use the vendor's normal\ncommission); omitted leaves it unchanged.",
+            "maximum": 100,
+            "minimum": 0,
+            "nullable": true,
+            "type": "number"
+          },
           "renterServiceFeeRate": {
             "maximum": 100,
             "minimum": 0,
@@ -10700,7 +11623,8 @@
               "$ref": "#/components/schemas/AddOnDto"
             },
             "maxItems": 30,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
           },
           "address": {
             "type": "string"
@@ -10882,6 +11806,7 @@
               "format": "uri",
               "type": "string"
             },
+            "maxItems": 30,
             "type": "array"
           },
           "includedItems": {
@@ -10898,6 +11823,7 @@
           "latitude": {
             "maximum": 90,
             "minimum": -90,
+            "nullable": true,
             "type": "number"
           },
           "leadTimeDays": {
@@ -10911,6 +11837,7 @@
           "longitude": {
             "maximum": 180,
             "minimum": -180,
+            "nullable": true,
             "type": "number"
           },
           "make": {
@@ -10959,6 +11886,10 @@
             "maxLength": 200,
             "type": "string"
           },
+          "notifyVendor": {
+            "description": "SPLIT-1708 - lets the admin UI opt out of the \"Splitt added a video to your\nlisting\" bell + email for THIS save. Omitted means true. Honoured only for a\nwrite-level curator saving a listing they do not own; for the owner it is\nignored (a vendor save never notifies anyone). A request instruction, not\nlisting state: it is never persisted. `@StrictBoolean` is mandatory (see\ninstantBook above): implicit conversion would turn the string \"false\" into\ntrue and silently notify a vendor the admin asked not to notify.\nNot a pricing field.",
+            "type": "boolean"
+          },
           "pricePerDay": {
             "minimum": 0,
             "type": "number"
@@ -10969,6 +11900,9 @@
           },
           "pricingType": {
             "type": "string"
+          },
+          "requiresBoaterLicense": {
+            "type": "boolean"
           },
           "requiresIdVerification": {
             "type": "boolean"
@@ -11014,11 +11948,33 @@
             "minimum": 1,
             "type": "number"
           },
+          "timezone": {
+            "nullable": true,
+            "type": "string"
+          },
+          "usagePolicy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UsagePolicyDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "videoEmbeds": {
+            "description": "SPLIT-1700 - up to 3 YouTube links, `{ url }` only. The server resolves\neach into the stored object (id, title, orientation, thumbnail, addedBy);\na client-sent `title`/`status`/`addedBy` is a 400. Full replace on every PUT\nthat includes the field (`[]` or `null` clears); omitting it leaves the column\nalone.\nNot a pricing field.",
+            "items": {
+              "$ref": "#/components/schemas/VideoEmbedInputDto"
+            },
+            "nullable": true,
+            "type": "array"
+          },
           "videoUrls": {
             "items": {
               "format": "uri",
               "type": "string"
             },
+            "maxItems": 30,
             "type": "array"
           },
           "weatherPolicy": {
@@ -11580,6 +12536,79 @@
         },
         "required": [
           "key"
+        ],
+        "type": "object"
+      },
+      "UsagePolicyDto": {
+        "properties": {
+          "fuel": {
+            "$ref": "#/components/schemas/FuelPolicyDto"
+          },
+          "generator": {
+            "$ref": "#/components/schemas/GeneratorPolicyDto"
+          },
+          "mileage": {
+            "$ref": "#/components/schemas/MileagePolicyDto"
+          }
+        },
+        "type": "object"
+      },
+      "UsageSummaryResponseDto": {
+        "properties": {
+          "fuel": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FuelUsageSummaryDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "generator": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GeneratorUsageSummaryDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "mileage": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MileageUsageSummaryDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "missing": {
+            "description": "Absent/inconsistent readings, e.g. ['return.odometer'] (see computeUsageSummary).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "rentalDays": {
+            "description": "Billable days of the trip (an hourly booking bills one).",
+            "type": "number"
+          },
+          "source": {
+            "description": "'snapshot' = the policy the renter booked under; 'listing' is legacy and no longer emitted (SPLIT-1680: a booking made before snapshots existed has no usage terms and 400s with reason no_usage_policy); kept so existing client decoders stay valid.",
+            "enum": [
+              "snapshot",
+              "listing"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "rentalDays",
+          "source",
+          "mileage",
+          "generator",
+          "fuel",
+          "missing"
         ],
         "type": "object"
       },
@@ -12290,6 +13319,19 @@
         ],
         "type": "object"
       },
+      "VideoEmbedInputDto": {
+        "properties": {
+          "url": {
+            "format": "uri",
+            "maxLength": 2048,
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
       "WaiverAgreement": {
         "properties": {
           "bookingId": {
@@ -12847,6 +13889,311 @@
         "summary": "Admin: list submitted contact messages, newest first.",
         "tags": [
           "Contact"
+        ]
+      }
+    },
+    "/api/v1/admin/distribution/google-things-to-do/overview": {
+      "get": {
+        "operationId": "GoogleTtdAdminController_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "distribution"
+        ]
+      }
+    },
+    "/api/v1/admin/distribution/google-things-to-do/runs": {
+      "get": {
+        "operationId": "GoogleTtdAdminController_runs",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "distribution"
+        ]
+      },
+      "post": {
+        "operationId": "GoogleTtdAdminController_trigger",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriggerTtdRunDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "distribution"
+        ]
+      }
+    },
+    "/api/v1/admin/distribution/google-things-to-do/runs/{id}": {
+      "get": {
+        "operationId": "GoogleTtdAdminController_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "distribution"
+        ]
+      }
+    },
+    "/api/v1/admin/distribution/google-things-to-do/runs/{id}/payload": {
+      "get": {
+        "operationId": "GoogleTtdAdminController_payload",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "distribution"
+        ]
+      }
+    },
+    "/api/v1/admin/distribution/google-things-to-do/vendors": {
+      "get": {
+        "operationId": "GoogleTtdAdminController_vendorList",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "distribution"
+        ]
+      }
+    },
+    "/api/v1/admin/distribution/google-things-to-do/vendors/{vendorId}/pause": {
+      "delete": {
+        "operationId": "GoogleTtdAdminController_resume",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vendorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "distribution"
+        ]
+      },
+      "put": {
+        "operationId": "GoogleTtdAdminController_pause",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vendorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PauseTtdVendorDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "distribution"
+        ]
+      }
+    },
+    "/api/v1/admin/distribution/google-things-to-do/vendors/{vendorId}/status": {
+      "get": {
+        "operationId": "GoogleTtdAdminController_vendorStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vendorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "distribution"
         ]
       }
     },
@@ -13444,9 +14791,9 @@
         ]
       }
     },
-    "/api/v1/admin/insurance-policies/{id}/document-url": {
+    "/api/v1/admin/insurance-policies/{id}/document": {
       "get": {
-        "operationId": "InsuranceAdminController_getDocumentUrl",
+        "operationId": "InsuranceAdminController_getDocument",
         "parameters": [
           {
             "in": "path",
@@ -13459,7 +14806,39 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The policy document bytes, served with the content type sniffed from the stored file (inline for a recognised image/PDF, attachment otherwise)."
           }
         },
         "security": [
@@ -13467,7 +14846,7 @@
             "bearer": []
           }
         ],
-        "summary": "Get a short-lived signed URL for a policy document (admin)",
+        "summary": "Stream a vendor insurance policy document through the API (admin). Every view is authenticated and audited; no shareable link is issued.",
         "tags": [
           "admin-insurance-policies"
         ]
@@ -14138,6 +15517,33 @@
         ]
       }
     },
+    "/api/v1/admin/reconciliation/incidental-missing-credit": {
+      "get": {
+        "operationId": "ReconciliationController_getIncidentalMissingCredit",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "SPLIT-1670 — GET /admin/reconciliation/incidental-missing-credit — captured\npost-trip (incidental) charges whose vendor credit was never written (the\ncredit failed after the renter was charged, or the charge predates\nSPLIT-1670). The finance backfill's work list. READ-ONLY. Gated on the\n`finance` read section (mirrors stuck-deposits).",
+        "tags": [
+          "Reconciliation"
+        ]
+      }
+    },
     "/api/v1/admin/reconciliation/overdue-rentals": {
       "get": {
         "operationId": "ReconciliationController_getOverdueRentals",
@@ -14398,7 +15804,7 @@
             "bearer": []
           }
         ],
-        "summary": "Send a one-off test business report (defaults to the caller's own email).",
+        "summary": "Send a one-off test business report to the CALLER'S OWN address.\nSPLIT-1486: the CRM twin of `sendFinanceTest` above, same reasoning and\nsame service-side re-check.",
         "tags": [
           "PlatformReport"
         ]
@@ -14463,7 +15869,7 @@
             "bearer": []
           }
         ],
-        "summary": "Send a one-off test finance report (defaults to the caller's own email).",
+        "summary": "Send a one-off test finance report to the CALLER'S OWN address.\n\nSPLIT-1486: this route was gated on the READ entitlement `FINANCE` while\nDELIVERING the full platform finance report by email to any address the\nbody named, so a view-only finance seat could exfiltrate GMV, take rate,\nrefunds, Stripe fees, deposits and per-vendor revenue to an attacker\nmailbox as a DKIM-signed message from Splitt's own domain. It now requires\n`FINANCE_WRITE`, exactly like every other send route on the platform\n(`email-templates.controller.ts` test-send, `campaigns.controller.ts`\ncampaign run), and `PlatformReportService` independently re-checks the\nwrite entitlement AND that the recipient is the caller's own address.\nA `FINANCE_WRITE` holder still satisfies the class-level\n`@RequireAnyEntitlements(FINANCE, CRM)` because write implies read\n(`effectiveEntitlements`).",
         "tags": [
           "PlatformReport"
         ]
@@ -15036,6 +16442,13 @@
         },
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
             "description": ""
           }
         },
@@ -15044,7 +16457,7 @@
             "bearer": []
           }
         ],
-        "summary": "PATCH /admin/users/:id/role\nChange a user's base persona. Body: { role: UserRole }. Audited.",
+        "summary": "PATCH /admin/users/:id/role\nChange a user's base persona. Body: { role: UserRole }. Audited.\n\nSPLIT-1486: routed through `AccessGrantService`, like its two siblings\nabove and below, instead of calling `AdminService.setUserRole` directly.\nThis endpoint was the one way to hand out the ADMIN role - and with it,\nvia `roleImpliedEntitlements`, EVERY sensitive entitlement - without the\nSPLIT-1231 dual-control gate ever running: a single compromised admin\ncould designate a puppet account staff and promote it to admin in two\nrequests, minting a second admin identity that could then approve the\nattacker's own pending grants. The identical change requested as\n`PATCH .../access {\"role\":\"admin\",\"entitlements\":[]}` was already\ndeferred; now all three routes share one rule, and the response carries\nthe same `status:'applied'` / `'pending_approval'` discriminant the FE\nalready renders for the other two. A role change that adds NO sensitive\naccess (renter -> vendor, any demotion) still applies immediately through\nthe unchanged `AdminService.setUserRole`, SPLIT-661 safeguards and all.\n\nNo longer `@Audited`, now matching both siblings. `AuditInterceptor`\nrecords ONE fixed action on every handler success, so while this handler\ncarried `@Audited({ action: 'access.role.set' })` a merely REQUESTED\npromotion still wrote an `access.role.set` row. That action is in\n`ACCESS_REVIEW_PRIVILEGE_ACTIONS`, so the row stamped the target's\n`lastPrivilegeChange` in `GET /admin/users/access-review` - resetting the\naccess-review clock for a user whose privileges had not changed, and\nhanding an attacker who spams pending role requests a way to keep a target\nlooking freshly reviewed. `admin-access-review.ts` excludes `.requested`\nfor exactly this reason: the report must never show a change that never\nhappened. `AccessGrantService.setUserRole` now records `access.role.set`\nitself, on the APPLIED branch only, exactly as `setUserAccess` records\n`access.set`. The matching `EXEMPT_MUTATIONS` entry lives in\n`common/audit/admin-audit-coverage.spec.ts`.",
         "tags": [
           "Admin"
         ]
@@ -15467,8 +16880,10 @@
           {
             "in": "query",
             "name": "location",
-            "required": true,
+            "required": false,
             "schema": {
+              "example": "Denver, CO",
+              "maxLength": 120,
               "type": "string"
             }
           }
@@ -16802,7 +18217,7 @@
             "description": ""
           }
         },
-        "summary": "SPLIT-285: native Sign in with Apple. The client posts Apple's\n`identityToken`; Apple only sends the user's name on the first authorization\n(and only to the client), so `firstName`/`lastName` ride along on that first\ncall and are used only when provisioning a brand-new account.",
+        "summary": "SPLIT-285: native Sign in with Apple. The client posts Apple's\n`identityToken`; Apple only sends the user's name on the first authorization\n(and only to the client), so `firstName`/`lastName` ride along on that first\ncall and are used only when provisioning a brand-new account.\n\nSPLIT security review 2026-09-11: when the client posts the RAW `nonce` it\ngenerated for the authorization request, the token's `nonce` claim must\nequal SHA-256 of it — the same binding the web callback already enforces\nagainst its `state`, so a lifted identity token cannot be replayed here.\nAbsent (today's shipped build) it is skipped, which is why the backend can\nship ahead of the client. See the field's doc comment on AppleSignInDto\nfor why that skip is temporary and what closes it.",
         "tags": [
           "SocialAuth"
         ]
@@ -16935,6 +18350,7 @@
             "description": ""
           }
         },
+        "summary": "Sign a session out. Send the session's refresh token in the body; an access\ntoken is optional and may be missing, expired or invalid, because the\nrefresh token alone identifies the session (an expired access token is the\nnormal state of a client that sat idle before signing out). The whole\nsession is ended, every token rotated from it included. Always answers 200\nwith the same body, whether or not anything was ended, so it cannot be used\nto probe which tokens exist. With a valid access token, the refresh token\nmust belong to that user.",
         "tags": [
           "Auth"
         ]
@@ -16980,7 +18396,7 @@
             "description": ""
           }
         },
-        "summary": "SPLIT-649: swap the one-time code from the callback redirect for the real\nsession. Returns EXACTLY the `POST /users/login` envelope (access token,\nrefresh token, compact user) via the same `authService.login` path — so\nweb social auth gains refresh-token support and the suspension check.\nUnknown, replayed or expired codes are all the same opaque 401.",
+        "summary": "SPLIT-649: swap the one-time code from the callback redirect for the real\nsession. Returns EXACTLY the `POST /users/login` envelope (access token,\nrefresh token, compact user) via the same `authService.login` path — so\nweb social auth gains refresh-token support and the suspension check.\nUnknown, replayed or expired codes are all the same opaque 401.\n\nSPLIT-1695: the envelope gains `isNewUser` (true only when the callback\nthat issued this code created the account) so the frontend can tag a first\nGoogle/Apple sign-in as a sign-up. The 2FA-challenge shape is unchanged.",
         "tags": [
           "SocialAuth"
         ]
@@ -17041,6 +18457,30 @@
             "description": ""
           }
         },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/sessions/{id}": {
+      "delete": {
+        "operationId": "AuthController_revokeSession",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Sign one of your sessions out: a browser on another device, or an AI\nassistant connected through the Splitt MCP (its user agent contains\n\"splitt-mcp\"). An id that is not one of your active sessions answers 404.",
         "tags": [
           "Auth"
         ]
@@ -17523,6 +18963,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The listing’s iCal feed secret (see feed-url mint/rotate). Omit for the legacy nameless feed.",
+            "in": "query",
+            "name": "key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -17530,6 +18979,54 @@
             "description": ""
           }
         },
+        "tags": [
+          "Booking"
+        ]
+      }
+    },
+    "/api/v1/bookings/ical/{listingId}/feed-url": {
+      "get": {
+        "operationId": "BookingController_getIcalFeedUrl",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "listingId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Mint (or return the existing) secret iCal feed URL for this listing. Owner or admin only.",
+        "tags": [
+          "Booking"
+        ]
+      }
+    },
+    "/api/v1/bookings/ical/{listingId}/feed-url/rotate": {
+      "post": {
+        "operationId": "BookingController_rotateIcalFeedUrl",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "listingId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Replace this listing’s iCal feed secret. Links minted from the old secret 403 immediately after. Owner or admin only.",
         "tags": [
           "Booking"
         ]
@@ -17647,6 +19144,38 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "addOns": {
+                      "description": "SPLIT-1670: priced add-on lines (selected + server-injected required ones).",
+                      "items": {
+                        "properties": {
+                          "lineTotal": {
+                            "type": "number"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "pricePerDay": {
+                            "description": "Unit price in both pricing modes.",
+                            "type": "number"
+                          },
+                          "pricing": {
+                            "enum": [
+                              "per_day",
+                              "per_booking"
+                            ],
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "type": "integer"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
                     "addOnsTotal": {
                       "type": "number"
                     },
@@ -17718,6 +19247,10 @@
                       "type": "number"
                     },
                     "quantity": {
+                      "type": "number"
+                    },
+                    "requiredFeesTotal": {
+                      "description": "SPLIT-1670: the part of `addOnsTotal` that is required add-ons (not opt-out-able).",
                       "type": "number"
                     },
                     "stayFeesTotal": {
@@ -18121,6 +19654,37 @@
         ]
       }
     },
+    "/api/v1/bookings/{id}/renter-contact": {
+      "get": {
+        "operationId": "BookingController_getRenterContact",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenterContactResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "SPLIT-1460 — the renter's contact details for ONE booking, for the vendor\nwho is running it. The ONLY route by which renter email/phone reaches a\nvendor anywhere in the platform.\n\nFour doors, deliberately stacked rather than folded into one check:\n  VendorOrPrivilegedGuard   — the vendor family (owner/manager/staff/plain\n                              vendor) + admin, with `@PrivilegedBy()`\n                              emptied so curators are NOT admitted.\n  @RequiresVendorCapability(MANAGE_BOOKINGS) — SUBTRACTS the capability from\n                              a seat that lacks it. Deliberately the\n                              deny-shaped decorator, not `@VendorPermissions`:\n                              that one asks the ALLOW question against a\n                              matrix which returns [] for the legacy plain\n                              `vendor` role, and would therefore 403 a\n                              legacy vendor account from its own renter's\n                              details. Logged per individual seat.\n  SharedRateLimitGuard      — 60/hour, keyed on the AUTHENTICATED USER (the\n                              guard prefers req.user.userId over IP), which\n                              is comfortably above a busy multi-listing\n                              weekend and far below a scrape. Cross-instance,\n                              because a per-instance throttle is not a\n                              ceiling on serverless.\n  service-level tier + ownership — 404/403, and the fail-closed audit write.\n\n`Cache-Control: no-store` because this response must not sit in any shared\nor browser cache: the whole design rests on each view being a logged event\nwithin a window, and a cached copy is a view nobody recorded that outlives\nthe window.",
+        "tags": [
+          "Booking"
+        ]
+      }
+    },
     "/api/v1/bookings/{id}/reschedule-proposal": {
       "delete": {
         "operationId": "BookingController_withdrawReschedule",
@@ -18334,6 +19898,37 @@
             "description": ""
           }
         },
+        "tags": [
+          "Booking"
+        ]
+      }
+    },
+    "/api/v1/bookings/{id}/usage-summary": {
+      "get": {
+        "operationId": "BookingController_getUsageSummary",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageSummaryResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Usage summary for a booking: miles / generator hours / fuel against the booked allowance, with suggested overage amounts. Parties or admin only.",
         "tags": [
           "Booking"
         ]
@@ -19800,6 +21395,68 @@
         ]
       }
     },
+    "/api/v1/distribution/google-things-to-do/packages/{id}/landing": {
+      "get": {
+        "operationId": "GoogleTtdPublicController_package",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Google Things to do option and all-in price for a package (public)",
+        "tags": [
+          "distribution"
+        ]
+      }
+    },
+    "/api/v1/distribution/google-things-to-do/rentals/{id}/landing": {
+      "get": {
+        "operationId": "GoogleTtdPublicController_rental",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Google Things to do options and all-in prices for a rental (public)",
+        "tags": [
+          "distribution"
+        ]
+      }
+    },
     "/api/v1/dynamic-pricing/apply-bulk/{listingId}": {
       "post": {
         "operationId": "DynamicPricingController_applySuggestedPrices",
@@ -19881,7 +21538,7 @@
           {
             "in": "query",
             "name": "startDate",
-            "required": false,
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -19889,7 +21546,7 @@
           {
             "in": "query",
             "name": "endDate",
-            "required": false,
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -21011,7 +22668,7 @@
             "description": ""
           }
         },
-        "summary": "Resend delivery-event webhook — `POST /api/v1/email/webhooks/resend`.\n\nMirrors the Stripe webhook contract exactly (payment.controller.ts):\n - `@Public()`, because the provider sends no Authorization header; the\n   Standard Webhooks signature over the RAW body is the authentication.\n - `@SkipThrottle()` for the per-instance ThrottlerGuard, and an exact-path\n   entry in `GlobalAnonThrottleGuard`'s skip list for the cross-instance\n   anonymous-IP ceiling. A delivery burst (Resend retries plus a campaign\n   blast's opens/clicks) must never 429, or the provider backs off and\n   bounce/complaint events — the ones that protect sending reputation —\n   arrive late or not at all. Signature verification is the gate.\n - `@RawBody()`, which only works because the Nest app is created with\n   `rawBody: true` and registers its parsers through `useBodyParser`\n   (api/index.ts / main.ts). The HMAC covers the exact delivered bytes, so\n   a re-serialised `@Body()` object would never verify.\n\nAlways answers 200 on an accepted delivery — including a duplicate\n`svix-id` and an event type we do not model — so Resend stops retrying.\n503 (secret unset), 401 (bad signature), 400 (malformed body) and 500 (DB\nfailure) are the deliberate retry/refuse signals.",
+        "summary": "Resend delivery-event webhook — `POST /api/v1/email/webhooks/resend`.\n\nMirrors the Stripe webhook contract exactly (payment.controller.ts):\n - `@Public()`, because the provider sends no Authorization header; the\n   Standard Webhooks signature over the RAW body is the authentication.\n - `@SkipThrottle()` for the per-instance ThrottlerGuard, and an exact-path\n   entry in `GlobalAnonThrottleGuard`'s skip list for the cross-instance\n   anonymous-IP ceiling. A delivery burst (Resend retries plus a campaign\n   blast's opens/clicks) must never 429, or the provider backs off and\n   bounce/complaint events — the ones that protect sending reputation —\n   arrive late or not at all. Signature verification is the gate.\n - `@RawBody()`, which only works because the Nest app is created with\n   `rawBody: true` and registers its parsers through `useBodyParser`\n   (api/index.ts / main.ts). The HMAC covers the exact delivered bytes, so\n   a re-serialised `@Body()` object would never verify.\n\nAlways answers 200 on an accepted delivery — including a duplicate\n`svix-id` and an event type we do not model — so Resend stops retrying.\n503 (secret unset), 401 (bad signature), 400 (malformed body) and 500 (a\nside effect failed) are the deliberate retry/refuse signals. SPLIT-1445:\nthe 200 on a duplicate is answered only AFTER the deliverability side\neffects have run again, so a retry can still finish work an earlier\ndelivery left half-applied.",
         "tags": [
           "EmailEvents"
         ]
@@ -21399,6 +23056,47 @@
         "parameters": [],
         "responses": {
           "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Experiences"
+        ]
+      }
+    },
+    "/api/v1/experiences/reviews/{id}/report": {
+      "post": {
+        "deprecated": true,
+        "operationId": "ExperiencesController_reportReview[0]",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportReviewDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportReviewResponseDto"
+                }
+              }
+            },
             "description": ""
           }
         },
@@ -22967,6 +24665,52 @@
         ]
       }
     },
+    "/api/v1/incidental-charges/{id}/refund": {
+      "post": {
+        "operationId": "IncidentalChargesController_refund",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundIncidentalChargeDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentalCharge"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Filer or admin refunds part or all of a captured charge to the renter and reverses the vendor share",
+        "tags": [
+          "incidental-charges"
+        ]
+      }
+    },
     "/api/v1/incidental-charges/{id}/resolve": {
       "post": {
         "operationId": "IncidentalChargesController_resolve",
@@ -23199,9 +24943,9 @@
         ]
       }
     },
-    "/api/v1/insurance-policies/{id}/document-url": {
+    "/api/v1/insurance-policies/{id}/document": {
       "get": {
-        "operationId": "InsurancePolicyController_getDocumentUrl",
+        "operationId": "InsurancePolicyController_getDocument",
         "parameters": [
           {
             "in": "path",
@@ -23214,7 +24958,39 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The policy document bytes, served with the content type sniffed from the stored file (inline for a recognised image/PDF, attachment otherwise)."
           }
         },
         "security": [
@@ -23222,7 +24998,7 @@
             "bearer": []
           }
         ],
-        "summary": "Get a short-lived signed URL for the policy document (owner or admin)",
+        "summary": "Stream the policy document through the API (owner or admin). No shareable link is issued.",
         "tags": [
           "insurance-policies"
         ]
@@ -25939,6 +27715,46 @@
         ]
       }
     },
+    "/api/v1/packages/reviews/{id}/report": {
+      "post": {
+        "operationId": "ExperiencesController_reportReview[1]",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportReviewDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportReviewResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": [
+          "Experiences"
+        ]
+      }
+    },
     "/api/v1/packages/search": {
       "get": {
         "operationId": "ExperiencesController_search[1]",
@@ -26618,7 +28434,7 @@
             "bearer": []
           }
         ],
-        "summary": "Move money from the Stripe platform balance to Splitt's own bank account.\n\nThe amount ceiling is NOT trusted from the preview the operator was\nlooking at: the service recomputes the balance and the vendor reserve\ninside this call and 400s anything above it, so a booking captured between\nthe preview and the submit cannot be paid out from under its vendor. The\nsensitive bucket (30 / 10 min) bounds a stolen finance session to a single\nwindow's worth of attempts.",
+        "summary": "Move money from the Stripe platform balance to Splitt's own bank account.\n\nThe amount ceiling is NOT trusted from the preview the operator was\nlooking at: the service recomputes the balance and the vendor reserve\ninside this call and 400s anything above it, so a booking captured between\nthe preview and the submit cannot be paid out from under its vendor. The\nplatform-payout bucket (30 / 10 min) bounds a stolen finance session to a\nsingle window's worth of attempts.\n\nSPLIT audit 2026-09-07 vendor payouts (fix-6): this previously resolved\n`ADMIN_SENSITIVE_BUCKET`, which carries `flagEnv: ADMIN_RATE_LIMIT_FLAG_ENV`\n— SPLIT-1335's SHIP-DARK default for every admin bucket, unset anywhere in\nthis branch, so the limiter only SHADOW-counted and the route shipped\ncompletely unthrottled despite the doc comment above claiming otherwise.\n`PLATFORM_PAYOUT_BUCKET` carries no `flagEnv` and therefore enforces from\nthe moment it ships — see that constant's own doc for why this ONE route\ncannot wait on the shared admin-console rollout.",
         "tags": [
           "Payment"
         ]
@@ -26761,6 +28577,42 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "Payment"
+        ]
+      }
+    },
+    "/api/v1/payments/booking/{bookingId}/refundable": {
+      "get": {
+        "operationId": "PaymentController_getRefundableBalance",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bookingId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundableBalanceResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "SPLIT-1670 (design §7.1) - what the vendor can still refund on a booking:\n`{ charged, refunded, refundable, currency }`, computed by the SAME function\n`processRefund` clamps with, so the preview always equals the mutation.\nListing owner or admin only (403); unknown booking 404; a non-uuid id 400.",
         "tags": [
           "Payment"
         ]
@@ -29438,6 +31290,76 @@
         ]
       }
     },
+    "/api/v1/reviews/{id}/block-author": {
+      "post": {
+        "operationId": "ReviewController_blockAuthor",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": [
+          "Review"
+        ]
+      }
+    },
+    "/api/v1/reviews/{id}/report": {
+      "post": {
+        "operationId": "ReviewController_report",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportReviewDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportReviewResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": [
+          "Review"
+        ]
+      }
+    },
     "/api/v1/reviews/{id}/response": {
       "delete": {
         "operationId": "ReviewController_removeResponse",
@@ -30271,7 +32193,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ServiceBooking"
+                  "type": "object"
                 }
               }
             },
@@ -30303,6 +32225,46 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceReview"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": [
+          "Services"
+        ]
+      }
+    },
+    "/api/v1/services/reviews/{id}/report": {
+      "post": {
+        "operationId": "ServicesController_reportReview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportReviewDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportReviewResponseDto"
                 }
               }
             },
@@ -30391,7 +32353,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Service"
+                  "type": "object"
                 }
               }
             },
@@ -30470,7 +32432,7 @@
             "description": ""
           }
         },
-        "summary": "SPLIT-974 — \"email me this plan\". The rest of this controller is\ndeliberately public; this one route needs a real recipient, so it opts\nINTO auth at the method level (JwtAuthGuard runs alongside the class-level\nSharedRateLimitGuard — Nest applies both). Its own `trips-email` bucket\n(5/10min, checked via getAllAndOverride — same override precedent as\n`geocodeSuggest`'s `trips-suggest` bucket) keeps a burst of email sends\nfrom draining the shared `trips-public` budget for every other visitor;\nthe class-level @Throttle burst brake still applies underneath it.",
+        "summary": "SPLIT-974 — \"email me this plan\". The rest of this controller is\ndeliberately public; this one route needs a real recipient, so it opts\nINTO auth at the method level. Its own `trips-email` bucket (5/10min,\nchecked via getAllAndOverride — same override precedent as\n`geocodeSuggest`'s `trips-suggest` bucket) keeps a burst of email sends\nfrom draining the shared `trips-public` budget for every other visitor;\nthe class-level @Throttle burst brake still applies underneath it.\n\nSPLIT-1488 (audit finding #31) — ORDER. Nest runs guards global → class →\nmethod, so the CLASS-level SharedRateLimitGuard above runs BEFORE this\nmethod-level JwtAuthGuard: `req.user` is not populated yet. The old comment\nhere claimed the two simply \"both apply\", which hid the consequence — the\nper-account bucket keyed on the IP, so it capped nobody per account and\nfive anonymous requests could spend the bucket of every authenticated user\nbehind the same NAT. SharedRateLimitGuard now recovers the principal itself\non a route that declares JwtAuthGuard (verifying the bearer against the\nsame secret, as GlobalAnonThrottleGuard already does), so this bucket keys\non `user:${userId}` regardless of guard order, and anonymous callers count\nagainst a separate IP-keyed window. See shared-rate-limit.guard.ts\n`principalKey`.",
         "tags": [
           "Trips"
         ]
@@ -31045,6 +33007,97 @@
         },
         "tags": [
           "User"
+        ]
+      }
+    },
+    "/api/v1/users/me/blocks": {
+      "get": {
+        "operationId": "UserBlockController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BlockedUserDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "UserBlock"
+        ]
+      },
+      "post": {
+        "operationId": "UserBlockController_block",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockUserDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "UserBlock"
+        ]
+      }
+    },
+    "/api/v1/users/me/blocks/{blockId}": {
+      "delete": {
+        "operationId": "UserBlockController_unblock",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "blockId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "UserBlock"
         ]
       }
     },
@@ -31838,7 +33891,7 @@
             "description": ""
           }
         },
-        "summary": "SPLIT-542: toggle account-level auto-approve across ALL the vendor's listings.\nSets the vendor default AND bulk-applies instantBook to every owned listing\n(reuses the existing instantBook auto-confirm flow). Body: { enabled: boolean }.\nStaff are excluded (account-level config), matching report-subscription scoping.",
+        "summary": "SPLIT-542: toggle account-level auto-approve across ALL the vendor's listings.\nSets the vendor default AND bulk-applies instantBook to every owned listing\n(reuses the existing instantBook auto-confirm flow). Body: { enabled: boolean }.\nStaff are excluded (account-level config).\n\nSPLIT-1544 (finding ACC-3): that exclusion used to be declared by leaving\nVENDOR_STAFF out of `@Roles(VENDOR, VENDOR_OWNER, VENDOR_MANAGER)`, which\nexcluded nobody: a required VENDOR admits the whole family. It is now\nENFORCED by the deny-shaped door the payout block uses. CHANGE_PRICING is\nthe one matrix capability a vendor_manager holds and a vendor_staff lacks,\nso it subtracts exactly the seat this route always meant to refuse, and it\nis the capability that already guards a listing's other terms of sale\n(rates, fees, discounts, the refund policy). A plain `vendor`, a\nvendor_owner, a vendor_manager and ADMIN keep access; `@PrivilegedBy()`\nkeeps curators out of another vendor's account settings.",
         "tags": [
           "Vendor"
         ]
@@ -31906,6 +33959,235 @@
         },
         "tags": [
           "VendorCalendar"
+        ]
+      }
+    },
+    "/api/v1/vendor/distribution/google-things-to-do": {
+      "get": {
+        "operationId": "GoogleTtdVendorController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "distribution"
+        ]
+      },
+      "patch": {
+        "operationId": "GoogleTtdVendorController_setEnabled",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetTtdEnabledDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "distribution"
+        ]
+      }
+    },
+    "/api/v1/vendor/distribution/google-things-to-do/subjects/{type}/{id}": {
+      "patch": {
+        "operationId": "GoogleTtdVendorController_setIncluded",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetTtdIncludedDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "distribution"
+        ]
+      }
+    },
+    "/api/v1/vendor/distribution/google-things-to-do/subjects/{type}/{id}/places/refresh": {
+      "post": {
+        "operationId": "GoogleTtdVendorController_refreshPlaces",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "distribution"
+        ]
+      }
+    },
+    "/api/v1/vendor/distribution/google-things-to-do/subjects/{type}/{id}/places/{placeId}": {
+      "put": {
+        "operationId": "GoogleTtdVendorController_setPlaceStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "placeId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetTtdPlaceStatusDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "distribution"
+        ]
+      }
+    },
+    "/api/v1/vendor/distribution/google-things-to-do/terms": {
+      "put": {
+        "operationId": "GoogleTtdVendorController_acceptTerms",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptTtdTermsDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "distribution"
         ]
       }
     },
@@ -32268,7 +34550,7 @@
             "description": ""
           }
         },
-        "summary": "Get the current vendor's report subscription preferences.\nReturns frequency and which report types are subscribed.",
+        "summary": "Get the current vendor's report subscription preferences.\nReturns frequency and which report types are subscribed.\n\nSPLIT-1544 (finding ACC-3): the `@Roles` list below omits VENDOR_STAFF but,\nbecause VENDOR expands to the whole family, admits it, and that is left\ndeliberately. VendorReportService.processReports emails EVERY vendor-family\nrole at the default WEEKLY frequency, staff included, so these two routes\nare how a seat changes or stops the emails it already receives. Refusing\nstaff here would lock them into the default. Which seats should get the\nreport emails at all is a separate decision, made in the cron.",
         "tags": [
           "Vendor"
         ]
@@ -32306,7 +34588,7 @@
             "description": ""
           }
         },
-        "summary": "Create Stripe Connect onboarding link for vendor",
+        "summary": "Create Stripe Connect onboarding link for vendor\n\nSPLIT-1489 (security audit 2026-09-18, finding #19) — the DOOR on this and\nthe other nine payout/earnings routes below.\n\nIt was `VendorRoleGuard` + `@Roles(VENDOR_OWNER[, VENDOR_MANAGER])` +\n`@VendorPermissions(ACCESS_PAYOUTS)`, which mis-gated in BOTH directions:\n - the legacy plain `vendor` account role (still live at\n   `user.entity.ts`, and still listed by this controller's own\n   report-subscription / tax-summary routes) was 403'd out of its own\n   money surface — `roleSatisfies('vendor', [VENDOR_OWNER, ...])` is\n   false, and even widened to `[VENDOR]` the ALLOW-shaped matrix returns\n   `[]` for it and would deny it again;\n - `VENDOR_MANAGER` was inert in eight of the ten `@Roles` lists: it\n   passed the role check and was then unconditionally denied by the\n   matrix, so the declared policy and the enforced policy disagreed.\n\nThe replacement is the shape `BookingController.getRenterContact` already\nuses for exactly this reason: `VendorOrPrivilegedGuard` admits the vendor\nfamily + ADMIN, `@PrivilegedBy()` is EMPTY so no curator entitlement\nreaches a vendor's payout data, and the DENY-shaped\n`@RequiresVendorCapability(ACCESS_PAYOUTS)` subtracts only the seats the\nmatrix explicitly denies (`vendor_manager`, `vendor_staff`). Declared and\nenforced policy are now the same statement.\n\n`@Roles(UserRole.VENDOR)` is kept as the readable declaration of the\nfamily this door admits (as on the booking sibling); the enforcement is\nthe guard.",
         "tags": [
           "Vendor"
         ]
@@ -32376,7 +34658,7 @@
             "description": ""
           }
         },
-        "summary": "SPLIT-461 (AA-52): on-demand year-end earnings / tax summary for the current\nvendor. `?year=YYYY` (defaults to the current year; absurd years → 400 via\nthe DTO). `?format=csv` returns a CSV download payload instead of JSON.\n\nUnlike the cron-only ANNUAL vendor-report, this is the on-demand document a\nvendor pulls for their tax filing.",
+        "summary": "SPLIT-461 (AA-52): on-demand year-end earnings / tax summary for the current\nvendor. `?year=YYYY` (defaults to the current year; absurd years → 400 via\nthe DTO). `?format=csv` returns a CSV download payload instead of JSON.\n\nUnlike the cron-only ANNUAL vendor-report, this is the on-demand document a\nvendor pulls for their tax filing.\n\nSPLIT-1544 (finding ACC-3): the summary is the year's gross earnings,\nplatform fees and NET PAYOUT, i.e. payout data. It sat behind\n`@Roles(VENDOR, VENDOR_OWNER, VENDOR_MANAGER)`, which admits every seat\n(VENDOR expands to the whole family), so a vendor_staff seat read the\ntotals the ACCESS_PAYOUTS row of the matrix denies it on\nGET /vendor/earnings. It now carries the payout block's door verbatim,\nwhich also refuses vendor_manager: the matrix denies that seat\nACCESS_PAYOUTS too, and the payout routes already refuse it.",
         "tags": [
           "Vendor"
         ]
@@ -32409,7 +34691,7 @@
             "description": ""
           }
         },
-        "summary": "SPLIT-461 (AA-52): CSV variant of the tax summary (explicit export route, in\naddition to `?format=csv`). Returns { success, csv, filename }.",
+        "summary": "SPLIT-461 (AA-52): CSV variant of the tax summary (explicit export route, in\naddition to `?format=csv`). Returns { success, csv, filename }.\nSame door as `getTaxSummary` (SPLIT-1544).",
         "tags": [
           "Vendor"
         ]
@@ -32510,7 +34792,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/VendorWaiver"
+                    "type": "object"
                   },
                   "type": "array"
                 }
@@ -32544,6 +34826,13 @@
         ],
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
             "description": ""
           }
         },
@@ -32573,7 +34862,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/VendorWaiver"
+                  "type": "object"
                 }
               }
             },
@@ -32616,7 +34905,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/VendorWaiver"
+                  "type": "object"
                 }
               }
             },
@@ -32651,7 +34940,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/VendorWaiver"
+                  "type": "object"
                 }
               }
             },
@@ -32673,11 +34962,11 @@
         "operationId": "VerificationController_getBoaterLicenseStatus",
         "parameters": [
           {
-            "description": "The listing ID to check against",
             "in": "query",
             "name": "listingId",
             "required": true,
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -32699,7 +34988,7 @@
             "bearer": []
           }
         ],
-        "summary": "Check if a boater license is required for a listing and if the user has one",
+        "summary": "Check whether a boater education card is required for a listing (vendor-declared flag OR state law) and what the caller holds. Never a booking gate (SPLIT-1452) - `requiresUpload` asks for an upload, it does not withhold the booking.",
         "tags": [
           "verifications"
         ]
@@ -32892,9 +35181,9 @@
         ]
       }
     },
-    "/api/v1/verifications/{id}/document-url": {
+    "/api/v1/verifications/{id}/document": {
       "get": {
-        "operationId": "VerificationController_getVerificationDocumentUrl",
+        "operationId": "VerificationController_getVerificationDocument",
         "parameters": [
           {
             "in": "path",
@@ -32907,7 +35196,39 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The KYC document bytes, served with the content type sniffed from the stored file (inline for a recognised image/PDF, attachment otherwise)."
           }
         },
         "security": [
@@ -32915,7 +35236,7 @@
             "bearer": []
           }
         ],
-        "summary": "Get a short-lived signed URL for a KYC document (admin only)",
+        "summary": "Stream a KYC document through the API (admin only). Every view is authenticated and audited; no shareable link is issued.",
         "tags": [
           "verifications"
         ]
@@ -33318,6 +35639,7 @@
             "bearer": []
           }
         ],
+        "summary": "SPLIT-1485 (security audit 2026-09-18, finding #15) — the signature audit\ntrail: every signer's name, EMAIL, IP ADDRESS, user-agent and signature\nstring. It was gated on `Entitlement.CONTENT`, which user.entity.ts\ndocuments as \"Content section: blog administration, waiver templates\" - so\na blog editor with no People-section access could bulk-dump the renter\nbase off the platform waiver every renter must sign, unaudited and\nunthrottled.\n\nThe DATA is People-section (user.entity.ts: \"users list, KYC\nverifications, vendor-onboarding review\"), not content, so the gate moves\nto `Entitlement.USERS` and the route picks up the two controls every\nsibling bulk-PII read already carries. Mirrors\n`VendorOnboardingController.listApplications` exactly, including its guard\nORDER: `SharedRateLimitGuard` goes LAST so the window keys on the\nauthenticated actor rather than the shared BFF egress IP, and a denied\ncaller consumes no quota (see `admin-rate-buckets.ts`).\n\n`@AuditedRead` (capture: 'summary') records the FACT and shape of the\nread - never the payload, which would copy the very PII being read into\nthe admin-readable audit table.\n\nADMIN is the superset of every entitlement, so an admin is unaffected.\n`:id/versions` and `:id/stats` stay on CONTENT: template text and\naggregate counts are genuinely content-section, and carry no signer PII.",
         "tags": [
           "EWaivers"
         ]
