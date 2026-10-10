@@ -202,6 +202,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/distribution/google-things-to-do/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoogleTtdAdminController_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/distribution/google-things-to-do/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoogleTtdAdminController_runs"];
+        put?: never;
+        post: operations["GoogleTtdAdminController_trigger"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/distribution/google-things-to-do/runs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoogleTtdAdminController_run"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/distribution/google-things-to-do/runs/{id}/payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoogleTtdAdminController_payload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/distribution/google-things-to-do/vendors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoogleTtdAdminController_vendorList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/distribution/google-things-to-do/vendors/{vendorId}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["GoogleTtdAdminController_pause"];
+        post?: never;
+        delete: operations["GoogleTtdAdminController_resume"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/distribution/google-things-to-do/vendors/{vendorId}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoogleTtdAdminController_vendorStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/experiences": {
         parameters: {
             query?: never;
@@ -497,15 +609,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/insurance-policies/{id}/document-url": {
+    "/api/v1/admin/insurance-policies/{id}/document": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get a short-lived signed URL for a policy document (admin) */
-        get: operations["InsuranceAdminController_getDocumentUrl"];
+        /** Stream a vendor insurance policy document through the API (admin). Every view is authenticated and audited; no shareable link is issued. */
+        get: operations["InsuranceAdminController_getDocument"];
         put?: never;
         post?: never;
         delete?: never;
@@ -790,6 +902,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/reconciliation/incidental-missing-credit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SPLIT-1670 — GET /admin/reconciliation/incidental-missing-credit — captured
+         *     post-trip (incidental) charges whose vendor credit was never written (the
+         *     credit failed after the renter was charged, or the charge predates
+         *     SPLIT-1670). The finance backfill's work list. READ-ONLY. Gated on the
+         *     `finance` read section (mirrors stuck-deposits).
+         */
+        get: operations["ReconciliationController_getIncidentalMissingCredit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/reconciliation/overdue-rentals": {
         parameters: {
             query?: never;
@@ -969,7 +1104,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Send a one-off test business report (defaults to the caller's own email). */
+        /**
+         * Send a one-off test business report to the CALLER'S OWN address.
+         *     SPLIT-1486: the CRM twin of `sendFinanceTest` above, same reasoning and
+         *     same service-side re-check.
+         */
         post: operations["PlatformReportController_sendBusinessTest"];
         delete?: never;
         options?: never;
@@ -1002,7 +1141,22 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Send a one-off test finance report (defaults to the caller's own email). */
+        /**
+         * Send a one-off test finance report to the CALLER'S OWN address.
+         *
+         *     SPLIT-1486: this route was gated on the READ entitlement `FINANCE` while
+         *     DELIVERING the full platform finance report by email to any address the
+         *     body named, so a view-only finance seat could exfiltrate GMV, take rate,
+         *     refunds, Stripe fees, deposits and per-vendor revenue to an attacker
+         *     mailbox as a DKIM-signed message from Splitt's own domain. It now requires
+         *     `FINANCE_WRITE`, exactly like every other send route on the platform
+         *     (`email-templates.controller.ts` test-send, `campaigns.controller.ts`
+         *     campaign run), and `PlatformReportService` independently re-checks the
+         *     write entitlement AND that the recipient is the caller's own address.
+         *     A `FINANCE_WRITE` holder still satisfies the class-level
+         *     `@RequireAnyEntitlements(FINANCE, CRM)` because write implies read
+         *     (`effectiveEntitlements`).
+         */
         post: operations["PlatformReportController_sendFinanceTest"];
         delete?: never;
         options?: never;
@@ -1341,6 +1495,36 @@ export interface paths {
         /**
          * PATCH /admin/users/:id/role
          *     Change a user's base persona. Body: { role: UserRole }. Audited.
+         *
+         *     SPLIT-1486: routed through `AccessGrantService`, like its two siblings
+         *     above and below, instead of calling `AdminService.setUserRole` directly.
+         *     This endpoint was the one way to hand out the ADMIN role - and with it,
+         *     via `roleImpliedEntitlements`, EVERY sensitive entitlement - without the
+         *     SPLIT-1231 dual-control gate ever running: a single compromised admin
+         *     could designate a puppet account staff and promote it to admin in two
+         *     requests, minting a second admin identity that could then approve the
+         *     attacker's own pending grants. The identical change requested as
+         *     `PATCH .../access {"role":"admin","entitlements":[]}` was already
+         *     deferred; now all three routes share one rule, and the response carries
+         *     the same `status:'applied'` / `'pending_approval'` discriminant the FE
+         *     already renders for the other two. A role change that adds NO sensitive
+         *     access (renter -> vendor, any demotion) still applies immediately through
+         *     the unchanged `AdminService.setUserRole`, SPLIT-661 safeguards and all.
+         *
+         *     No longer `@Audited`, now matching both siblings. `AuditInterceptor`
+         *     records ONE fixed action on every handler success, so while this handler
+         *     carried `@Audited({ action: 'access.role.set' })` a merely REQUESTED
+         *     promotion still wrote an `access.role.set` row. That action is in
+         *     `ACCESS_REVIEW_PRIVILEGE_ACTIONS`, so the row stamped the target's
+         *     `lastPrivilegeChange` in `GET /admin/users/access-review` - resetting the
+         *     access-review clock for a user whose privileges had not changed, and
+         *     handing an attacker who spams pending role requests a way to keep a target
+         *     looking freshly reviewed. `admin-access-review.ts` excludes `.requested`
+         *     for exactly this reason: the report must never show a change that never
+         *     happened. `AccessGrantService.setUserRole` now records `access.role.set`
+         *     itself, on the APPLIED branch only, exactly as `setUserAccess` records
+         *     `access.set`. The matching `EXEMPT_MUTATIONS` entry lives in
+         *     `common/audit/admin-audit-coverage.spec.ts`.
          */
         patch: operations["AdminController_setUserRole"];
         trace?: never;
@@ -2329,6 +2513,14 @@ export interface paths {
          *     `identityToken`; Apple only sends the user's name on the first authorization
          *     (and only to the client), so `firstName`/`lastName` ride along on that first
          *     call and are used only when provisioning a brand-new account.
+         *
+         *     SPLIT security review 2026-09-11: when the client posts the RAW `nonce` it
+         *     generated for the authorization request, the token's `nonce` claim must
+         *     equal SHA-256 of it — the same binding the web callback already enforces
+         *     against its `state`, so a lifted identity token cannot be replayed here.
+         *     Absent (today's shipped build) it is skipped, which is why the backend can
+         *     ship ahead of the client. See the field's doc comment on AppleSignInDto
+         *     for why that skip is temporary and what closes it.
          */
         post: operations["SocialAuthController_appleSignIn"];
         delete?: never;
@@ -2421,6 +2613,16 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Sign a session out. Send the session's refresh token in the body; an access
+         *     token is optional and may be missing, expired or invalid, because the
+         *     refresh token alone identifies the session (an expired access token is the
+         *     normal state of a client that sat idle before signing out). The whole
+         *     session is ended, every token rotated from it included. Always answers 200
+         *     with the same body, whether or not anything was ended, so it cannot be used
+         *     to probe which tokens exist. With a valid access token, the refresh token
+         *     must belong to that user.
+         */
         post: operations["AuthController_logout"];
         delete?: never;
         options?: never;
@@ -2459,6 +2661,10 @@ export interface paths {
          *     refresh token, compact user) via the same `authService.login` path — so
          *     web social auth gains refresh-token support and the suspension check.
          *     Unknown, replayed or expired codes are all the same opaque 401.
+         *
+         *     SPLIT-1695: the envelope gains `isNewUser` (true only when the callback
+         *     that issued this code created the account) so the frontend can tag a first
+         *     Google/Apple sign-in as a sign-up. The 2FA-challenge shape is unchanged.
          */
         post: operations["SocialAuthController_exchangeOAuthCode"];
         delete?: never;
@@ -2516,6 +2722,27 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Sign one of your sessions out: a browser on another device, or an AI
+         *     assistant connected through the Splitt MCP (its user agent contains
+         *     "splitt-mcp"). An id that is not one of your active sessions answers 404.
+         */
+        delete: operations["AuthController_revokeSession"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2769,6 +2996,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bookings/ical/{listingId}/feed-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mint (or return the existing) secret iCal feed URL for this listing. Owner or admin only. */
+        get: operations["BookingController_getIcalFeedUrl"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bookings/ical/{listingId}/feed-url/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace this listing’s iCal feed secret. Links minted from the old secret 403 immediately after. Owner or admin only. */
+        post: operations["BookingController_rotateIcalFeedUrl"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bookings/ical/{listingId}/import": {
         parameters: {
             query?: never;
@@ -2981,6 +3242,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bookings/{id}/renter-contact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SPLIT-1460 — the renter's contact details for ONE booking, for the vendor
+         *     who is running it. The ONLY route by which renter email/phone reaches a
+         *     vendor anywhere in the platform.
+         *
+         *     Four doors, deliberately stacked rather than folded into one check:
+         *       VendorOrPrivilegedGuard   — the vendor family (owner/manager/staff/plain
+         *                                   vendor) + admin, with `@PrivilegedBy()`
+         *                                   emptied so curators are NOT admitted.
+         *       @RequiresVendorCapability(MANAGE_BOOKINGS) — SUBTRACTS the capability from
+         *                                   a seat that lacks it. Deliberately the
+         *                                   deny-shaped decorator, not `@VendorPermissions`:
+         *                                   that one asks the ALLOW question against a
+         *                                   matrix which returns [] for the legacy plain
+         *                                   `vendor` role, and would therefore 403 a
+         *                                   legacy vendor account from its own renter's
+         *                                   details. Logged per individual seat.
+         *       SharedRateLimitGuard      — 60/hour, keyed on the AUTHENTICATED USER (the
+         *                                   guard prefers req.user.userId over IP), which
+         *                                   is comfortably above a busy multi-listing
+         *                                   weekend and far below a scrape. Cross-instance,
+         *                                   because a per-instance throttle is not a
+         *                                   ceiling on serverless.
+         *       service-level tier + ownership — 404/403, and the fail-closed audit write.
+         *
+         *     `Cache-Control: no-store` because this response must not sit in any shared
+         *     or browser cache: the whole design rests on each view being a logged event
+         *     within a window, and a cached copy is a view nobody recorded that outlives
+         *     the window.
+         */
+        get: operations["BookingController_getRenterContact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bookings/{id}/reschedule-proposal": {
         parameters: {
             query?: never;
@@ -3054,6 +3361,23 @@ export interface paths {
         };
         get?: never;
         put: operations["BookingController_reassignUnit"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bookings/{id}/usage-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Usage summary for a booking: miles / generator hours / fuel against the booked allowance, with suggested overage amounts. Parties or admin only. */
+        get: operations["BookingController_getUsageSummary"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -3715,6 +4039,40 @@ export interface paths {
         patch: operations["DisputesController_update"];
         trace?: never;
     };
+    "/api/v1/distribution/google-things-to-do/packages/{id}/landing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Google Things to do option and all-in price for a package (public) */
+        get: operations["GoogleTtdPublicController_package"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/distribution/google-things-to-do/rentals/{id}/landing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Google Things to do options and all-in prices for a rental (public) */
+        get: operations["GoogleTtdPublicController_rental"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dynamic-pricing/apply-bulk/{listingId}": {
         parameters: {
             query?: never;
@@ -4135,8 +4493,11 @@ export interface paths {
          *
          *     Always answers 200 on an accepted delivery — including a duplicate
          *     `svix-id` and an event type we do not model — so Resend stops retrying.
-         *     503 (secret unset), 401 (bad signature), 400 (malformed body) and 500 (DB
-         *     failure) are the deliberate retry/refuse signals.
+         *     503 (secret unset), 401 (bad signature), 400 (malformed body) and 500 (a
+         *     side effect failed) are the deliberate retry/refuse signals. SPLIT-1445:
+         *     the 200 on a duplicate is answered only AFTER the deliverability side
+         *     effects have run again, so a retry can still finish work an earlier
+         *     delivery left half-applied.
          */
         post: operations["EmailEventsController_handleResendWebhook"];
         delete?: never;
@@ -4381,6 +4742,23 @@ export interface paths {
         get: operations["ExperiencesController_getMyExperiences[0]"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/experiences/reviews/{id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @deprecated */
+        post: operations["ExperiencesController_reportReview[0]"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5014,6 +5392,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/incidental-charges/{id}/refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Filer or admin refunds part or all of a captured charge to the renter and reverses the vendor share */
+        post: operations["IncidentalChargesController_refund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/incidental-charges/{id}/resolve": {
         parameters: {
             query?: never;
@@ -5100,15 +5495,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/insurance-policies/{id}/document-url": {
+    "/api/v1/insurance-policies/{id}/document": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get a short-lived signed URL for the policy document (owner or admin) */
-        get: operations["InsurancePolicyController_getDocumentUrl"];
+        /** Stream the policy document through the API (owner or admin). No shareable link is issued. */
+        get: operations["InsurancePolicyController_getDocument"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6090,6 +6485,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/packages/reviews/{id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExperiencesController_reportReview[1]"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/packages/search": {
         parameters: {
             query?: never;
@@ -6338,8 +6749,17 @@ export interface paths {
          *     looking at: the service recomputes the balance and the vendor reserve
          *     inside this call and 400s anything above it, so a booking captured between
          *     the preview and the submit cannot be paid out from under its vendor. The
-         *     sensitive bucket (30 / 10 min) bounds a stolen finance session to a single
-         *     window's worth of attempts.
+         *     platform-payout bucket (30 / 10 min) bounds a stolen finance session to a
+         *     single window's worth of attempts.
+         *
+         *     SPLIT audit 2026-09-07 vendor payouts (fix-6): this previously resolved
+         *     `ADMIN_SENSITIVE_BUCKET`, which carries `flagEnv: ADMIN_RATE_LIMIT_FLAG_ENV`
+         *     — SPLIT-1335's SHIP-DARK default for every admin bucket, unset anywhere in
+         *     this branch, so the limiter only SHADOW-counted and the route shipped
+         *     completely unthrottled despite the doc comment above claiming otherwise.
+         *     `PLATFORM_PAYOUT_BUCKET` carries no `flagEnv` and therefore enforces from
+         *     the moment it ships — see that constant's own doc for why this ONE route
+         *     cannot wait on the shared admin-console rollout.
          */
         post: operations["PaymentController_createPlatformPayout"];
         delete?: never;
@@ -6434,6 +6854,28 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["PaymentController_syncDisputeWebhookEvents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/booking/{bookingId}/refundable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SPLIT-1670 (design §7.1) - what the vendor can still refund on a booking:
+         *     `{ charged, refunded, refundable, currency }`, computed by the SAME function
+         *     `processRefund` clamps with, so the preview always equals the mutation.
+         *     Listing owner or admin only (403); unknown booking 404; a non-uuid id 400.
+         */
+        get: operations["PaymentController_getRefundableBalance"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -7369,6 +7811,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reviews/{id}/block-author": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ReviewController_blockAuthor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reviews/{id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ReviewController_report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reviews/{id}/response": {
         parameters: {
             query?: never;
@@ -7673,6 +8147,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/services/reviews/{id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ServicesController_reportReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/services/{id}": {
         parameters: {
             query?: never;
@@ -7734,12 +8224,24 @@ export interface paths {
         /**
          * SPLIT-974 — "email me this plan". The rest of this controller is
          *     deliberately public; this one route needs a real recipient, so it opts
-         *     INTO auth at the method level (JwtAuthGuard runs alongside the class-level
-         *     SharedRateLimitGuard — Nest applies both). Its own `trips-email` bucket
-         *     (5/10min, checked via getAllAndOverride — same override precedent as
+         *     INTO auth at the method level. Its own `trips-email` bucket (5/10min,
+         *     checked via getAllAndOverride — same override precedent as
          *     `geocodeSuggest`'s `trips-suggest` bucket) keeps a burst of email sends
          *     from draining the shared `trips-public` budget for every other visitor;
          *     the class-level @Throttle burst brake still applies underneath it.
+         *
+         *     SPLIT-1488 (audit finding #31) — ORDER. Nest runs guards global → class →
+         *     method, so the CLASS-level SharedRateLimitGuard above runs BEFORE this
+         *     method-level JwtAuthGuard: `req.user` is not populated yet. The old comment
+         *     here claimed the two simply "both apply", which hid the consequence — the
+         *     per-account bucket keyed on the IP, so it capped nobody per account and
+         *     five anonymous requests could spend the bucket of every authenticated user
+         *     behind the same NAT. SharedRateLimitGuard now recovers the principal itself
+         *     on a route that declares JwtAuthGuard (verifying the bearer against the
+         *     same secret, as GlobalAnonThrottleGuard already does), so this bucket keys
+         *     on `user:${userId}` regardless of guard order, and anonymous callers count
+         *     against a separate IP-keyed window. See shared-rate-limit.guard.ts
+         *     `principalKey`.
          */
         post: operations["TripsController_emailPlan"];
         delete?: never;
@@ -8018,6 +8520,38 @@ export interface paths {
         put?: never;
         post?: never;
         delete: operations["UserController_deleteMe"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/me/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["UserBlockController_list"];
+        put?: never;
+        post: operations["UserBlockController_block"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/me/blocks/{blockId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["UserBlockController_unblock"];
         options?: never;
         head?: never;
         patch?: never;
@@ -8555,7 +9089,18 @@ export interface paths {
          * SPLIT-542: toggle account-level auto-approve across ALL the vendor's listings.
          *     Sets the vendor default AND bulk-applies instantBook to every owned listing
          *     (reuses the existing instantBook auto-confirm flow). Body: { enabled: boolean }.
-         *     Staff are excluded (account-level config), matching report-subscription scoping.
+         *     Staff are excluded (account-level config).
+         *
+         *     SPLIT-1544 (finding ACC-3): that exclusion used to be declared by leaving
+         *     VENDOR_STAFF out of `@Roles(VENDOR, VENDOR_OWNER, VENDOR_MANAGER)`, which
+         *     excluded nobody: a required VENDOR admits the whole family. It is now
+         *     ENFORCED by the deny-shaped door the payout block uses. CHANGE_PRICING is
+         *     the one matrix capability a vendor_manager holds and a vendor_staff lacks,
+         *     so it subtracts exactly the seat this route always meant to refuse, and it
+         *     is the capability that already guards a listing's other terms of sale
+         *     (rates, fees, discounts, the refund policy). A plain `vendor`, a
+         *     vendor_owner, a vendor_manager and ADMIN keep access; `@PrivilegedBy()`
+         *     keeps curators out of another vendor's account settings.
          */
         patch: operations["VendorController_setAutoApprove"];
         trace?: never;
@@ -8601,6 +9146,86 @@ export interface paths {
         };
         get: operations["VendorCalendarController_getFeed"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vendor/distribution/google-things-to-do": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoogleTtdVendorController_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["GoogleTtdVendorController_setEnabled"];
+        trace?: never;
+    };
+    "/api/v1/vendor/distribution/google-things-to-do/subjects/{type}/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["GoogleTtdVendorController_setIncluded"];
+        trace?: never;
+    };
+    "/api/v1/vendor/distribution/google-things-to-do/subjects/{type}/{id}/places/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["GoogleTtdVendorController_refreshPlaces"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vendor/distribution/google-things-to-do/subjects/{type}/{id}/places/{placeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["GoogleTtdVendorController_setPlaceStatus"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vendor/distribution/google-things-to-do/terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["GoogleTtdVendorController_acceptTerms"];
         post?: never;
         delete?: never;
         options?: never;
@@ -8760,6 +9385,14 @@ export interface paths {
         /**
          * Get the current vendor's report subscription preferences.
          *     Returns frequency and which report types are subscribed.
+         *
+         *     SPLIT-1544 (finding ACC-3): the `@Roles` list below omits VENDOR_STAFF but,
+         *     because VENDOR expands to the whole family, admits it, and that is left
+         *     deliberately. VendorReportService.processReports emails EVERY vendor-family
+         *     role at the default WEEKLY frequency, staff included, so these two routes
+         *     are how a seat changes or stops the emails it already receives. Refusing
+         *     staff here would lock them into the default. Which seats should get the
+         *     report emails at all is a separate decision, made in the cron.
          */
         get: operations["VendorController_getReportSubscription"];
         put?: never;
@@ -8783,7 +9416,36 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create Stripe Connect onboarding link for vendor */
+        /**
+         * Create Stripe Connect onboarding link for vendor
+         *
+         *     SPLIT-1489 (security audit 2026-09-18, finding #19) — the DOOR on this and
+         *     the other nine payout/earnings routes below.
+         *
+         *     It was `VendorRoleGuard` + `@Roles(VENDOR_OWNER[, VENDOR_MANAGER])` +
+         *     `@VendorPermissions(ACCESS_PAYOUTS)`, which mis-gated in BOTH directions:
+         *      - the legacy plain `vendor` account role (still live at
+         *        `user.entity.ts`, and still listed by this controller's own
+         *        report-subscription / tax-summary routes) was 403'd out of its own
+         *        money surface — `roleSatisfies('vendor', [VENDOR_OWNER, ...])` is
+         *        false, and even widened to `[VENDOR]` the ALLOW-shaped matrix returns
+         *        `[]` for it and would deny it again;
+         *      - `VENDOR_MANAGER` was inert in eight of the ten `@Roles` lists: it
+         *        passed the role check and was then unconditionally denied by the
+         *        matrix, so the declared policy and the enforced policy disagreed.
+         *
+         *     The replacement is the shape `BookingController.getRenterContact` already
+         *     uses for exactly this reason: `VendorOrPrivilegedGuard` admits the vendor
+         *     family + ADMIN, `@PrivilegedBy()` is EMPTY so no curator entitlement
+         *     reaches a vendor's payout data, and the DENY-shaped
+         *     `@RequiresVendorCapability(ACCESS_PAYOUTS)` subtracts only the seats the
+         *     matrix explicitly denies (`vendor_manager`, `vendor_staff`). Declared and
+         *     enforced policy are now the same statement.
+         *
+         *     `@Roles(UserRole.VENDOR)` is kept as the readable declaration of the
+         *     family this door admits (as on the booking sibling); the enforcement is
+         *     the guard.
+         */
         post: operations["VendorController_createOnboardingLink"];
         delete?: never;
         options?: never;
@@ -8851,6 +9513,15 @@ export interface paths {
          *
          *     Unlike the cron-only ANNUAL vendor-report, this is the on-demand document a
          *     vendor pulls for their tax filing.
+         *
+         *     SPLIT-1544 (finding ACC-3): the summary is the year's gross earnings,
+         *     platform fees and NET PAYOUT, i.e. payout data. It sat behind
+         *     `@Roles(VENDOR, VENDOR_OWNER, VENDOR_MANAGER)`, which admits every seat
+         *     (VENDOR expands to the whole family), so a vendor_staff seat read the
+         *     totals the ACCESS_PAYOUTS row of the matrix denies it on
+         *     GET /vendor/earnings. It now carries the payout block's door verbatim,
+         *     which also refuses vendor_manager: the matrix denies that seat
+         *     ACCESS_PAYOUTS too, and the payout routes already refuse it.
          */
         get: operations["VendorController_getTaxSummary"];
         put?: never;
@@ -8871,6 +9542,7 @@ export interface paths {
         /**
          * SPLIT-461 (AA-52): CSV variant of the tax summary (explicit export route, in
          *     addition to `?format=csv`). Returns { success, csv, filename }.
+         *     Same door as `getTaxSummary` (SPLIT-1544).
          */
         get: operations["VendorController_exportTaxSummary"];
         put?: never;
@@ -8969,7 +9641,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Check if a boater license is required for a listing and if the user has one */
+        /** Check whether a boater education card is required for a listing (vendor-declared flag OR state law) and what the caller holds. Never a booking gate (SPLIT-1452) - `requiresUpload` asks for an upload, it does not withhold the booking. */
         get: operations["VerificationController_getBoaterLicenseStatus"];
         put?: never;
         post?: never;
@@ -9081,15 +9753,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/verifications/{id}/document-url": {
+    "/api/v1/verifications/{id}/document": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get a short-lived signed URL for a KYC document (admin only) */
-        get: operations["VerificationController_getVerificationDocumentUrl"];
+        /** Stream a KYC document through the API (admin only). Every view is authenticated and audited; no shareable link is issued. */
+        get: operations["VerificationController_getVerificationDocument"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9233,6 +9905,32 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * SPLIT-1485 (security audit 2026-09-18, finding #15) — the signature audit
+         *     trail: every signer's name, EMAIL, IP ADDRESS, user-agent and signature
+         *     string. It was gated on `Entitlement.CONTENT`, which user.entity.ts
+         *     documents as "Content section: blog administration, waiver templates" - so
+         *     a blog editor with no People-section access could bulk-dump the renter
+         *     base off the platform waiver every renter must sign, unaudited and
+         *     unthrottled.
+         *
+         *     The DATA is People-section (user.entity.ts: "users list, KYC
+         *     verifications, vendor-onboarding review"), not content, so the gate moves
+         *     to `Entitlement.USERS` and the route picks up the two controls every
+         *     sibling bulk-PII read already carries. Mirrors
+         *     `VendorOnboardingController.listApplications` exactly, including its guard
+         *     ORDER: `SharedRateLimitGuard` goes LAST so the window keys on the
+         *     authenticated actor rather than the shared BFF egress IP, and a denied
+         *     caller consumes no quota (see `admin-rate-buckets.ts`).
+         *
+         *     `@AuditedRead` (capture: 'summary') records the FACT and shape of the
+         *     read - never the payload, which would copy the very PII being read into
+         *     the admin-readable audit table.
+         *
+         *     ADMIN is the superset of every entitlement, so an admin is unaffected.
+         *     `:id/versions` and `:id/stats` stay on CONTENT: template text and
+         *     aggregate counts are genuinely content-section, and carry no signer PII.
+         */
         get: operations["EWaiversController_getWaiverAgreements"];
         put?: never;
         post?: never;
@@ -9551,6 +10249,9 @@ export interface components {
         AcceptRescheduleProposalDto: {
             expectedProposalToken?: string;
         };
+        AcceptTtdTermsDto: {
+            termsVersion: string;
+        };
         AddEvidenceDto: {
             /**
              * Format: uuid
@@ -9575,6 +10276,9 @@ export interface components {
             name: string;
             price?: number;
             pricePerDay?: number;
+            /** @enum {string} */
+            pricing?: "per_day" | "per_booking";
+            required?: boolean;
         };
         AdminModerationOverrideDto: {
             reason: string;
@@ -9587,7 +10291,7 @@ export interface components {
         };
         ApiErrorResponse: {
             /**
-             * @description Optional machine-readable error code for domain errors with a stable identifier (e.g. `LIFECYCLE_ILLEGAL_TRANSITION`). Omitted otherwise.
+             * @description Optional machine-readable error code for domain errors with a stable identifier (e.g. `LIFECYCLE_ILLEGAL_TRANSITION`). Omitted otherwise. Authentication failures (401) carry one of `TOKEN_MISSING`, `TOKEN_EXPIRED`, `TOKEN_INVALID` (the access token), `REFRESH_INVALID` (the refresh token: the session is over) or `ACCOUNT_SUSPENDED`; the `message` text is unchanged and clients that ignore `code` are unaffected.
              * @example LIFECYCLE_ILLEGAL_TRANSITION
              */
             code?: string;
@@ -9632,6 +10336,35 @@ export interface components {
             firstName?: string;
             idToken: string;
             lastName?: string;
+            /**
+             * @description SPLIT security review 2026-09-11 — the RAW nonce the client generated for
+             *     this authorization request. The client sends SHA-256(rawNonce) to Apple as
+             *     the request's `nonce`, Apple echoes it verbatim into the id_token's `nonce`
+             *     claim, and posting the PRE-IMAGE here is what proves the token was minted
+             *     for this app's own live request: a replayed identity token (lifted from
+             *     logs, a compromised device, or another relying party) carries a nonce whose
+             *     pre-image the attacker does not have. Verified in
+             *     SocialAuthController.appleSignIn.
+             *
+             *     OPTIONAL on purpose, and this is the whole shape of the change: the
+             *     currently shipped iOS build sets no nonce and posts none, and the global
+             *     pipe runs `forbidNonWhitelisted`, so a REQUIRED field would 400 every
+             *     existing install while an unknown field would 400 the new one. Backend
+             *     ships first and accepts both; the client half follows. Until the old build
+             *     is off the floor an attacker can still down-grade by simply omitting this
+             *     field — making it REQUIRED is the follow-up that actually closes replay,
+             *     and it cannot happen before the minimum supported app version is raised.
+             *
+             *     `@ValidateIf` rather than `@IsOptional` so an explicitly-null nonce is a
+             *     400 instead of being silently treated as absent — a client that sends the
+             *     field at all must send a real value. `@StrictString` for the same reason
+             *     one step further in: the pipe's enableImplicitConversion would otherwise
+             *     turn `42` into `"42"` and `{}` into `"[object Object]"` and let @IsString
+             *     pass, so a malformed nonce would be hashed and compared rather than
+             *     rejected (SPLIT-1325 class). It fails closed either way — a junk nonce
+             *     simply will not match Apple's claim — but a 400 names the real problem.
+             */
+            nonce?: string;
         };
         ApplyPriceDto: {
             /** Format: date-time */
@@ -9702,6 +10435,23 @@ export interface components {
              * @example 2026-06-20
              */
             startDate: string;
+        };
+        BlockResponseDto: {
+            blocked: boolean;
+        };
+        BlockUserDto: {
+            /** Format: uuid */
+            userId: string;
+        };
+        BlockedUserDto: {
+            /** Format: date-time */
+            createdAt: string;
+            id: string;
+            /** @description "First L.", the same shape a review author is shown under. */
+            name: string;
+            profileImageUrl: string | null;
+            /** @description Only for a directly created block; omitted for one made from a review. */
+            userId?: string;
         };
         BlogPost: {
             author: string;
@@ -9777,6 +10527,11 @@ export interface components {
             pendingDateChange: {
                 [key: string]: unknown;
             } | null;
+            /**
+             * Format: date
+             * @example 2026-06-20
+             */
+            policyAnchorStartDate?: string | null;
             /** @description Server-computed itemized price breakdown (money fields are numbers inside this jsonb blob, not decimal strings). */
             priceBreakdown: {
                 [key: string]: unknown;
@@ -9871,6 +10626,14 @@ export interface components {
             /** @enum {string} */
             verificationStatus: "none" | "pickup_pending" | "pickup_verified" | "return_pending" | "return_verified" | "disputed";
         };
+        BookingAttributionDto: {
+            campaign?: string;
+            funnel?: string;
+            medium?: string;
+            optionId?: string;
+            source?: string;
+            surface?: string;
+        };
         BookingCoverageDetailsDto: {
             /** @description Deductible amount (number inside jsonb). */
             deductible: number;
@@ -9878,6 +10641,32 @@ export interface components {
             isLiabilityIncluded: boolean;
             /** @description Max coverage amount (number inside jsonb). */
             maxCoverage: number;
+        };
+        BookingRefundDto: {
+            /**
+             * Format: decimal
+             * @description Refunded amount (DECIMAL string).
+             * @example 195.00
+             */
+            amount: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description The refund transaction id. */
+            id: string;
+            /** @description The refunded incidental charge, when `kind` is `incidental`. */
+            incidentalChargeId?: string;
+            /**
+             * @description `incidental` = a refund of a post-trip charge; `rental` = every other refund on the booking.
+             * @enum {string}
+             */
+            kind: "rental" | "incidental";
+            /** @description Renter-visible free-text reason, when supplied. */
+            reason?: string;
+            /**
+             * @description Why the vendor or admin refunded. Absent on an automatic refund (cancellation, shortened dates).
+             * @enum {string}
+             */
+            reasonCode?: "early_return" | "unused_days" | "service_issue" | "goodwill" | "overcharge" | "other";
         };
         BookingResponseDto: {
             /** @description Cancellation policy snapshotted at booking time, or null. */
@@ -9959,6 +10748,8 @@ export interface components {
              * @example 195.00
              */
             refundAmount?: string | null;
+            /** @description SPLIT-1670: the booking's refunds and adjustments ("Refunds & adjustments"), oldest first: every COMPLETED refund of the rental, an extension or a post-trip charge. Present on the DETAIL read (GET /bookings/:id and the mutations that return it) only; absent from the list endpoints. */
+            refunds?: components["schemas"]["BookingRefundDto"][];
             /** @description The renter, projected to public-safe fields. Null when the renter relation is not loaded (e.g. the renter-owned my-bookings view). */
             renter: components["schemas"]["PublicBookingUserDto"] | null;
             /**
@@ -9966,14 +10757,12 @@ export interface components {
              * @enum {string}
              */
             renterBoaterLicenseStatus?: "VERIFIED" | "PENDING_REVIEW" | "EXPIRED" | "NONE";
+            /** @description SPLIT-1460: renter context for a VENDOR-context read (absent on renter-facing reads). Carries NO contact values. Those come from GET /bookings/:id/renter-contact, which audits every call. */
+            renterCard?: components["schemas"]["RenterCardDto"] | null;
             /** @description Renter user id (FK scalar, always present). */
             renterId: string;
             /** @description Free-text notes from the renter to the vendor, or null. */
             renterNotes?: string | null;
-            /** @description Computed risk score (0+). */
-            riskScore: number;
-            /** @description Risk signal codes raised at booking time. */
-            riskSignals?: string[] | null;
             /** @description Server-priced add-ons selected at booking time. */
             selectedAddOns: Record<string, never>[] | null;
             /**
@@ -10438,6 +11227,12 @@ export interface components {
             title: string;
         };
         CreateBookingDto: {
+            /**
+             * @description SPLIT-1575 — where the booking came from (the Google Things to do landing
+             *     parameters). Optional; recorded best-effort in `booking_attribution` after
+             *     the booking exists and never read by pricing, availability or payment.
+             */
+            attribution?: components["schemas"]["BookingAttributionDto"];
             bringingPets?: boolean;
             deliveryRequested?: boolean;
             endDate: string;
@@ -10449,6 +11244,27 @@ export interface components {
             /** @enum {string} */
             protectionPlan?: "none" | "basic" | "standard" | "premier";
             quantity?: number;
+            /**
+             * @description SPLIT-1466 — the renter's own note to the vendor ("gate code is 4821",
+             *     "arriving around 9am with two kids").
+             *
+             *     The `booking.renterNotes` COLUMN and the vendor-side renderers shipped in
+             *     SPLIT-1464, but no DTO ever accepted the field, so `POST /bookings` 400'd
+             *     on it and the only way a note could exist was direct SQL. The vendor was
+             *     shown a labelled surface that could never be anything but empty.
+             *
+             *     Bounded at 500 characters: long enough for pickup logistics, short enough
+             *     that it cannot be used as free storage or to bury a vendor's booking card.
+             *     The column is `text`, so the cap is a product decision enforced here.
+             *
+             *     SAFE TO RENDER, and deliberately NOT safe to email. React escapes it on the
+             *     web and Compose cannot interpret markup, so the rendered surfaces are inert
+             *     (verified with an `<img onerror>` payload during SPLIT-1460 validation).
+             *     It must NOT be interpolated into any transactional email: renter-authored
+             *     text in DKIM-signed mail is the SPLIT-1189 / SPLIT-1374 injection class.
+             *     Vendor mail stays name-only and links to the booking.
+             */
+            renterNotes?: string;
             selectedAddOns?: components["schemas"]["SelectedAddOnDto"][];
             startDate: string;
             startTime?: string;
@@ -10564,6 +11380,8 @@ export interface components {
             requiredFor?: "renter" | "vendor" | "all";
         };
         CreateExperienceBookingDto: {
+            /** @description SPLIT-1575 — landing-page attribution; see CreateBookingDto.attribution. */
+            attribution?: components["schemas"]["BookingAttributionDto"];
             /** Format: uuid */
             experienceId: string;
             guestNotes?: string;
@@ -10716,15 +11534,17 @@ export interface components {
              * @description The booking the charge is filed against.
              */
             bookingId: string;
-            /** @description Itemized renter-facing explanation of the charge. */
-            description: string;
+            /** @description Itemized renter-facing explanation of the charge. May be omitted or blank ONLY when `lineItems` is sent: the server then generates it from the lines (SPLIT-1670). */
+            description?: string;
             /** @description Renter-visible photos/receipts (required for DAMAGE). */
             evidence?: components["schemas"]["EvidenceItemDto"][];
+            /** @description SPLIT-1670: itemised lines. `amount` must equal the sum of the lines (each recomputed server-side as round2(quantity x unitRate)). */
+            lineItems?: components["schemas"]["IncidentalLineItemDto"][];
             /**
              * @description Charge category.
              * @enum {string}
              */
-            type: "damage" | "fuel" | "cleaning" | "late_return" | "mileage" | "other";
+            type: "damage" | "fuel" | "cleaning" | "late_return" | "mileage" | "generator_hours" | "other";
         };
         CreateInsurancePolicyDto: {
             /** @description Aggregate coverage limit (USD). Optional. */
@@ -10795,6 +11615,19 @@ export interface components {
             icalUrl?: string;
             imageFocalPoints?: components["schemas"]["FocalPointDto"][];
             imageUrls?: string[];
+            /**
+             * @description Legacy alias the frontend still sends. `ListingService.createListing`
+             *     persists `imageUrls: images || rest.imageUrls`, so whatever arrives HERE
+             *     outranks the field above and lands verbatim in the publicly-rendered
+             *     `listing.imageUrls` column.
+             *
+             *     SPLIT-1490 #26: it used to carry only `@IsString({ each: true })`, so
+             *     sending `images` instead of `imageUrls` bypassed the only URL validation
+             *     on the create path entirely - any string at all (arbitrary external host,
+             *     `data:` payload, non-URL garbage) was persisted. The alias is kept for
+             *     back-compat but now carries the IDENTICAL validators as `imageUrls`, so
+             *     which of the two the client sends can no longer change what is enforced.
+             */
             images?: string[];
             instantBook?: boolean;
             latitude?: number;
@@ -10815,6 +11648,7 @@ export interface components {
             pricePerHour?: number;
             pricingType?: string;
             quantity?: number;
+            requiresBoaterLicense?: boolean;
             requiresIdVerification?: boolean;
             stayDetails?: components["schemas"]["StayDetailsDto"];
             subAttributes?: {
@@ -10826,11 +11660,22 @@ export interface components {
             taxResponsibilityAck?: boolean;
             taxState?: string;
             timeSlotDuration?: number;
+            timezone?: string | null;
+            usagePolicy?: components["schemas"]["UsagePolicyDto"] | null;
             /**
              * Format: uuid
              * @description Create on behalf of this vendor (curators only). Omit to create as yourself.
              */
             vendorId?: string;
+            /**
+             * @description SPLIT-1700 - up to 3 YouTube links, `{ url }` only. The server resolves
+             *     each into the stored object (id, title, orientation, thumbnail, addedBy);
+             *     a client-sent `title`/`status`/`addedBy` is a 400. Full replace on every PUT
+             *     that includes the field (`[]` or `null` clears); omitting it leaves the column
+             *     alone.
+             *     Not a pricing field.
+             */
+            videoEmbeds?: components["schemas"]["VideoEmbedInputDto"][] | null;
             /** @enum {string} */
             weatherPolicy?: "none" | "full_refund";
             weeklyDiscountPct?: number;
@@ -10909,6 +11754,8 @@ export interface components {
             arrivalDate: number | null;
             /** @description Stripe payout id (po_...). */
             payoutId: string;
+            /** @description SPLIT audit 2026-09-07 fix-5: true only when this call answered a same-key/same-amount replay from the durable attempt record instead of moving new money. Absent (falsy) on a fresh payout. */
+            replay?: boolean;
             /** @description The safe amount this payout was checked against. */
             safeAmount: number;
             /** @description Stripe payout status at creation time. */
@@ -11003,7 +11850,7 @@ export interface components {
         };
         CreateRouteDto: {
             /** @enum {string} */
-            activityType: "road_cycling" | "gravel" | "ebike" | "mtb" | "hike" | "trail_run" | "atv_offroad" | "snowmobile" | "jet_ski" | "kayak_paddle" | "ski_tour" | "other";
+            activityType: "other" | "road_cycling" | "gravel" | "ebike" | "mtb" | "hike" | "trail_run" | "atv_offroad" | "snowmobile" | "jet_ski" | "kayak_paddle" | "ski_tour";
             cuePoints?: components["schemas"]["RouteCueDto"][];
             /** @enum {string} */
             difficulty?: "moderate" | "easy" | "challenging" | "expert";
@@ -11243,12 +12090,27 @@ export interface components {
         };
         DeleteAccountDto: {
             /**
+             * @description Optional one-time authorization code from the same Apple authorization,
+             *     used to revoke the account's Sign in with Apple grant after deletion.
+             */
+            appleAuthorizationCode?: string;
+            /**
+             * @description Apple identity token (JWT) from a Sign in with Apple authorization the user
+             *     completed within the last 10 minutes. Replaces `password` and `code`.
+             */
+            appleIdentityToken?: string;
+            /**
+             * @description The RAW nonce whose SHA-256 the client sent Apple as the authorization
+             *     request's nonce. Required with `appleIdentityToken`.
+             */
+            appleNonce?: string;
+            /**
              * @description Exactly 6 digits. Validated for SHAPE only — whether it is the *right* code
              *     is decided by the constant-time-ish bcrypt compare in
              *     `TwoFactorService.verifyStepUpCode`, never here.
              */
-            code: string;
-            password: string;
+            code?: string;
+            password?: string;
         };
         DeleteDeviceTokenDto: {
             token: string;
@@ -11482,6 +12344,19 @@ export interface components {
              */
             email: string;
         };
+        FuelPolicyDto: {
+            /** @enum {string} */
+            policy: "none" | "return_same_level" | "prepaid";
+            refuelFlatFee?: number;
+            refuelRatePerPct?: number;
+        };
+        FuelUsageSummaryDto: {
+            pickupPct: number | null;
+            /** @enum {string} */
+            policy: "return_same_level" | "prepaid" | "none";
+            returnPct: number | null;
+            suggestedAmount: number;
+        };
         GenerateDescriptionDto: {
             category: string;
             make?: string;
@@ -11523,8 +12398,56 @@ export interface components {
             weekdays: number[];
             weeks: number;
         };
+        GeneratorPolicyDto: {
+            includedHoursPerDay: number | null;
+            overageRate: number;
+        };
+        GeneratorUsageSummaryDto: {
+            included: number | null;
+            includedHoursPerDay: number | null;
+            overage: number | null;
+            /** @description USD per hour over the allowance. */
+            overageRate: number;
+            pickup: number | null;
+            pickupPhotoUrl: string | null;
+            return: number | null;
+            returnPhotoUrl: string | null;
+            suggestedAmount: number;
+            used: number | null;
+        };
         GoogleSignInDto: {
             idToken: string;
+            /**
+             * @description SPLIT security review 2026-09-11 — the RAW nonce the client generated for
+             *     this sign-in request, exactly as on {@link AppleSignInDto}. The client
+             *     sends SHA-256(rawNonce) to Google as the request's `nonce`, Google echoes
+             *     it verbatim into the id_token's `nonce` claim, and posting the PRE-IMAGE
+             *     here proves the token was minted for this app's own live request.
+             *
+             *     Without it a Google ID token is accepted on iss + aud + email_verified
+             *     alone for its full ~1h life — so one lifted from logs, a compromised
+             *     device, or another relying party sharing our audience is a complete
+             *     account takeover.
+             *
+             *     Posting the nonce VERBATIM would prove nothing: an attacker holding a
+             *     stolen token also holds its `nonce` claim. Only the pre-image is evidence.
+             *
+             *     OPTIONAL for the same compatibility reason as Apple's — and this field is
+             *     why the Google half had to ship in the SAME wave: the DTO whitelists its
+             *     fields under `forbidNonWhitelisted`, so a client that started sending a
+             *     nonce would have been 400'd until a SECOND backend deploy nobody knew was
+             *     needed. That is exactly the trap the Apple change was written to avoid.
+             *     Making it REQUIRED is the follow-up that actually closes replay, and cannot
+             *     happen before the minimum supported app version is raised.
+             *
+             *     SPLIT-1695: omission is now accepted ONLY for an ID token that carries no
+             *     `nonce` claim. A token that does carry one (iOS, Google One Tap) and is
+             *     posted without this field is a 401, so the binding can no longer be dodged
+             *     by dropping the field. The claim must equal SHA-256 (lowercase hex) of this
+             *     value, so the client sends sha256(raw) to Google as the request nonce and
+             *     the RAW value here.
+             */
+            nonce?: string;
         };
         ImportICalDto: {
             /** Format: uri */
@@ -11558,7 +12481,7 @@ export interface components {
             createdAt: string;
             /**
              * Format: decimal
-             * @description Portion captured from the held security deposit.
+             * @description RESERVED (always 0): deposit-first capture is not built (design §6.6).
              * @example 195.00
              */
             depositCapturedAmount: string;
@@ -11586,12 +12509,24 @@ export interface components {
             /** @description The renter-facing hosted invoice URL (surfaced in the notification + UI). */
             hostedInvoiceUrl: string | null;
             id: string;
+            /** @description SPLIT-1670. Itemised lines: Array<{ kind, label, quantity, unit?, unitRate, amount, source? }>. `amount` is round2(quantity x unitRate); the charge amount equals their sum. Null for a lump-sum charge. */
+            lineItems: Record<string, never>[] | null;
             /**
              * Format: decimal
              * @description Portion captured off-session from the renter's saved card.
              * @example 195.00
              */
             offSessionCapturedAmount: string;
+            /**
+             * Format: decimal
+             * @description SPLIT-1670 (design 7.3): total refunded back to the renter so far, via
+             *     `POST /incidental-charges/:id/refund`. A refund may never exceed
+             *     `capturedAmount - refundedAmount`. Written only under this row's FOR UPDATE
+             *     lock (`PaymentService.refundIncidentalCharge`), and handed back when a
+             *     refund bounces (`handleRefundUpdated`).
+             * @example 195.00
+             */
+            refundedAmount: string;
             /** Format: date-time */
             renterRespondedAt: string | null;
             /**
@@ -11616,14 +12551,30 @@ export interface components {
             /** @description The off-session PaymentIntent that captured the overflow (null if none). */
             stripePaymentIntentId: string | null;
             /** @enum {string} */
-            type: "damage" | "fuel" | "cleaning" | "late_return" | "mileage" | "other";
+            type: "damage" | "fuel" | "cleaning" | "late_return" | "mileage" | "generator_hours" | "other";
             /** Format: date-time */
             updatedAt: string;
+        };
+        IncidentalLineItemDto: {
+            /** @description Ignored: the server recomputes round2(quantity x unitRate). */
+            amount?: number;
+            /** @enum {string} */
+            kind: "mileage" | "generator_hours" | "fuel" | "late_return" | "cleaning" | "custom";
+            /** @description Renter-facing line label. */
+            label: string;
+            /** @description Units charged (miles, hours, %). */
+            quantity: number;
+            /** @enum {string} */
+            source?: "readings" | "manual";
+            /** @description mi, km, hr, %, day... */
+            unit?: string;
+            /** @description USD per unit. */
+            unitRate: number;
         };
         IncludedItemDto: {
             description?: string;
             /** @enum {string} */
-            icon: "map" | "storage" | "guide" | "safety-gear" | "helmet" | "life-jacket" | "navigation" | "fuel" | "trailer" | "delivery" | "instruction" | "cooler" | "tools" | "pump" | "lock" | "charger" | "permit" | "insurance";
+            icon: "map" | "storage" | "safety-gear" | "helmet" | "life-jacket" | "navigation" | "fuel" | "trailer" | "delivery" | "instruction" | "cooler" | "tools" | "pump" | "lock" | "charger" | "permit" | "guide" | "insurance";
             label: string;
         };
         InspectionChecklistItemDto: {
@@ -11690,6 +12641,7 @@ export interface components {
             estimatedValue: string;
             /** Format: date-time */
             featuredUntil: string | null;
+            icalFeedToken: string | null;
             icalUrl: string;
             id: string;
             imageFocalPoints: {
@@ -11735,6 +12687,7 @@ export interface components {
              * @example 195.00
              */
             pricePerHour?: string | null;
+            requiresBoaterLicense: boolean;
             requiresIdVerification: boolean;
             reviews: components["schemas"]["Review"][];
             /** @enum {string|null} */
@@ -11760,6 +12713,12 @@ export interface components {
             totalReviews: number;
             /** Format: date-time */
             updatedAt: string;
+            /** @description SPLIT-1670. Usage allowance: { mileage?{includedPerDay|null, overageRate, unit mi|km, capPerBooking?}, generator?{includedHoursPerDay|null, overageRate}, fuel?{policy return_same_level|prepaid|none, refuelRatePerPct?, refuelFlatFee?} }. Rates are USD per unit. Vendor-editable, public. */
+            usagePolicy: {
+                [key: string]: unknown;
+            } | null;
+            /** @description SPLIT-1699. Video embeds: Array<{ provider youtube; videoId; url; title|null; authorName|null; thumbnailUrl|null; orientation portrait|landscape; durationSeconds|null; addedBy vendor|staff; addedAt; status active|unavailable; lastCheckedAt|null }>. Public readers receive only status=active entries. */
+            videoEmbeds: Record<string, never>[] | null;
             videoUrls: string[];
             /** @enum {string} */
             weatherPolicy: "none" | "full_refund";
@@ -11942,7 +12901,7 @@ export interface components {
             password: string;
         };
         LogoutDto: {
-            /** @description The opaque refresh token to revoke for this session. */
+            /** @description The opaque refresh token of the session to sign out. The whole session is ended, every token rotated from it included. */
             refreshToken?: string;
         };
         MaintenanceBlock: {
@@ -12060,6 +13019,33 @@ export interface components {
             vendor: components["schemas"]["User"];
             vendorId: string;
         };
+        MileagePolicyDto: {
+            capPerBooking?: number | null;
+            includedPerDay: number | null;
+            overageRate: number;
+            /** @enum {string} */
+            unit: "mi" | "km";
+        };
+        MileageUsageSummaryDto: {
+            /** @description return minus pickup; null when a reading is missing/invalid. */
+            driven: number | null;
+            /** @description Included for the whole trip (days x perDay, capped by capPerBooking); null = unlimited. */
+            included: number | null;
+            /** @description Per-day allowance; null = unlimited. */
+            includedPerDay: number | null;
+            /** @description Units over the allowance; null when `driven` is unknown. */
+            overage: number | null;
+            /** @description USD per unit over the allowance. */
+            overageRate: number;
+            pickup: number | null;
+            pickupPhotoUrl: string | null;
+            return: number | null;
+            returnPhotoUrl: string | null;
+            /** @description round2(overage x overageRate); a PREFILL, nothing is charged. */
+            suggestedAmount: number;
+            /** @enum {string} */
+            unit: "mi" | "km";
+        };
         ModerateReviewDto: Record<string, never>;
         ModerationDto: {
             /** @enum {string} */
@@ -12080,7 +13066,7 @@ export interface components {
             message: string;
             recipientId: string;
             /** @enum {string} */
-            type: "NEW_MESSAGE" | "BOOKING_REQUEST" | "BOOKING_CONFIRMED" | "BOOKING_REJECTED" | "NEW_REVIEW" | "SEARCH_ALERT" | "PICKUP_REMINDER" | "RETURN_REMINDER" | "RISK_REVIEW" | "DAMAGE_CLAIM" | "DISPUTE_UPDATE" | "BOOKING_CANCELLED" | "BOOKING_DATE_CHANGED" | "BOOKING_OVERDUE" | "INSURANCE_EXPIRING" | "CALENDAR_SYNC" | "RESCHEDULE_PROPOSAL" | "KYC_APPROVED" | "KYC_REJECTED" | "KYC_INFO_REQUESTED" | "LISTING_PROMOTED" | "LISTING_PROMOTION_ENDED" | "VENDOR_APPLICATION_APPROVED" | "VENDOR_ONBOARDING_APPROVED" | "VENDOR_ONBOARDING_SUBMITTED" | "VENDOR_APPLICATION_RECEIVED" | "CHARGEBACK_DISPUTE" | "PACKAGE_STAFF_ASSIGNMENT_REQUESTED" | "PACKAGE_STAFF_ASSIGNMENT_APPROVED" | "PACKAGE_STAFF_ASSIGNMENT_REJECTED" | "LISTING_PUBLISHED_BY_STAFF" | "PAYOUT_ALERT";
+            type: "NEW_MESSAGE" | "BOOKING_REQUEST" | "BOOKING_CONFIRMED" | "BOOKING_REJECTED" | "NEW_REVIEW" | "SEARCH_ALERT" | "PICKUP_REMINDER" | "RETURN_REMINDER" | "RISK_REVIEW" | "DAMAGE_CLAIM" | "DISPUTE_UPDATE" | "BOOKING_CANCELLED" | "BOOKING_DATE_CHANGED" | "BOOKING_OVERDUE" | "INSURANCE_EXPIRING" | "CALENDAR_SYNC" | "RESCHEDULE_PROPOSAL" | "KYC_APPROVED" | "KYC_REJECTED" | "KYC_INFO_REQUESTED" | "LISTING_PROMOTED" | "LISTING_PROMOTION_ENDED" | "VENDOR_APPLICATION_APPROVED" | "VENDOR_ONBOARDING_APPROVED" | "VENDOR_ONBOARDING_SUBMITTED" | "VENDOR_APPLICATION_RECEIVED" | "CHARGEBACK_DISPUTE" | "PACKAGE_STAFF_ASSIGNMENT_REQUESTED" | "PACKAGE_STAFF_ASSIGNMENT_APPROVED" | "PACKAGE_STAFF_ASSIGNMENT_REJECTED" | "LISTING_PUBLISHED_BY_STAFF" | "LISTING_VIDEO_UNAVAILABLE" | "LISTING_VIDEO_ADDED_BY_STAFF" | "PAYOUT_ALERT" | "BOATER_LICENSE_REMINDER" | "INCIDENTAL_CHARGE";
         };
         OAuthExchangeDto: {
             code: string;
@@ -12117,6 +13103,9 @@ export interface components {
         PasskeyRenameDto: {
             /** @description New label for this passkey. */
             name: string;
+        };
+        PauseTtdVendorDto: {
+            reason: string;
         };
         PayoutDetailDto: {
             /**
@@ -12251,6 +13240,8 @@ export interface components {
             available: number;
             /** @description Payout currency (always 'usd' today). */
             currency: string;
+            /** @description SPLIT audit 2026-09-07 fix-2: this admin surface's OWN recently-accepted platform payouts, netted out defensively on top of Stripe's own balance. See the service's PLATFORM_PAYOUT_INFLIGHT_WINDOW_MS doc for why this is a bounded, self-expiring margin, never a standing liability. */
+            inFlightPlatformPayout: number;
             /**
              * @description Which Stripe key mode produced these numbers.
              * @enum {string}
@@ -12258,13 +13249,15 @@ export interface components {
             keyMode: "live" | "test" | "missing";
             /** @description Stripe pending balance in dollars. Context only: Stripe already excludes it from `available`, so it is never subtracted twice. */
             pending: number;
-            /** @description Up to 200 reserved rows, oldest rental end date first. */
+            /** @description Up to 200 reserved rows, oldest rental end date first (experience rows last). */
             reservedBreakdown: components["schemas"]["ReservedVendorPayoutRowDto"][];
-            /** @description How many rows that sum covers. */
+            /** @description How many rows the reservedVendorPayout/reservedTax sums cover. */
             reservedCount: number;
-            /** @description Sum of every untransferred vendor cut, over ALL rows (not just the capped breakdown below). */
+            /** @description SPLIT audit 2026-09-07 fix-3b: unremitted Stripe Tax collected on the SAME reserved rows, owed to a tax authority, never Splitt's to withdraw. */
+            reservedTax: number;
+            /** @description Sum of every untransferred vendor/host cut (rental + experience; SPLIT audit 2026-09-07 fix-1), over ALL rows (not just the capped breakdown below). */
             reservedVendorPayout: number;
-            /** @description available minus reservedVendorPayout, clamped at zero. The ceiling the POST route enforces. */
+            /** @description available minus reservedVendorPayout minus reservedTax minus inFlightPlatformPayout, clamped at zero. The ceiling the POST route enforces. */
             safeAmount: number;
             /** @description Always true on a 200. */
             success: boolean;
@@ -12327,7 +13320,13 @@ export interface components {
             amount?: number;
             /** Format: uuid */
             bookingId: string;
+            /** @description Renter-visible free-text reason (max 500 characters); shown on the booking and emailed. */
             reason?: string;
+            /**
+             * @description Why the refund was issued. REQUIRED for a vendor-family caller (400 otherwise); an admin may omit it.
+             * @enum {string}
+             */
+            reasonCode?: "early_return" | "unused_days" | "service_issue" | "goodwill" | "overcharge" | "other";
         };
         PromoCode: {
             code: string;
@@ -12551,6 +13550,31 @@ export interface components {
             /** @description The opaque refresh token issued at login. */
             refreshToken: string;
         };
+        RefundIncidentalChargeDto: {
+            /** @description Dollars to refund (at most two decimals). Omit to refund everything still refundable (captured - already refunded). */
+            amount?: number;
+            /** @description Renter-visible reason for the refund (max 500 characters). */
+            reason: string;
+        };
+        RefundableBalanceResponseDto: {
+            /**
+             * @description The captured rental charge, pre-tax (what a refund is clamped against). 0 when the booking is unpaid.
+             * @example 450
+             */
+            charged: number;
+            /** @example usd */
+            currency: string;
+            /**
+             * @description charged - refunded (never negative): the largest amount `POST /payments/refund` accepts now. 0 when unpaid.
+             * @example 410
+             */
+            refundable: number;
+            /**
+             * @description Completed refunds already issued against that charge.
+             * @example 40
+             */
+            refunded: number;
+        };
         RegisterDeviceTokenDto: {
             /** @enum {string} */
             environment?: "sandbox" | "production";
@@ -12577,6 +13601,50 @@ export interface components {
             /** @description Reason for rejection, surfaced to the user. */
             rejectionReason: string;
         };
+        RenterBoaterLicenseDto: {
+            expiresAt?: string | null;
+            issuingState?: string | null;
+            /** @enum {string} */
+            status: "VERIFIED" | "PENDING_REVIEW" | "EXPIRED" | "NONE";
+        };
+        RenterCardDto: {
+            averageRating: number | null;
+            boaterLicense: components["schemas"]["RenterBoaterLicenseDto"] | null;
+            /** @description Bookings this renter has COMPLETED platform-wide. */
+            completedRentals: number;
+            /** @description ISO instant contact access closes (rental end + 7 days). */
+            contactAvailableUntil: string | null;
+            /** @enum {string} */
+            disclosureTier: "NONE" | "REQUEST" | "CONTACT" | "PICKUP" | "RECORD";
+            /** @description Whether a phone number exists at all, so the UI can say "no phone on file" rather than render an empty reveal. */
+            hasPhoneOnFile: boolean;
+            isIdVerified: boolean;
+            isPhoneVerified: boolean;
+            /** @description ISO date the renter joined. */
+            memberSince: string | null;
+        };
+        RenterContactResponseDto: {
+            /** @description The booking this disclosure was made for. */
+            bookingId: string;
+            /** @description ISO instant this access closes (rental end + 7 days). The UI renders it so the vendor knows the window is finite. */
+            disclosedUntil: string | null;
+            /** @description The renter's email address. */
+            email: string | null;
+            /** @description The renter's phone number, or null when they have none on file (phone is optional at registration and checkout). */
+            phone: string | null;
+            /** @description Whether that phone number has been verified by Splitt. */
+            phoneVerified: boolean;
+            /** @description Purpose limitation shown to the vendor at the moment of disclosure. */
+            purposeNotice: string;
+        };
+        ReportReviewDto: {
+            details?: string;
+            /** @enum {string} */
+            reason: "spam" | "harassment" | "inappropriate" | "scam" | "other";
+        };
+        ReportReviewResponseDto: {
+            reported: boolean;
+        };
         RequestDeletionCodeDto: {
             password: string;
         };
@@ -12589,20 +13657,25 @@ export interface components {
             description?: string;
         };
         ReservedVendorPayoutRowDto: {
-            /** @description Booking the cut belongs to. */
+            /** @description The rental booking or experience booking id the cut belongs to. See `bookingKind`. */
             bookingId: string;
             /**
-             * @description Booking status. CONFIRMED rows are reserved too: the money is already in the platform balance and already promised to the vendor.
+             * @description Which table `bookingId` names: `booking` (rental) or `experience_booking` (package).
+             * @enum {string}
+             */
+            bookingKind: "rental" | "experience";
+            /**
+             * @description Booking (or experience booking) status. CONFIRMED rows are reserved too: the money is already in the platform balance and already promised to the payee.
              * @enum {string}
              */
             bookingStatus: "draft" | "pending" | "confirmed" | "cancelled" | "completed" | "rejected";
-            /** @description Rental end date (YYYY-MM-DD), oldest first. */
+            /** @description Rental end date (YYYY-MM-DD), oldest first. Null for an experience row, which sorts last (after every dated rental row), never ahead of one. */
             endDate: string | null;
-            /** @description Ledger transaction id holding the vendor cut. */
+            /** @description Ledger transaction id holding the cut. */
             transactionId: string;
-            /** @description Listing owner who is owed the payout. */
+            /** @description Listing owner (rental) or experience host (package) who is owed the payout. */
             vendorId: string;
-            /** @description Vendor cut still owed, in dollars. */
+            /** @description Payee cut still owed, in dollars. */
             vendorPayout: number;
         };
         ResetPasswordDto: {
@@ -12645,6 +13718,9 @@ export interface components {
             comment: string;
             /** Format: date-time */
             createdAt: string;
+            /** Format: date-time */
+            hiddenAt: string | null;
+            hiddenReason: string | null;
             id: string;
             listing: components["schemas"]["Listing"];
             listingId?: string;
@@ -12774,6 +13850,9 @@ export interface components {
             comment: string;
             /** Format: date-time */
             createdAt: string;
+            /** Format: date-time */
+            hiddenAt: string | null;
+            hiddenReason: string | null;
             id: string;
             rating: number;
             reviewer: components["schemas"]["User"];
@@ -12830,6 +13909,16 @@ export interface components {
             reason?: string;
             suspended: boolean;
         };
+        SetTtdEnabledDto: {
+            enabled: boolean;
+        };
+        SetTtdIncludedDto: {
+            included: boolean;
+        };
+        SetTtdPlaceStatusDto: {
+            /** @enum {string} */
+            status: "auto" | "pinned" | "removed";
+        };
         SetUserAccessDto: {
             entitlements: ("admin" | "crm" | "crm_write" | "finance" | "finance_write" | "operations" | "operations_write" | "users" | "users_write" | "catalog" | "catalog_write" | "content" | "content_write" | "vendor_onboarding" | "vendor_onboarding_write")[];
             /** @enum {string} */
@@ -12859,7 +13948,9 @@ export interface components {
         };
         SimulateDisputeDto: {
             /** Format: uuid */
-            bookingId: string;
+            bookingId?: string;
+            /** Format: uuid */
+            experienceBookingId?: string;
         };
         StayBedTypeDto: {
             count: number;
@@ -13106,7 +14197,7 @@ export interface components {
              * @description Transaction type.
              * @enum {string}
              */
-            type: "payment" | "refund" | "payout" | "platform_fee" | "deposit" | "deposit_release" | "deposit_claim" | "date_change";
+            type: "payment" | "refund" | "payout" | "platform_fee" | "deposit" | "deposit_release" | "deposit_claim" | "date_change" | "incidental";
             /**
              * Format: decimal
              * @description Vendor payout share (DECIMAL string).
@@ -13159,7 +14250,7 @@ export interface components {
              * @description Transaction type.
              * @enum {string}
              */
-            type: "payment" | "refund" | "payout" | "platform_fee" | "deposit" | "deposit_release" | "deposit_claim" | "date_change";
+            type: "payment" | "refund" | "payout" | "platform_fee" | "deposit" | "deposit_release" | "deposit_claim" | "date_change" | "incidental";
         };
         TransactionalOverrideDto: {
             bodyHtml: string;
@@ -13188,6 +14279,10 @@ export interface components {
         TriggerReportsDto: {
             /** @enum {string} */
             frequency: "daily" | "weekly" | "monthly" | "quarterly" | "annual" | "none";
+        };
+        TriggerTtdRunDto: {
+            /** @enum {string} */
+            mode: "dry_run" | "upload";
         };
         TripGuideDto: {
             /**
@@ -13380,6 +14475,12 @@ export interface components {
             isActive?: boolean;
             maximumCommissionFee?: number;
             minimumCommissionFee?: number;
+            /**
+             * @description SPLIT-1670: flat platform commission (percent) on post-trip / incidental
+             *     charges. `null` CLEARS it (post-trip charges then use the vendor's normal
+             *     commission); omitted leaves it unchanged.
+             */
+            postTripCommissionRate?: number | null;
             renterServiceFeeRate?: number;
             tieredRates?: components["schemas"]["TieredRateDto"][];
         };
@@ -13485,10 +14586,10 @@ export interface components {
              */
             includedItems?: components["schemas"]["IncludedItemDto"][];
             instantBook?: boolean;
-            latitude?: number;
+            latitude?: number | null;
             leadTimeDays?: number;
             location?: string;
-            longitude?: number;
+            longitude?: number | null;
             make?: string;
             maxGuests?: number;
             maxRentalDays?: number;
@@ -13499,9 +14600,21 @@ export interface components {
             model?: string;
             monthlyDiscountPct?: number;
             name?: string;
+            /**
+             * @description SPLIT-1708 - lets the admin UI opt out of the "Splitt added a video to your
+             *     listing" bell + email for THIS save. Omitted means true. Honoured only for a
+             *     write-level curator saving a listing they do not own; for the owner it is
+             *     ignored (a vendor save never notifies anyone). A request instruction, not
+             *     listing state: it is never persisted. `@StrictBoolean` is mandatory (see
+             *     instantBook above): implicit conversion would turn the string "false" into
+             *     true and silently notify a vendor the admin asked not to notify.
+             *     Not a pricing field.
+             */
+            notifyVendor?: boolean;
             pricePerDay?: number;
             pricePerHour?: number;
             pricingType?: string;
+            requiresBoaterLicense?: boolean;
             requiresIdVerification?: boolean;
             /** @enum {string} */
             status?: "draft" | "available" | "unavailable" | "rented" | "archived";
@@ -13515,6 +14628,17 @@ export interface components {
             taxResponsibilityAck?: boolean;
             taxState?: string;
             timeSlotDuration?: number;
+            timezone?: string | null;
+            usagePolicy?: components["schemas"]["UsagePolicyDto"] | null;
+            /**
+             * @description SPLIT-1700 - up to 3 YouTube links, `{ url }` only. The server resolves
+             *     each into the stored object (id, title, orientation, thumbnail, addedBy);
+             *     a client-sent `title`/`status`/`addedBy` is a 400. Full replace on every PUT
+             *     that includes the field (`[]` or `null` clears); omitting it leaves the column
+             *     alone.
+             *     Not a pricing field.
+             */
+            videoEmbeds?: components["schemas"]["VideoEmbedInputDto"][] | null;
             videoUrls?: string[];
             /** @enum {string} */
             weatherPolicy?: "none" | "full_refund";
@@ -13717,6 +14841,25 @@ export interface components {
             enabled?: boolean;
             key: string;
             rolloutPercentage?: number;
+        };
+        UsagePolicyDto: {
+            fuel?: components["schemas"]["FuelPolicyDto"];
+            generator?: components["schemas"]["GeneratorPolicyDto"];
+            mileage?: components["schemas"]["MileagePolicyDto"];
+        };
+        UsageSummaryResponseDto: {
+            fuel: components["schemas"]["FuelUsageSummaryDto"] | null;
+            generator: components["schemas"]["GeneratorUsageSummaryDto"] | null;
+            mileage: components["schemas"]["MileageUsageSummaryDto"] | null;
+            /** @description Absent/inconsistent readings, e.g. ['return.odometer'] (see computeUsageSummary). */
+            missing: string[];
+            /** @description Billable days of the trip (an hourly booking bills one). */
+            rentalDays: number;
+            /**
+             * @description 'snapshot' = the policy the renter booked under; 'listing' is legacy and no longer emitted (SPLIT-1680: a booking made before snapshots existed has no usage terms and 400s with reason no_usage_policy); kept so existing client decoders stay valid.
+             * @enum {string}
+             */
+            source: "snapshot" | "listing";
         };
         User: {
             /**
@@ -14120,6 +15263,10 @@ export interface components {
             /** @description Email verification token from the emailed link */
             token: string;
         };
+        VideoEmbedInputDto: {
+            /** Format: uri */
+            url: string;
+        };
         WaiverAgreement: {
             bookingId: string | null;
             contentSnapshot: string | null;
@@ -14407,6 +15554,195 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    GoogleTtdAdminController_overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoogleTtdAdminController_runs: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    GoogleTtdAdminController_trigger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerTtdRunDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoogleTtdAdminController_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoogleTtdAdminController_payload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GoogleTtdAdminController_vendorList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    GoogleTtdAdminController_pause: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendorId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PauseTtdVendorDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoogleTtdAdminController_resume: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendorId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoogleTtdAdminController_vendorStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendorId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -14765,7 +16101,7 @@ export interface operations {
             };
         };
     };
-    InsuranceAdminController_getDocumentUrl: {
+    InsuranceAdminController_getDocument: {
         parameters: {
             query?: never;
             header?: never;
@@ -14776,11 +16112,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description The policy document bytes, served with the content type sniffed from the stored file (inline for a recognised image/PDF, attachment otherwise). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/pdf": string;
+                    "image/gif": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                };
             };
         };
     };
@@ -15170,6 +16513,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    ReconciliationController_getIncidentalMissingCredit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -15760,7 +17122,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -15999,8 +17363,8 @@ export interface operations {
     };
     AiController_getDemandForecast: {
         parameters: {
-            query: {
-                location: string;
+            query?: {
+                location?: string;
             };
             header?: never;
             path?: never;
@@ -17185,6 +18549,25 @@ export interface operations {
             };
         };
     };
+    AuthController_revokeSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     BlackoutController_remove: {
         parameters: {
             query?: never;
@@ -17480,6 +18863,47 @@ export interface operations {
     };
     BookingController_exportICal: {
         parameters: {
+            query?: {
+                /** @description The listing’s iCal feed secret (see feed-url mint/rotate). Omit for the legacy nameless feed. */
+                key?: string;
+            };
+            header?: never;
+            path: {
+                listingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BookingController_getIcalFeedUrl: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BookingController_rotateIcalFeedUrl: {
+        parameters: {
             query?: never;
             header?: never;
             path: {
@@ -17566,6 +18990,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description SPLIT-1670: priced add-on lines (selected + server-injected required ones). */
+                        addOns?: {
+                            lineTotal?: number;
+                            name?: string;
+                            /** @description Unit price in both pricing modes. */
+                            pricePerDay?: number;
+                            /** @enum {string} */
+                            pricing?: "per_day" | "per_booking";
+                            quantity?: number;
+                            required?: boolean;
+                        }[];
                         addOnsTotal?: number;
                         baseBeforeDiscount?: number;
                         cleaningFee?: number;
@@ -17592,6 +19027,8 @@ export interface operations {
                         petFee?: number;
                         premium?: number;
                         quantity: number;
+                        /** @description SPLIT-1670: the part of `addOnsTotal` that is required add-ons (not opt-out-able). */
+                        requiredFeesTotal?: number;
                         stayFeesTotal?: number;
                         total: number;
                     };
@@ -17843,6 +19280,27 @@ export interface operations {
             };
         };
     };
+    BookingController_getRenterContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenterContactResponseDto"];
+                };
+            };
+        };
+    };
     BookingController_proposeReschedule: {
         parameters: {
             query?: never;
@@ -17981,6 +19439,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    BookingController_getUsageSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageSummaryResponseDto"];
                 };
             };
         };
@@ -19022,6 +20501,48 @@ export interface operations {
             };
         };
     };
+    GoogleTtdPublicController_package: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoogleTtdPublicController_rental: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     DynamicPricingController_applySuggestedPrices: {
         parameters: {
             query?: never;
@@ -19066,9 +20587,9 @@ export interface operations {
     };
     DynamicPricingController_calculatePriceRange: {
         parameters: {
-            query?: {
-                startDate?: string;
-                endDate?: string;
+            query: {
+                startDate: string;
+                endDate: string;
             };
             header?: never;
             path: {
@@ -20010,6 +21531,31 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    "ExperiencesController_reportReview[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportReviewDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportReviewResponseDto"];
+                };
             };
         };
     };
@@ -21041,6 +22587,31 @@ export interface operations {
             };
         };
     };
+    IncidentalChargesController_refund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefundIncidentalChargeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentalCharge"];
+                };
+            };
+        };
+    };
     IncidentalChargesController_resolve: {
         parameters: {
             query?: never;
@@ -21177,7 +22748,7 @@ export interface operations {
             };
         };
     };
-    InsurancePolicyController_getDocumentUrl: {
+    InsurancePolicyController_getDocument: {
         parameters: {
             query?: never;
             header?: never;
@@ -21188,11 +22759,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description The policy document bytes, served with the content type sniffed from the stored file (inline for a recognised image/PDF, attachment otherwise). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/pdf": string;
+                    "image/gif": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                };
             };
         };
     };
@@ -22806,6 +24384,31 @@ export interface operations {
             };
         };
     };
+    "ExperiencesController_reportReview[1]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportReviewDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportReviewResponseDto"];
+                };
+            };
+        };
+    };
     "ExperiencesController_search[1]": {
         parameters: {
             query: {
@@ -23381,6 +24984,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    PaymentController_getRefundableBalance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundableBalanceResponseDto"];
+                };
             };
         };
     };
@@ -24969,6 +26593,52 @@ export interface operations {
             };
         };
     };
+    ReviewController_blockAuthor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlockResponseDto"];
+                };
+            };
+        };
+    };
+    ReviewController_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportReviewDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportReviewResponseDto"];
+                };
+            };
+        };
+    };
     ReviewController_editResponse: {
         parameters: {
             query?: never;
@@ -25532,7 +27202,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ServiceBooking"];
+                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -25556,6 +27226,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ServiceReview"];
+                };
+            };
+        };
+    };
+    ServicesController_reportReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportReviewDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportReviewResponseDto"];
                 };
             };
         };
@@ -25601,7 +27296,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Service"];
+                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -26035,6 +27730,67 @@ export interface operations {
         };
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UserBlockController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlockedUserDto"][];
+                };
+            };
+        };
+    };
+    UserBlockController_block: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BlockUserDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlockResponseDto"];
+                };
+            };
+        };
+    };
+    UserBlockController_unblock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                blockId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -26774,6 +28530,143 @@ export interface operations {
             };
         };
     };
+    GoogleTtdVendorController_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoogleTtdVendorController_setEnabled: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetTtdEnabledDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoogleTtdVendorController_setIncluded: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetTtdIncludedDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoogleTtdVendorController_refreshPlaces: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoogleTtdVendorController_setPlaceStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                placeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetTtdPlaceStatusDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoogleTtdVendorController_acceptTerms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptTtdTermsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     VendorController_getVendorEarnings: {
         parameters: {
             query?: never;
@@ -27213,7 +29106,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VendorWaiver"][];
+                    "application/json": Record<string, never>[];
                 };
             };
         };
@@ -27234,7 +29127,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VendorWaiver"];
+                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -27259,7 +29152,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VendorWaiver"];
+                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -27279,7 +29172,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -27299,7 +29194,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VendorWaiver"];
+                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -27307,7 +29202,6 @@ export interface operations {
     VerificationController_getBoaterLicenseStatus: {
         parameters: {
             query: {
-                /** @description The listing ID to check against */
                 listingId: string;
             };
             header?: never;
@@ -27448,7 +29342,7 @@ export interface operations {
             };
         };
     };
-    VerificationController_getVerificationDocumentUrl: {
+    VerificationController_getVerificationDocument: {
         parameters: {
             query?: never;
             header?: never;
@@ -27459,11 +29353,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description The KYC document bytes, served with the content type sniffed from the stored file (inline for a recognised image/PDF, attachment otherwise). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/pdf": string;
+                    "image/gif": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                };
             };
         };
     };
