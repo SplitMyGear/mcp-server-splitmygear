@@ -592,6 +592,419 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/gear-guide/gaps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gear Guide gaps across all listings, newest first (default: open) */
+        get: operations["AdminGearGuideController_gaps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-guide/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quality and cost dashboard over the last N days (1..90, default 7) */
+        get: operations["AdminGearGuideController_getStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List and search gear models */
+        get: operations["AdminGearModelController_list"];
+        put?: never;
+        /** Create a gear model */
+        post: operations["AdminGearModelController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/_diag/pdf-runtime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Diagnostic: can this runtime parse and rasterize a PDF? (no input; builds a probe PDF in memory) */
+        get: operations["AdminGearModelController_pdfRuntime"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/category-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List category-scope knowledge items */
+        get: operations["AdminGearModelController_listCategoryItems"];
+        put?: never;
+        /** Create a category-scope knowledge item */
+        post: operations["AdminGearModelController_createCategoryItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/category-items/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update a category-scope knowledge item */
+        put: operations["AdminGearModelController_updateCategoryItem"];
+        post?: never;
+        /** Delete a category-scope knowledge item */
+        delete: operations["AdminGearModelController_removeCategoryItem"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/seed-baseline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Load the RV and Boating category baseline (idempotent) */
+        post: operations["AdminGearModelController_seedBaseline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one gear model */
+        get: operations["AdminGearModelController_get"];
+        /** Update a gear model */
+        put: operations["AdminGearModelController_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/build": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The latest build of the model: steps, attempts, errors and cost */
+        get: operations["AdminGearModelController_getBuild"];
+        put?: never;
+        /** Start (or restart, with force) the pack build: one outbox-driven job per step. A running build is returned unchanged. */
+        post: operations["AdminGearModelController_build"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/build/run-next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run the next pending build step inline (up to about 240 s); safe alongside the cron drain */
+        post: operations["AdminGearModelController_runNext"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A model's knowledge items (optionally by status), with their review state */
+        get: operations["AdminGearGuideController_listItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/items/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edit a model's DRAFT item (title, topic, body, steps with their warnings); voids a prior approval */
+        put: operations["AdminGearGuideController_updateItem"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/items/{itemId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stamp a draft item as reviewed (reviewedAt, reviewedBy). Publish does not gate on it. */
+        post: operations["AdminGearGuideController_approveItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/items/{itemId}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject a draft item: it is retired and never published */
+        post: operations["AdminGearGuideController_retireItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/manual-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fetch a manufacturer manual (https PDF, up to 50 MB) into the private store */
+        post: operations["AdminGearModelController_manualUrl"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/manuals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the manuals of the model (never their storage keys) */
+        get: operations["AdminGearModelController_listManuals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/manuals/{manualId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a manual (its file is deleted from the private store) */
+        delete: operations["AdminGearModelController_removeManual"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/manuals/{manualId}/url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A signed read URL for a manual, valid for 300 seconds. The only way a manual is ever opened. */
+        get: operations["AdminGearModelController_manualSignedUrl"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A model's figures and photos (never storage keys) */
+        get: operations["AdminGearGuideController_listMedia"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/media/{mediaId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edit a figure caption and/or alt text */
+        put: operations["AdminGearGuideController_updateMedia"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Merge a duplicate model into this one (the duplicate is retired) */
+        post: operations["AdminGearModelController_merge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish the draft pack: items go live, packVersion +1, older cached answers are dropped */
+        post: operations["AdminGearModelController_publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set the status of a gear model */
+        patch: operations["AdminGearModelController_setStatus"];
+        trace?: never;
+    };
+    "/api/v1/admin/gear-models/{id}/topics/refresh-questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rewrite the model's suggested topic questions in natural wording from the item titles and kinds. No rebuild, no AI; idempotent. Category-list topics keep their written questions. */
+        post: operations["AdminGearModelController_refreshTopicQuestions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/insurance-policies": {
         parameters: {
             query?: never;
@@ -5261,6 +5674,504 @@ export interface paths {
         };
         /** Get detailed stats for a specific unit */
         get: operations["FleetController_getUnitStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/bookings/{bookingId}/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask the Gear Guide about a booking. Streams Server-Sent Events (meta, delta, retract, answer, error); ?stream=false returns the final answer as JSON. `retract` ({}) means every delta so far is withdrawn: clear the draft, a replacement stream and the final answer (possibly a hand-off) follow. Without sessionId a NEW session starts; pass the sessionId from `meta` to continue a conversation. The `answer` payload (SSE and JSON alike) carries `vendor_verified` (boolean: a vendor vouched for the cached answer; false for a live answer) and, on every entry of `sources`, an `origin` of `manual`, `vendor` or `category`. */
+        post: operations["GearGuideAskController_ask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/bookings/{bookingId}/pack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The offline pack for this booking: topics, published items, ready answers and media. ETag / If-None-Match supported (304). */
+        get: operations["GearGuideAskController_pack"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/bookings/{bookingId}/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The booking's Gear Guide conversation so far */
+        get: operations["GearGuideAskController_session"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/bookings/{bookingId}/topics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggested questions: the topics the guide covers for this gear, and the listing's quirks */
+        get: operations["GearGuideAskController_topics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/conversations/{conversationId}/messages/{messageId}/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save the caller's OWN chat reply to the Gear Guide of the listing the conversation is about (the caller must own it and have the guide on): a listing-scope verified FAQ item */
+        post: operations["VendorGearGuideController_saveChatReply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/gaps/open-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open gaps across every listing the caller owns (the nav badge), and per listing */
+        get: operations["VendorGearGuideController_openGapCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/listings/{id}/faq": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The answers the guide already has for this listing (model's and listing's) */
+        get: operations["GearGuideController_faq"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/listings/{id}/faq/{topic}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace the answer on a topic for THIS listing with the vendor's own wording (verified, listing scope) */
+        put: operations["VendorGearGuideController_overrideFaq"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/listings/{id}/faq/{topic}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vouch for the guide's answer on a topic for THIS listing (Host-verified): a listing-scope verified cache entry plus a listing FAQ item. The shared model answer is untouched. */
+        post: operations["VendorGearGuideController_approveFaq"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/listings/{id}/faq/{topic}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hide a topic for this listing: the guide no longer answers it from any cache, and it leaves the offline pack */
+        post: operations["VendorGearGuideController_hideFaq"];
+        /** Show a hidden topic again for this listing */
+        delete: operations["VendorGearGuideController_unhideFaq"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/listings/{id}/gaps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Questions the guide could not answer (open by default) */
+        get: operations["GearGuideController_listGaps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/listings/{id}/gaps/{gapId}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer a gap: creates a FAQ item and a verified cache entry */
+        post: operations["GearGuideController_answerGap"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/listings/{id}/gaps/{gapId}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss a gap without answering it */
+        post: operations["GearGuideController_dismissGap"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/listings/{id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the listing's own knowledge items */
+        get: operations["GearGuideController_listItems"];
+        put?: never;
+        /** Add a knowledge item to the listing */
+        post: operations["GearGuideController_createItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/listings/{id}/items/draft-from-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn free-text notes into DRAFT knowledge items (AI) */
+        post: operations["GearGuideController_draftFromNotes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/listings/{id}/items/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update a knowledge item of the listing */
+        put: operations["GearGuideController_updateItem"];
+        post?: never;
+        /** Delete a knowledge item of the listing */
+        delete: operations["GearGuideController_removeItem"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/listings/{id}/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the listing's Gear Guide media */
+        get: operations["GearGuideController_listMedia"];
+        put?: never;
+        /** Attach a photo, figure or video embed to the listing */
+        post: operations["GearGuideController_addMedia"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/listings/{id}/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Link (or unlink) the listing to a gear model */
+        put: operations["GearGuideController_linkModel"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/listings/{id}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gear Guide settings of the listing */
+        get: operations["GearGuideController_getSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update the Gear Guide settings of the listing */
+        patch: operations["GearGuideController_updateSettings"];
+        trace?: never;
+    };
+    "/api/v1/gear-guide/listings/{listingId}/preview-ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A listing's owner or an admin tries the Gear Guide as a renter would, with no booking. Same pipeline; it never writes the answer cache. */
+        post: operations["GearGuideAskController_previewAsk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search gear models to link a listing to */
+        get: operations["GearGuideController_searchModels"];
+        put?: never;
+        /** Find the model with this make, model and variant, or add it as PENDING (ops build its pack). `created` says which. */
+        post: operations["VendorGearGuideController_createModel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/models/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A model as a vendor sees it: identity, photo checklist, how many OTHER listings use it, and whether a manual is waiting for a build */
+        get: operations["VendorGearGuideController_getModel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/models/{id}/build": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The build status of a model the caller's listing uses: a state (no_manual, awaiting_build, building, in_review, published, failed) and counts, never costs or errors. Read only: a vendor cannot start a build. */
+        get: operations["VendorGearGuideController_getBuild"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/models/{id}/manual": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a manual uploaded to the private store, with the attestation that the caller may share it */
+        post: operations["GearGuideController_addManual"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/models/{id}/manual/upload-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Client-upload handshake for a manual (PDF, up to 50 MB, private store, manuals/<modelId>/). Complete with POST models/:id/manual. */
+        post: operations["GearGuideController_manualUploadToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/models/{id}/manuals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The model's manuals (label, pages, size; never the file or its key) and the exact attestation text and version a vendor accepts when adding one */
+        get: operations["GearGuideController_listManuals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/turns/{turnId}/escalate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hand the question to the vendor: it goes into the booking's messages, becomes a gap in the vendor's Gear Guide, and notifies them. Repeating it changes nothing. */
+        post: operations["GearGuideAskController_escalate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/turns/{turnId}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thumbs up or down on an answer */
+        post: operations["GearGuideAskController_feedback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/geo/resolve-place": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GeoController_resolvePlace"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10289,6 +11200,13 @@ export interface components {
             comment: string;
             rating?: number;
         };
+        AnswerGapDto: {
+            answer: string;
+            /** @description The question as the vendor words it for every renter to see: the FAQ item's title, its example question and, when topicSlug is omitted, the source of its slug. Write it fresh; the renter's own wording (names, codes, site numbers) must not be copied into published content. */
+            title: string;
+            /** @description Topic slug for the new FAQ item; derived from the vendor-written title when omitted. */
+            topicSlug?: string;
+        };
         ApiErrorResponse: {
             /**
              * @description Optional machine-readable error code for domain errors with a stable identifier (e.g. `LIFECYCLE_ILLEGAL_TRANSITION`). Omitted otherwise. Authentication failures (401) carry one of `TOKEN_MISSING`, `TOKEN_EXPIRED`, `TOKEN_INVALID` (the access token), `REFRESH_INVALID` (the refresh token: the session is over) or `ACCOUNT_SUSPENDED`; the `message` text is unchanged and clients that ignore `code` are unaffected.
@@ -10393,6 +11311,26 @@ export interface components {
             password?: string;
             /** @description Honeypot — a filled value means a bot; the submission is dropped silently. */
             website?: string;
+        };
+        AskDto: {
+            /**
+             * @description Which client is asking. Default web.
+             * @enum {string}
+             */
+            channel?: "ios" | "android" | "web" | "siri";
+            /**
+             * Format: uri
+             * @description A photo of the thing the question is about (https, on an allowed image host). Answered by the vision models; not streamed token by token.
+             */
+            imageUrl?: string;
+            /** @description BCP 47 language tag the answer should be written in, e.g. "es". */
+            locale?: string;
+            question: string;
+            /**
+             * Format: uuid
+             * @description Continue this session. Omitted: the booking's latest session, or a new one.
+             */
+            sessionId?: string;
         };
         AudienceSegmentCriteriaDto: {
             /** @enum {string} */
@@ -10900,6 +11838,24 @@ export interface components {
             verifiedAt: string;
             verifiedById: string;
         };
+        BrowseGeoDto: {
+            /**
+             * @description Geocoded place label; null when the client sent coordinates.
+             * @example Minneapolis, Minnesota
+             */
+            label: string | null;
+            /** @example 44.97997 */
+            lat: number;
+            /** @example -93.26384 */
+            lng: number;
+            /**
+             * @description Radius in km.
+             * @example 40
+             */
+            radiusKm: number;
+            /** @enum {string} */
+            source: "client" | "geocoded";
+        };
         Buffer: Record<string, never>;
         BulkCreateUnitsDto: {
             /**
@@ -11011,6 +11967,11 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             url: string;
+        };
+        CalloutDto: {
+            label: string;
+            x: number;
+            y: number;
         };
         Campaign: {
             /** Format: date-time */
@@ -11526,6 +12487,19 @@ export interface components {
             spotsTotal?: number;
             startTime: string;
         };
+        CreateGearModelDto: {
+            aliases?: string[];
+            /** @enum {string} */
+            category: "E-Bikes" | "Biking" | "Camping" | "RV" | "Hiking" | "Water Sports" | "Winter Sports" | "Snow Sports" | "Climbing" | "Surfing" | "Fishing" | "Golf" | "Kayaking" | "Skiing" | "Tennis" | "Boating" | "ATVs" | "Photography" | "Electronics" | "Cabins" | "Campsites" | "RV Sites" | "Glamping" | "Other";
+            make: string;
+            /** Format: uri */
+            manufacturerUrl?: string;
+            model: string;
+            /** @description Boats: the engine, e.g. "Yamaha F150 outboard". */
+            variant?: string;
+            yearFrom?: number;
+            yearTo?: number;
+        };
         CreateIncidentalChargeDto: {
             /** @description Amount requested from the renter (USD, > 0). The REAL ceiling is booking-relative and enforced server-side in fileCharge (SPLIT-1191). This 1,000,000 bound is only a fail-fast sanity check. */
             amount: number;
@@ -11680,6 +12654,30 @@ export interface components {
             weatherPolicy?: "none" | "full_refund";
             weeklyDiscountPct?: number;
             year?: number;
+        };
+        CreateListingItemDto: {
+            bodyMd: string;
+            /** @enum {string} */
+            kind: "procedure" | "fact" | "warning" | "faq" | "quirk";
+            /**
+             * @default draft
+             * @enum {string}
+             */
+            status: "draft" | "published";
+            steps?: components["schemas"]["GearStepDto"][];
+            tags?: string[];
+            title: string;
+            /** @example water-heater-bypass */
+            topicSlug: string;
+        };
+        CreateListingMediaDto: {
+            alt?: string;
+            callouts?: components["schemas"]["CalloutDto"][];
+            caption?: string;
+            /** @enum {string} */
+            kind: "photo" | "figure" | "video_embed";
+            /** @description https URL on the platform media host allow-list (a YouTube link for video_embed). */
+            url: string;
         };
         CreateListingRouteDto: {
             /** @enum {string} */
@@ -12001,6 +12999,16 @@ export interface components {
             storeName?: string;
             termsAccepted?: boolean;
         };
+        CreateVendorGearModelDto: {
+            /** @enum {string} */
+            category: "E-Bikes" | "Biking" | "Camping" | "RV" | "Hiking" | "Water Sports" | "Winter Sports" | "Snow Sports" | "Climbing" | "Surfing" | "Fishing" | "Golf" | "Kayaking" | "Skiing" | "Tennis" | "Boating" | "ATVs" | "Photography" | "Electronics" | "Cabins" | "Campsites" | "RV Sites" | "Glamping" | "Other";
+            make: string;
+            model: string;
+            /** @description Boats: the engine. */
+            variant?: string;
+            yearFrom?: number;
+            yearTo?: number;
+        };
         CreateVendorPromoCodeDto: {
             code: string;
             description?: string;
@@ -12145,6 +13153,10 @@ export interface components {
             status: "open" | "under_review" | "resolved_renter" | "resolved_vendor" | "compromise" | "closed";
             /** Format: date-time */
             updatedAt: string;
+        };
+        DraftFromNotesDto: {
+            /** @description Free-text notes from the vendor about this unit. */
+            notes: string;
         };
         DraftMessageDto: Record<string, never>;
         DynamicPricingConfig: {
@@ -12325,6 +13337,14 @@ export interface components {
             featuredUntil?: string | null;
             isFeatured: boolean;
         };
+        FetchManualUrlDto: {
+            label?: string;
+            /**
+             * Format: uri
+             * @description An https URL of the manufacturer manual (a PDF).
+             */
+            url: string;
+        };
         FinalizeVerificationDto: {
             /** Format: uri */
             blobUrl: string;
@@ -12356,6 +13376,186 @@ export interface components {
             policy: "return_same_level" | "prepaid" | "none";
             returnPct: number | null;
             suggestedAmount: number;
+        };
+        GearAnswerCache: {
+            /** @description The answer: {text, steps?[], warnings?[]}. */
+            answer: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            /** @description SPLIT-1737: thumbs-down votes on turns that used this entry; 2 flags it. */
+            downCount: number;
+            flagged: boolean;
+            hitCount: number;
+            id: string;
+            /** Format: date-time */
+            lastHitAt: string | null;
+            modelUsed: string | null;
+            packVersion: number;
+            questionExamples: string[];
+            /** @enum {string} */
+            scope: "model" | "listing";
+            scopeId: string;
+            /** @description Knowledge items the answer was drawn from. */
+            sources: Record<string, never>[];
+            topicSlug: string;
+            /** Format: date-time */
+            updatedAt: string;
+            vendorVerified: boolean;
+        };
+        GearGuideGap: {
+            answeredItem: components["schemas"]["GearKnowledgeItem"] | null;
+            answeredItemId: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            gearModel: components["schemas"]["GearModel"] | null;
+            gearModelId: string | null;
+            id: string;
+            listing: components["schemas"]["Listing"];
+            listingId: string;
+            question: string;
+            session: components["schemas"]["GearGuideSession"] | null;
+            sessionId: string | null;
+            /** @enum {string} */
+            status: "open" | "answered" | "dismissed";
+            turn: components["schemas"]["GearGuideTurn"] | null;
+            /** @description SPLIT-1737: the hand-off turn this gap came from (one gap per turn). */
+            turnId: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        GearGuideSession: {
+            booking: components["schemas"]["Booking"] | null;
+            bookingId: string | null;
+            /** @enum {string} */
+            channel: "ios" | "android" | "web" | "siri";
+            costMicrousd: number;
+            id: string;
+            listing: components["schemas"]["Listing"];
+            listingId: string;
+            renter: components["schemas"]["User"];
+            renterId: string;
+            /** Format: date-time */
+            startedAt: string;
+            turnsCount: number;
+        };
+        GearGuideTurn: {
+            /** @description Structured answer shown to the renter, when there is one. */
+            answer: {
+                [key: string]: unknown;
+            } | null;
+            cacheEntry: components["schemas"]["GearAnswerCache"] | null;
+            /** @description SPLIT-1737: the cache entry this turn served (hit) or wrote (write-back). */
+            cacheEntryId: string | null;
+            content: string;
+            costMicrousd: number;
+            /** Format: date-time */
+            createdAt: string;
+            escalated: boolean;
+            /** @enum {string|null} */
+            feedback: "up" | "down" | null;
+            feedbackNote: string | null;
+            id: string;
+            /**
+             * @description SPLIT-1737 follow-up: the `Idempotency-Key` the client sent with the ask
+             *     (a UUID), set on the ASSISTANT turn. A repeat with the same key in the same
+             *     scope within 10 minutes replays this turn's stored answer.
+             */
+            idempotencyKey: string | null;
+            /** @description `<renterId>:<bookingId>`: the key is only ever unique inside one renter's one booking. */
+            idempotencyScope: string | null;
+            latencyMs: number | null;
+            modelUsed: string | null;
+            /** @description SPLIT-1737: a vendor/admin preview turn; it never moves the cache counters. */
+            preview: boolean;
+            /** @enum {string} */
+            role: "user" | "assistant";
+            session: components["schemas"]["GearGuideSession"];
+            sessionId: string;
+            /** @enum {string|null} */
+            tier: "vendor" | "cache" | "ondevice" | "server" | null;
+            topicSlug: string | null;
+            /** @description SPLIT-1737: ms from the request to the first streamed delta (null: not streamed). */
+            ttfdMs: number | null;
+        };
+        GearKnowledgeItem: {
+            /** @description Plain uuid (no FK): the author's departure never rewrites the item. */
+            authorId: string | null;
+            bodyMd: string;
+            /** Format: date-time */
+            createdAt: string;
+            id: string;
+            /** @enum {string} */
+            kind: "procedure" | "fact" | "warning" | "faq" | "quirk";
+            /** @enum {string} */
+            scope: "category" | "model" | "listing";
+            scopeId: string;
+            /** @description Provenance: {type: manual|vendor|platform|chat, ref?, page?}. */
+            source: {
+                [key: string]: unknown;
+            };
+            /** @enum {string} */
+            status: "published" | "retired" | "draft";
+            /** @description Ordered steps: [{text, mediaIds[], warning?}]. */
+            steps: Record<string, never>[];
+            tags: string[];
+            title: string;
+            topicSlug: string;
+            /** Format: date-time */
+            updatedAt: string;
+            version: number;
+        };
+        GearMedia: {
+            alt: string | null;
+            /** @description Plain uuid (no FK): the approver's departure never rewrites history. */
+            approvedBy: string | null;
+            blobKey: string | null;
+            /** @description Labelled points on the image: [{x, y, label}]. */
+            callouts: Record<string, never>[];
+            caption: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            id: string;
+            /** @enum {string} */
+            kind: "photo" | "figure" | "video_embed";
+            /** @enum {string} */
+            scope: "category" | "model" | "listing";
+            scopeId: string;
+            source: string;
+            url: string | null;
+        };
+        GearModel: {
+            aliases: string[];
+            category: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description Plain uuid on purpose (no FK): removing a staff account never rewrites history. */
+            createdBy: string | null;
+            id: string;
+            make: string;
+            /** @description Private blob key of the owner's manual; never returned to clients. */
+            manualBlobKey: string | null;
+            manufacturerUrl: string | null;
+            model: string;
+            packVersion: number;
+            /** @description Photo checklist: [{key, label}]. */
+            photoChecklist: Record<string, never>[];
+            /** @enum {string} */
+            status: "pending" | "building" | "published" | "retired";
+            /** @description Topic list for this model: [{slug, title, examples[]}]. */
+            topics: Record<string, never>[];
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description Boats: the engine, e.g. "Yamaha F150 outboard". */
+            variant: string | null;
+            yearFrom: number | null;
+            yearTo: number | null;
+        };
+        GearStepDto: {
+            mediaIds?: string[];
+            text: string;
+            warning?: string;
         };
         GenerateDescriptionDto: {
             category: string;
@@ -12590,6 +13790,13 @@ export interface components {
             email?: string;
             ttlHours?: number;
         };
+        LinkListingModelDto: {
+            /**
+             * Format: uuid
+             * @description The gear model to link, or null to unlink.
+             */
+            gearModelId?: string | null;
+        };
         Listing: {
             addOns: string[];
             advanceBookingDays: number;
@@ -12641,6 +13848,13 @@ export interface components {
             estimatedValue: string;
             /** Format: date-time */
             featuredUntil: string | null;
+            gearGuideEnabled: boolean;
+            /** @description SPLIT-1735. Gear Guide settings: { alwaysHandOffTopics: string[], window: rental_only | always }. */
+            gearGuideSettings: {
+                [key: string]: unknown;
+            } | null;
+            gearModel?: components["schemas"]["GearModel"] | null;
+            gearModelId: string | null;
             icalFeedToken: string | null;
             icalUrl: string;
             id: string;
@@ -12747,6 +13961,8 @@ export interface components {
         ListingBrowseResponseDto: {
             /** @description The current page of listings (owner projected to public-safe fields). */
             data: components["schemas"]["Listing"][];
+            /** @description SPLIT-1727: the radius centre applied to a location search; absent when the location matched by text only (a region, or no geocode). */
+            geo?: components["schemas"]["BrowseGeoDto"];
             /** @description The page size. */
             limit: number;
             /** @description The current 1-based page number. */
@@ -12974,6 +14190,13 @@ export interface components {
         MarkNotReturnedDto: {
             note?: string;
         };
+        MergeGearModelsDto: {
+            /**
+             * Format: uuid
+             * @description The duplicate to fold into the model in the path; it is retired.
+             */
+            loserId: string;
+        };
         Message: {
             content: string;
             conversation: components["schemas"]["Conversation"];
@@ -13066,7 +14289,7 @@ export interface components {
             message: string;
             recipientId: string;
             /** @enum {string} */
-            type: "NEW_MESSAGE" | "BOOKING_REQUEST" | "BOOKING_CONFIRMED" | "BOOKING_REJECTED" | "NEW_REVIEW" | "SEARCH_ALERT" | "PICKUP_REMINDER" | "RETURN_REMINDER" | "RISK_REVIEW" | "DAMAGE_CLAIM" | "DISPUTE_UPDATE" | "BOOKING_CANCELLED" | "BOOKING_DATE_CHANGED" | "BOOKING_OVERDUE" | "INSURANCE_EXPIRING" | "CALENDAR_SYNC" | "RESCHEDULE_PROPOSAL" | "KYC_APPROVED" | "KYC_REJECTED" | "KYC_INFO_REQUESTED" | "LISTING_PROMOTED" | "LISTING_PROMOTION_ENDED" | "VENDOR_APPLICATION_APPROVED" | "VENDOR_ONBOARDING_APPROVED" | "VENDOR_ONBOARDING_SUBMITTED" | "VENDOR_APPLICATION_RECEIVED" | "CHARGEBACK_DISPUTE" | "PACKAGE_STAFF_ASSIGNMENT_REQUESTED" | "PACKAGE_STAFF_ASSIGNMENT_APPROVED" | "PACKAGE_STAFF_ASSIGNMENT_REJECTED" | "LISTING_PUBLISHED_BY_STAFF" | "LISTING_VIDEO_UNAVAILABLE" | "LISTING_VIDEO_ADDED_BY_STAFF" | "PAYOUT_ALERT" | "BOATER_LICENSE_REMINDER" | "INCIDENTAL_CHARGE";
+            type: "NEW_MESSAGE" | "BOOKING_REQUEST" | "BOOKING_CONFIRMED" | "BOOKING_REJECTED" | "NEW_REVIEW" | "SEARCH_ALERT" | "PICKUP_REMINDER" | "RETURN_REMINDER" | "RISK_REVIEW" | "DAMAGE_CLAIM" | "DISPUTE_UPDATE" | "BOOKING_CANCELLED" | "BOOKING_DATE_CHANGED" | "BOOKING_OVERDUE" | "INSURANCE_EXPIRING" | "CALENDAR_SYNC" | "RESCHEDULE_PROPOSAL" | "KYC_APPROVED" | "KYC_REJECTED" | "KYC_INFO_REQUESTED" | "LISTING_PROMOTED" | "LISTING_PROMOTION_ENDED" | "VENDOR_APPLICATION_APPROVED" | "VENDOR_ONBOARDING_APPROVED" | "VENDOR_ONBOARDING_SUBMITTED" | "VENDOR_APPLICATION_RECEIVED" | "CHARGEBACK_DISPUTE" | "PACKAGE_STAFF_ASSIGNMENT_REQUESTED" | "PACKAGE_STAFF_ASSIGNMENT_APPROVED" | "PACKAGE_STAFF_ASSIGNMENT_REJECTED" | "LISTING_PUBLISHED_BY_STAFF" | "LISTING_VIDEO_UNAVAILABLE" | "GEAR_GUIDE_GAP" | "GEAR_GUIDE_READY" | "LISTING_VIDEO_ADDED_BY_STAFF" | "PAYOUT_ALERT" | "BOATER_LICENSE_REMINDER" | "INCIDENTAL_CHARGE";
         };
         OAuthExchangeDto: {
             code: string;
@@ -13080,6 +14303,11 @@ export interface components {
             challengeToken: string;
             /** @description The six-digit code emailed to the account. */
             code: string;
+        };
+        OverrideFaqDto: {
+            answer: string;
+            /** @description The question as the vendor words it for every renter to see (the FAQ item's title and example question). */
+            title: string;
         };
         ParseSearchDto: {
             query: string;
@@ -13546,6 +14774,17 @@ export interface components {
              */
             performedAt?: string;
         };
+        RecordManualDto: {
+            /** @description Must be true: the caller attests they own or may share the manual. The attestation text is stored server-side. */
+            attested: boolean;
+            /**
+             * Format: uri
+             * @description The private blob URL the client upload returned (https, on the private store, under manuals/<modelId>/).
+             */
+            blobUrl: string;
+            /** @description Which manual this is: 'hull', 'engine', 'manual' (default). */
+            label?: string;
+        };
         RefreshTokenDto: {
             /** @description The opaque refresh token issued at login. */
             refreshToken: string;
@@ -13769,6 +15008,12 @@ export interface components {
             name: string;
             note?: string;
         };
+        SaveChatReplyDto: {
+            /** @description The question as the vendor words it, fresh: the renter's own wording (names, codes) must not be copied into published content. */
+            title: string;
+            /** @description Topic slug; derived from the title when omitted. */
+            topicSlug?: string;
+        };
         SelectedAddOnDto: {
             name: string;
             quantity: number;
@@ -13877,6 +15122,10 @@ export interface components {
         SetExperienceGearDto: {
             links: components["schemas"]["ExperienceGearLinkDto"][];
         };
+        SetGearModelStatusDto: {
+            /** @enum {string} */
+            status: "pending" | "building" | "published" | "retired";
+        };
         SetModerationBypassDto: {
             enabled: boolean;
         };
@@ -13951,6 +15200,12 @@ export interface components {
             bookingId?: string;
             /** Format: uuid */
             experienceBookingId?: string;
+        };
+        StartBuildDto: {
+            /** @description Abandon a build that is still running and start a new one. Without it a running build is returned unchanged. */
+            force?: boolean;
+            /** @description Re-queue the dead and pending steps of the latest build (attempts reset), keeping the finished ones. This is also what a build with a dead step does by default; send it to clear the retry back-off of a running one. */
+            resume?: boolean;
         };
         StayBedTypeDto: {
             count: number;
@@ -14282,7 +15537,7 @@ export interface components {
         };
         TriggerTtdRunDto: {
             /** @enum {string} */
-            mode: "dry_run" | "upload";
+            mode: "upload" | "dry_run";
         };
         TripGuideDto: {
             /**
@@ -14318,6 +15573,11 @@ export interface components {
             group?: string;
             /** @example Lakeside Grill */
             name: string;
+        };
+        TurnFeedbackDto: {
+            /** @enum {string} */
+            feedback: "up" | "down";
+            note?: string;
         };
         TwoFactorDisableConfirmDto: {
             /** @description The six-digit code emailed to the account. */
@@ -14469,6 +15729,17 @@ export interface components {
         };
         UpdateCampaignDto: Record<string, never>;
         UpdateCategoryDto: Record<string, never>;
+        UpdateCategoryItemDto: {
+            bodyMd?: string;
+            /** @enum {string} */
+            kind?: "procedure" | "fact" | "warning" | "faq" | "quirk";
+            /** @enum {string} */
+            status?: "draft" | "published" | "retired";
+            steps?: components["schemas"]["GearStepDto"][];
+            tags?: string[];
+            title?: string;
+            topicSlug?: string;
+        };
         UpdateCommissionConfigDto: {
             defaultCommissionRate?: number;
             enableTieredCommission?: boolean;
@@ -14542,6 +15813,24 @@ export interface components {
             description?: string;
             enabled?: boolean;
             rolloutPercentage?: number;
+        };
+        UpdateGearGuideSettingsDto: {
+            alwaysHandOffTopics?: string[];
+            enabled?: boolean;
+            /** @enum {string} */
+            window?: "rental_only" | "always";
+        };
+        UpdateGearModelDto: {
+            aliases?: string[];
+            /** @enum {string} */
+            category?: "E-Bikes" | "Biking" | "Camping" | "RV" | "Hiking" | "Water Sports" | "Winter Sports" | "Snow Sports" | "Climbing" | "Surfing" | "Fishing" | "Golf" | "Kayaking" | "Skiing" | "Tennis" | "Boating" | "ATVs" | "Photography" | "Electronics" | "Cabins" | "Campsites" | "RV Sites" | "Glamping" | "Other";
+            make?: string;
+            /** Format: uri */
+            manufacturerUrl?: string;
+            model?: string;
+            variant?: string;
+            yearFrom?: number;
+            yearTo?: number;
         };
         UpdateInsurancePolicyDto: Record<string, never>;
         UpdateListingDto: {
@@ -14645,6 +15934,17 @@ export interface components {
             weeklyDiscountPct?: number;
             year?: number;
         };
+        UpdateListingItemDto: {
+            bodyMd?: string;
+            /** @enum {string} */
+            kind?: "procedure" | "fact" | "warning" | "faq" | "quirk";
+            /** @enum {string} */
+            status?: "draft" | "published" | "retired";
+            steps?: components["schemas"]["GearStepDto"][];
+            tags?: string[];
+            title?: string;
+            topicSlug?: string;
+        };
         UpdateListingRouteDto: Record<string, never>;
         UpdateMessageTemplateDto: {
             body?: string;
@@ -14656,9 +15956,19 @@ export interface components {
             /** @enum {string} */
             trigger?: "BOOKING_CONFIRMED" | "PICKUP_REMINDER_24H" | "RETURN_REMINDER_24H" | "POST_RETURN";
         };
+        UpdateModelItemDto: {
+            bodyMd?: string;
+            steps?: components["schemas"]["GearStepDto"][];
+            title?: string;
+            topicSlug?: string;
+        };
+        UpdateModelMediaDto: {
+            alt?: string | null;
+            caption?: string | null;
+        };
         UpdateNotificationPreferenceDto: {
             /** @enum {string} */
-            category: "BOOKING_REMINDER" | "REVIEW_REQUEST" | "LISTING_INQUIRY" | "PRICE_ALERT" | "NEW_MESSAGE";
+            category: "BOOKING_REMINDER" | "REVIEW_REQUEST" | "LISTING_INQUIRY" | "PRICE_ALERT" | "NEW_MESSAGE" | "GEAR_GUIDE";
             emailEnabled?: boolean;
             inAppEnabled?: boolean;
             pushEnabled?: boolean;
@@ -14835,6 +16145,23 @@ export interface components {
             licenseNumber?: string;
             /** @enum {string} */
             verificationType: "DRIVERS_LICENSE" | "INSURANCE" | "BOATER_LICENSE" | "BIOMETRIC_LIVENESS";
+        };
+        UpsertCategoryItemDto: {
+            bodyMd: string;
+            /** @enum {string} */
+            category: "E-Bikes" | "Biking" | "Camping" | "RV" | "Hiking" | "Water Sports" | "Winter Sports" | "Snow Sports" | "Climbing" | "Surfing" | "Fishing" | "Golf" | "Kayaking" | "Skiing" | "Tennis" | "Boating" | "ATVs" | "Photography" | "Electronics" | "Cabins" | "Campsites" | "RV Sites" | "Glamping" | "Other";
+            /** @enum {string} */
+            kind: "procedure" | "fact" | "warning" | "faq" | "quirk";
+            /**
+             * @default draft
+             * @enum {string}
+             */
+            status: "draft" | "published" | "retired";
+            steps?: components["schemas"]["GearStepDto"][];
+            tags?: string[];
+            title: string;
+            /** @example water-heater-bypass */
+            topicSlug: string;
         };
         UpsertFeatureFlagDto: {
             description?: string;
@@ -16077,6 +17404,656 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    AdminGearGuideController_gaps: {
+        parameters: {
+            query?: {
+                status?: "open" | "answered" | "dismissed";
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGearGuideController_getStats: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGearModelController_list: {
+        parameters: {
+            query?: {
+                search?: string;
+                category?: "E-Bikes" | "Biking" | "Camping" | "RV" | "Hiking" | "Water Sports" | "Winter Sports" | "Snow Sports" | "Climbing" | "Surfing" | "Fishing" | "Golf" | "Kayaking" | "Skiing" | "Tennis" | "Boating" | "ATVs" | "Photography" | "Electronics" | "Cabins" | "Campsites" | "RV Sites" | "Glamping" | "Other";
+                status?: "pending" | "building" | "published" | "retired";
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGearModelController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGearModelDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearModel"];
+                };
+            };
+        };
+    };
+    AdminGearModelController_pdfRuntime: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGearModelController_listCategoryItems: {
+        parameters: {
+            query?: {
+                category?: "E-Bikes" | "Biking" | "Camping" | "RV" | "Hiking" | "Water Sports" | "Winter Sports" | "Snow Sports" | "Climbing" | "Surfing" | "Fishing" | "Golf" | "Kayaking" | "Skiing" | "Tennis" | "Boating" | "ATVs" | "Photography" | "Electronics" | "Cabins" | "Campsites" | "RV Sites" | "Glamping" | "Other";
+                status?: "draft" | "published" | "retired";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearKnowledgeItem"][];
+                };
+            };
+        };
+    };
+    AdminGearModelController_createCategoryItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertCategoryItemDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearKnowledgeItem"];
+                };
+            };
+        };
+    };
+    AdminGearModelController_updateCategoryItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCategoryItemDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearKnowledgeItem"];
+                };
+            };
+        };
+    };
+    AdminGearModelController_removeCategoryItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGearModelController_seedBaseline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGearModelController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearModel"];
+                };
+            };
+        };
+    };
+    AdminGearModelController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateGearModelDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearModel"];
+                };
+            };
+        };
+    };
+    AdminGearModelController_getBuild: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGearModelController_build: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartBuildDto"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGearModelController_runNext: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGearGuideController_listItems: {
+        parameters: {
+            query?: {
+                status?: "draft" | "published" | "retired";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    AdminGearGuideController_updateItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateModelItemDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGearGuideController_approveItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGearGuideController_retireItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGearModelController_manualUrl: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FetchManualUrlDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGearModelController_listManuals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    AdminGearModelController_removeManual: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                manualId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGearModelController_manualSignedUrl: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                manualId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGearGuideController_listMedia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    AdminGearGuideController_updateMedia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                mediaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateModelMediaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGearModelController_merge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeGearModelsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGearModelController_publish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGearModelController_setStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetGearModelStatusDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearModel"];
+                };
+            };
+        };
+    };
+    AdminGearModelController_refreshTopicQuestions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -21268,6 +23245,9 @@ export interface operations {
                 groupSize?: number;
                 maxPrice?: number;
                 minPrice?: number;
+                radiusKm?: number;
+                lng?: number;
+                lat?: number;
                 location?: string;
                 category?: "tours" | "food" | "outdoor" | "arts" | "fitness" | "wellness" | "music" | "sports" | "workshop" | "photography" | "other";
             };
@@ -22424,6 +24404,808 @@ export interface operations {
             };
         };
     };
+    GearGuideAskController_ask: {
+        parameters: {
+            query: {
+                stream: string;
+            };
+            header: {
+                "idempotency-key": string;
+                /** @description A UUID the client generates per question. A repeat with the same key from the same renter on the same booking within 10 minutes does NOT create a second turn or call the AI again: if the first request finished, its answer is replayed (SSE: `meta` then `answer`; ?stream=false: the same JSON); if the first is still running the answer is 409 GEAR_GUIDE_REQUEST_IN_PROGRESS; the same key with a different question is 422 GEAR_GUIDE_IDEMPOTENCY_KEY_REUSED. A malformed key is 400 GEAR_GUIDE_INVALID_IDEMPOTENCY_KEY. Safe to retry after a dropped connection. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                bookingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskDto"];
+            };
+        };
+        responses: {
+            /** @description The answer: an SSE stream (default) or, with ?stream=false, the final answer as JSON. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description GEAR_GUIDE_REQUEST_IN_PROGRESS: the first request with this Idempotency-Key is still being answered. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description GEAR_GUIDE_IDEMPOTENCY_KEY_REUSED: this Idempotency-Key was used for a different question. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GearGuideAskController_pack: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GearGuideAskController_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GearGuideAskController_topics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    VendorGearGuideController_saveChatReply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: string;
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveChatReplyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    VendorGearGuideController_openGapCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GearGuideController_faq: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearAnswerCache"][];
+                };
+            };
+        };
+    };
+    VendorGearGuideController_overrideFaq: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                topic: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OverrideFaqDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearAnswerCache"];
+                };
+            };
+        };
+    };
+    VendorGearGuideController_approveFaq: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                topic: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearAnswerCache"];
+                };
+            };
+        };
+    };
+    VendorGearGuideController_hideFaq: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                topic: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    VendorGearGuideController_unhideFaq: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                topic: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GearGuideController_listGaps: {
+        parameters: {
+            query?: {
+                status?: "open" | "answered" | "dismissed";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearGuideGap"][];
+                };
+            };
+        };
+    };
+    GearGuideController_answerGap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                gapId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswerGapDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearGuideGap"];
+                };
+            };
+        };
+    };
+    GearGuideController_dismissGap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                gapId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearGuideGap"];
+                };
+            };
+        };
+    };
+    GearGuideController_listItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearKnowledgeItem"][];
+                };
+            };
+        };
+    };
+    GearGuideController_createItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateListingItemDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearKnowledgeItem"];
+                };
+            };
+        };
+    };
+    GearGuideController_draftFromNotes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftFromNotesDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearKnowledgeItem"][];
+                };
+            };
+        };
+    };
+    GearGuideController_updateItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateListingItemDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearKnowledgeItem"];
+                };
+            };
+        };
+    };
+    GearGuideController_removeItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GearGuideController_listMedia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearMedia"][];
+                };
+            };
+        };
+    };
+    GearGuideController_addMedia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateListingMediaDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearMedia"];
+                };
+            };
+        };
+    };
+    GearGuideController_linkModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkListingModelDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GearGuideController_getSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GearGuideController_updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateGearGuideSettingsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GearGuideAskController_previewAsk: {
+        parameters: {
+            query: {
+                stream: string;
+            };
+            header?: never;
+            path: {
+                listingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GearGuideController_searchModels: {
+        parameters: {
+            query?: {
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    VendorGearGuideController_createModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateVendorGearModelDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    VendorGearGuideController_getModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    VendorGearGuideController_getBuild: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GearGuideController_addManual: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordManualDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GearGuideController_manualUploadToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GearGuideController_listManuals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GearGuideAskController_escalate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                turnId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GearGuideAskController_feedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                turnId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TurnFeedbackDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GeoController_resolvePlace: {
+        parameters: {
+            query: {
+                /** @description A browse location as typed or shared in a link */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AppController_getHealth: {
         parameters: {
             query?: never;
@@ -22843,6 +25625,16 @@ export interface operations {
                  */
                 amenities?: string;
                 location?: string;
+                /**
+                 * @description SPLIT-1727 — centre of a radius location search (the web autocomplete
+                 *     knows the coordinates of the place the renter picked). `lat` and `lng`
+                 *     come as a pair: either alone is a 400. Without them, a city-level
+                 *     `location` is geocoded server-side; a region-level one stays text-only.
+                 */
+                lat?: number;
+                lng?: number;
+                /** @description SPLIT-1727 — search radius in km (default 40 ≈ 25 mi). */
+                radiusKm?: number;
                 minPrice?: number;
                 maxPrice?: number;
                 instantBook?: boolean;
@@ -22868,7 +25660,7 @@ export interface operations {
                 startDate?: string;
                 endDate?: string;
                 status?: "draft" | "available" | "unavailable" | "rented" | "archived";
-                sortBy?: "createdAt" | "pricePerDay" | "averageRating";
+                sortBy?: "createdAt" | "pricePerDay" | "averageRating" | "distance";
                 sortOrder?: "ASC" | "DESC";
                 page?: number;
                 limit?: number;
@@ -23000,6 +25792,16 @@ export interface operations {
                  */
                 amenities?: string;
                 location?: string;
+                /**
+                 * @description SPLIT-1727 — centre of a radius location search (the web autocomplete
+                 *     knows the coordinates of the place the renter picked). `lat` and `lng`
+                 *     come as a pair: either alone is a 400. Without them, a city-level
+                 *     `location` is geocoded server-side; a region-level one stays text-only.
+                 */
+                lat?: number;
+                lng?: number;
+                /** @description SPLIT-1727 — search radius in km (default 40 ≈ 25 mi). */
+                radiusKm?: number;
                 minPrice?: number;
                 maxPrice?: number;
                 instantBook?: boolean;
@@ -23025,7 +25827,7 @@ export interface operations {
                 startDate?: string;
                 endDate?: string;
                 status?: "draft" | "available" | "unavailable" | "rented" | "archived";
-                sortBy?: "createdAt" | "pricePerDay" | "averageRating";
+                sortBy?: "createdAt" | "pricePerDay" | "averageRating" | "distance";
                 sortOrder?: "ASC" | "DESC";
                 page?: number;
                 limit?: number;
@@ -24118,6 +26920,9 @@ export interface operations {
                 groupSize?: number;
                 maxPrice?: number;
                 minPrice?: number;
+                radiusKm?: number;
+                lng?: number;
+                lat?: number;
                 location?: string;
                 category?: "tours" | "food" | "outdoor" | "arts" | "fitness" | "wellness" | "music" | "sports" | "workshop" | "photography" | "other";
             };
@@ -25509,6 +28314,16 @@ export interface operations {
                  */
                 amenities?: string;
                 location?: string;
+                /**
+                 * @description SPLIT-1727 — centre of a radius location search (the web autocomplete
+                 *     knows the coordinates of the place the renter picked). `lat` and `lng`
+                 *     come as a pair: either alone is a 400. Without them, a city-level
+                 *     `location` is geocoded server-side; a region-level one stays text-only.
+                 */
+                lat?: number;
+                lng?: number;
+                /** @description SPLIT-1727 — search radius in km (default 40 ≈ 25 mi). */
+                radiusKm?: number;
                 minPrice?: number;
                 maxPrice?: number;
                 instantBook?: boolean;
@@ -25534,7 +28349,7 @@ export interface operations {
                 startDate?: string;
                 endDate?: string;
                 status?: "draft" | "available" | "unavailable" | "rented" | "archived";
-                sortBy?: "createdAt" | "pricePerDay" | "averageRating";
+                sortBy?: "createdAt" | "pricePerDay" | "averageRating" | "distance";
                 sortOrder?: "ASC" | "DESC";
                 page?: number;
                 limit?: number;
@@ -25666,6 +28481,16 @@ export interface operations {
                  */
                 amenities?: string;
                 location?: string;
+                /**
+                 * @description SPLIT-1727 — centre of a radius location search (the web autocomplete
+                 *     knows the coordinates of the place the renter picked). `lat` and `lng`
+                 *     come as a pair: either alone is a 400. Without them, a city-level
+                 *     `location` is geocoded server-side; a region-level one stays text-only.
+                 */
+                lat?: number;
+                lng?: number;
+                /** @description SPLIT-1727 — search radius in km (default 40 ≈ 25 mi). */
+                radiusKm?: number;
                 minPrice?: number;
                 maxPrice?: number;
                 instantBook?: boolean;
@@ -25691,7 +28516,7 @@ export interface operations {
                 startDate?: string;
                 endDate?: string;
                 status?: "draft" | "available" | "unavailable" | "rented" | "archived";
-                sortBy?: "createdAt" | "pricePerDay" | "averageRating";
+                sortBy?: "createdAt" | "pricePerDay" | "averageRating" | "distance";
                 sortOrder?: "ASC" | "DESC";
                 page?: number;
                 limit?: number;

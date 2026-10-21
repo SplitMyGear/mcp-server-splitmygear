@@ -18,6 +18,7 @@ import { routeTools } from './routes';
 import { complianceTools } from './compliance';
 import { messageTemplateTools } from './message-templates';
 import { vendorExtrasTools } from './vendor-extras';
+import { gearGuideTools } from './gear-guide';
 
 const widen = (defs: ReadonlyArray<unknown>): ToolDef<ZodRawShape>[] => defs as ToolDef<ZodRawShape>[];
 
@@ -42,6 +43,8 @@ export const ALL_TOOLS: ReadonlyArray<ToolDef<ZodRawShape>> = [
   ...widen(complianceTools),
   ...widen(messageTemplateTools),
   ...widen(vendorExtrasTools),
+  // Gear Guide: renter questions about a booking, vendor notes and gaps (SPLIT-1741)
+  ...widen(gearGuideTools),
 ];
 
 const names = ALL_TOOLS.map((t) => t.name);

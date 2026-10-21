@@ -137,6 +137,29 @@
         ],
         "type": "object"
       },
+      "AnswerGapDto": {
+        "properties": {
+          "answer": {
+            "maxLength": 4000,
+            "type": "string"
+          },
+          "title": {
+            "description": "The question as the vendor words it for every renter to see: the FAQ item's title, its example question and, when topicSlug is omitted, the source of its slug. Write it fresh; the renter's own wording (names, codes, site numbers) must not be copied into published content.",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "topicSlug": {
+            "description": "Topic slug for the new FAQ item; derived from the vendor-written title when omitted.",
+            "maxLength": 80,
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "answer"
+        ],
+        "type": "object"
+      },
       "ApiErrorResponse": {
         "properties": {
           "code": {
@@ -294,6 +317,44 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "AskDto": {
+        "properties": {
+          "channel": {
+            "description": "Which client is asking. Default web.",
+            "enum": [
+              "ios",
+              "android",
+              "web",
+              "siri"
+            ],
+            "type": "string"
+          },
+          "imageUrl": {
+            "description": "A photo of the thing the question is about (https, on an allowed image host). Answered by the vision models; not streamed token by token.",
+            "format": "uri",
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "locale": {
+            "description": "BCP 47 language tag the answer should be written in, e.g. \"es\".",
+            "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?$",
+            "type": "string"
+          },
+          "question": {
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "sessionId": {
+            "description": "Continue this session. Omitted: the booking's latest session, or a new one.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
         "type": "object"
       },
       "AudienceSegmentCriteriaDto": {
@@ -1580,6 +1641,44 @@
         ],
         "type": "object"
       },
+      "BrowseGeoDto": {
+        "properties": {
+          "label": {
+            "description": "Geocoded place label; null when the client sent coordinates.",
+            "example": "Minneapolis, Minnesota",
+            "nullable": true,
+            "type": "string"
+          },
+          "lat": {
+            "example": 44.97997,
+            "type": "number"
+          },
+          "lng": {
+            "example": -93.26384,
+            "type": "number"
+          },
+          "radiusKm": {
+            "description": "Radius in km.",
+            "example": 40,
+            "type": "number"
+          },
+          "source": {
+            "enum": [
+              "client",
+              "geocoded"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "lat",
+          "lng",
+          "radiusKm",
+          "label",
+          "source"
+        ],
+        "type": "object"
+      },
       "Buffer": {
         "properties": {},
         "type": "object"
@@ -1761,6 +1860,30 @@
           "treatFreeAllDayAsBusy",
           "createdAt",
           "updatedAt"
+        ],
+        "type": "object"
+      },
+      "CalloutDto": {
+        "properties": {
+          "label": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "x": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          },
+          "y": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "label"
         ],
         "type": "object"
       },
@@ -2966,12 +3089,16 @@
             "type": "array"
           },
           "latitude": {
+            "maximum": 90,
+            "minimum": -90,
             "type": "number"
           },
           "location": {
             "type": "string"
           },
           "longitude": {
+            "maximum": 180,
+            "minimum": -180,
             "type": "number"
           },
           "maxGuests": {
@@ -3111,12 +3238,16 @@
             "type": "array"
           },
           "latitude": {
+            "maximum": 90,
+            "minimum": -90,
             "type": "number"
           },
           "location": {
             "type": "string"
           },
           "longitude": {
+            "maximum": 180,
+            "minimum": -180,
             "type": "number"
           },
           "maxGuests": {
@@ -3240,6 +3371,81 @@
         "required": [
           "date",
           "startTime"
+        ],
+        "type": "object"
+      },
+      "CreateGearModelDto": {
+        "properties": {
+          "aliases": {
+            "items": {
+              "maxLength": 160,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "category": {
+            "enum": [
+              "E-Bikes",
+              "Biking",
+              "Camping",
+              "RV",
+              "Hiking",
+              "Water Sports",
+              "Winter Sports",
+              "Snow Sports",
+              "Climbing",
+              "Surfing",
+              "Fishing",
+              "Golf",
+              "Kayaking",
+              "Skiing",
+              "Tennis",
+              "Boating",
+              "ATVs",
+              "Photography",
+              "Electronics",
+              "Cabins",
+              "Campsites",
+              "RV Sites",
+              "Glamping",
+              "Other"
+            ],
+            "type": "string"
+          },
+          "make": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "manufacturerUrl": {
+            "format": "uri",
+            "maxLength": 500,
+            "type": "string"
+          },
+          "model": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "variant": {
+            "description": "Boats: the engine, e.g. \"Yamaha F150 outboard\".",
+            "maxLength": 160,
+            "type": "string"
+          },
+          "yearFrom": {
+            "maximum": 2100,
+            "minimum": 1900,
+            "type": "number"
+          },
+          "yearTo": {
+            "maximum": 2100,
+            "minimum": 1900,
+            "type": "number"
+          }
+        },
+        "required": [
+          "category",
+          "make",
+          "model"
         ],
         "type": "object"
       },
@@ -3769,6 +3975,94 @@
         "required": [
           "name",
           "description"
+        ],
+        "type": "object"
+      },
+      "CreateListingItemDto": {
+        "properties": {
+          "bodyMd": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "procedure",
+              "fact",
+              "warning",
+              "faq",
+              "quirk"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "default": "draft",
+            "enum": [
+              "draft",
+              "published"
+            ],
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/GearStepDto"
+            },
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          },
+          "topicSlug": {
+            "example": "water-heater-bypass",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "topicSlug",
+          "title",
+          "bodyMd"
+        ],
+        "type": "object"
+      },
+      "CreateListingMediaDto": {
+        "properties": {
+          "alt": {
+            "maxLength": 300,
+            "type": "string"
+          },
+          "callouts": {
+            "items": {
+              "$ref": "#/components/schemas/CalloutDto"
+            },
+            "maxItems": 12,
+            "type": "array"
+          },
+          "caption": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "photo",
+              "figure",
+              "video_embed"
+            ],
+            "type": "string"
+          },
+          "url": {
+            "description": "https URL on the platform media host allow-list (a YouTube link for video_embed).",
+            "maxLength": 1000,
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "url"
         ],
         "type": "object"
       },
@@ -4730,6 +5024,68 @@
         ],
         "type": "object"
       },
+      "CreateVendorGearModelDto": {
+        "properties": {
+          "category": {
+            "enum": [
+              "E-Bikes",
+              "Biking",
+              "Camping",
+              "RV",
+              "Hiking",
+              "Water Sports",
+              "Winter Sports",
+              "Snow Sports",
+              "Climbing",
+              "Surfing",
+              "Fishing",
+              "Golf",
+              "Kayaking",
+              "Skiing",
+              "Tennis",
+              "Boating",
+              "ATVs",
+              "Photography",
+              "Electronics",
+              "Cabins",
+              "Campsites",
+              "RV Sites",
+              "Glamping",
+              "Other"
+            ],
+            "type": "string"
+          },
+          "make": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "model": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "variant": {
+            "description": "Boats: the engine.",
+            "maxLength": 160,
+            "type": "string"
+          },
+          "yearFrom": {
+            "maximum": 2100,
+            "minimum": 1900,
+            "type": "number"
+          },
+          "yearTo": {
+            "maximum": 2100,
+            "minimum": 1900,
+            "type": "number"
+          }
+        },
+        "required": [
+          "category",
+          "make",
+          "model"
+        ],
+        "type": "object"
+      },
       "CreateVendorPromoCodeDto": {
         "properties": {
           "code": {
@@ -5090,6 +5446,19 @@
           "adminResolutionNotes",
           "createdAt",
           "updatedAt"
+        ],
+        "type": "object"
+      },
+      "DraftFromNotesDto": {
+        "properties": {
+          "notes": {
+            "description": "Free-text notes from the vendor about this unit.",
+            "maxLength": 4000,
+            "type": "string"
+          }
+        },
+        "required": [
+          "notes"
         ],
         "type": "object"
       },
@@ -5614,6 +5983,24 @@
         ],
         "type": "object"
       },
+      "FetchManualUrlDto": {
+        "properties": {
+          "label": {
+            "maxLength": 40,
+            "type": "string"
+          },
+          "url": {
+            "description": "An https URL of the manufacturer manual (a PDF).",
+            "format": "uri",
+            "maxLength": 500,
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
       "FinalizeVerificationDto": {
         "properties": {
           "blobUrl": {
@@ -5727,6 +6114,706 @@
           "returnPct",
           "policy",
           "suggestedAmount"
+        ],
+        "type": "object"
+      },
+      "GearAnswerCache": {
+        "properties": {
+          "answer": {
+            "additionalProperties": true,
+            "description": "The answer: {text, steps?[], warnings?[]}.",
+            "nullable": false,
+            "type": "object"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "downCount": {
+            "description": "SPLIT-1737: thumbs-down votes on turns that used this entry; 2 flags it.",
+            "type": "number"
+          },
+          "flagged": {
+            "type": "boolean"
+          },
+          "hitCount": {
+            "type": "number"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lastHitAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "modelUsed": {
+            "nullable": true,
+            "type": "string"
+          },
+          "packVersion": {
+            "type": "number"
+          },
+          "questionExamples": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "scope": {
+            "enum": [
+              "model",
+              "listing"
+            ],
+            "type": "string"
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "sources": {
+            "additionalProperties": true,
+            "description": "Knowledge items the answer was drawn from.",
+            "items": {
+              "type": "object"
+            },
+            "nullable": false,
+            "type": "array"
+          },
+          "topicSlug": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "vendorVerified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "answer",
+          "sources",
+          "id",
+          "scope",
+          "scopeId",
+          "topicSlug",
+          "questionExamples",
+          "modelUsed",
+          "hitCount",
+          "lastHitAt",
+          "vendorVerified",
+          "flagged",
+          "downCount",
+          "packVersion",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "GearGuideGap": {
+        "properties": {
+          "answeredItem": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GearKnowledgeItem"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "answeredItemId": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "gearModel": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GearModel"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "gearModelId": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "listing": {
+            "$ref": "#/components/schemas/Listing"
+          },
+          "listingId": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "session": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GearGuideSession"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "sessionId": {
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "answered",
+              "dismissed"
+            ],
+            "type": "string"
+          },
+          "turn": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GearGuideTurn"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "turnId": {
+            "description": "SPLIT-1737: the hand-off turn this gap came from (one gap per turn).",
+            "nullable": true,
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "listingId",
+          "listing",
+          "gearModelId",
+          "gearModel",
+          "turnId",
+          "turn",
+          "question",
+          "sessionId",
+          "session",
+          "status",
+          "answeredItemId",
+          "answeredItem",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "GearGuideSession": {
+        "properties": {
+          "booking": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Booking"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "bookingId": {
+            "nullable": true,
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "ios",
+              "android",
+              "web",
+              "siri"
+            ],
+            "type": "string"
+          },
+          "costMicrousd": {
+            "type": "number"
+          },
+          "id": {
+            "type": "string"
+          },
+          "listing": {
+            "$ref": "#/components/schemas/Listing"
+          },
+          "listingId": {
+            "type": "string"
+          },
+          "renter": {
+            "$ref": "#/components/schemas/User"
+          },
+          "renterId": {
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "turnsCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "bookingId",
+          "booking",
+          "renterId",
+          "renter",
+          "listingId",
+          "listing",
+          "channel",
+          "startedAt",
+          "turnsCount",
+          "costMicrousd"
+        ],
+        "type": "object"
+      },
+      "GearGuideTurn": {
+        "properties": {
+          "answer": {
+            "additionalProperties": true,
+            "description": "Structured answer shown to the renter, when there is one.",
+            "nullable": true,
+            "type": "object"
+          },
+          "cacheEntry": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GearAnswerCache"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "cacheEntryId": {
+            "description": "SPLIT-1737: the cache entry this turn served (hit) or wrote (write-back).",
+            "nullable": true,
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "costMicrousd": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "escalated": {
+            "type": "boolean"
+          },
+          "feedback": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "nullable": true,
+            "type": "string"
+          },
+          "feedbackNote": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "description": "SPLIT-1737 follow-up: the `Idempotency-Key` the client sent with the ask\n(a UUID), set on the ASSISTANT turn. A repeat with the same key in the same\nscope within 10 minutes replays this turn's stored answer.",
+            "nullable": true,
+            "type": "string"
+          },
+          "idempotencyScope": {
+            "description": "`<renterId>:<bookingId>`: the key is only ever unique inside one renter's one booking.",
+            "nullable": true,
+            "type": "string"
+          },
+          "latencyMs": {
+            "nullable": true,
+            "type": "number"
+          },
+          "modelUsed": {
+            "nullable": true,
+            "type": "string"
+          },
+          "preview": {
+            "description": "SPLIT-1737: a vendor/admin preview turn; it never moves the cache counters.",
+            "type": "boolean"
+          },
+          "role": {
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "type": "string"
+          },
+          "session": {
+            "$ref": "#/components/schemas/GearGuideSession"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "tier": {
+            "enum": [
+              "vendor",
+              "cache",
+              "ondevice",
+              "server"
+            ],
+            "nullable": true,
+            "type": "string"
+          },
+          "topicSlug": {
+            "nullable": true,
+            "type": "string"
+          },
+          "ttfdMs": {
+            "description": "SPLIT-1737: ms from the request to the first streamed delta (null: not streamed).",
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "required": [
+          "answer",
+          "id",
+          "sessionId",
+          "session",
+          "role",
+          "content",
+          "topicSlug",
+          "tier",
+          "modelUsed",
+          "latencyMs",
+          "costMicrousd",
+          "ttfdMs",
+          "cacheEntryId",
+          "cacheEntry",
+          "preview",
+          "feedbackNote",
+          "feedback",
+          "escalated",
+          "idempotencyKey",
+          "idempotencyScope",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "GearKnowledgeItem": {
+        "properties": {
+          "authorId": {
+            "description": "Plain uuid (no FK): the author's departure never rewrites the item.",
+            "nullable": true,
+            "type": "string"
+          },
+          "bodyMd": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "procedure",
+              "fact",
+              "warning",
+              "faq",
+              "quirk"
+            ],
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "category",
+              "model",
+              "listing"
+            ],
+            "type": "string"
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "source": {
+            "additionalProperties": true,
+            "description": "Provenance: {type: manual|vendor|platform|chat, ref?, page?}.",
+            "nullable": false,
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "published",
+              "retired",
+              "draft"
+            ],
+            "type": "string"
+          },
+          "steps": {
+            "additionalProperties": true,
+            "description": "Ordered steps: [{text, mediaIds[], warning?}].",
+            "items": {
+              "type": "object"
+            },
+            "nullable": false,
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          },
+          "topicSlug": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "version": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "steps",
+          "source",
+          "id",
+          "scope",
+          "scopeId",
+          "kind",
+          "topicSlug",
+          "title",
+          "bodyMd",
+          "tags",
+          "status",
+          "authorId",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "GearMedia": {
+        "properties": {
+          "alt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "approvedBy": {
+            "description": "Plain uuid (no FK): the approver's departure never rewrites history.",
+            "nullable": true,
+            "type": "string"
+          },
+          "blobKey": {
+            "nullable": true,
+            "type": "string"
+          },
+          "callouts": {
+            "additionalProperties": true,
+            "description": "Labelled points on the image: [{x, y, label}].",
+            "items": {
+              "type": "object"
+            },
+            "nullable": false,
+            "type": "array"
+          },
+          "caption": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "photo",
+              "figure",
+              "video_embed"
+            ],
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "category",
+              "model",
+              "listing"
+            ],
+            "type": "string"
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "url": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "callouts",
+          "id",
+          "blobKey",
+          "url",
+          "kind",
+          "caption",
+          "alt",
+          "scope",
+          "scopeId",
+          "source",
+          "approvedBy",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "GearModel": {
+        "properties": {
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "category": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "description": "Plain uuid on purpose (no FK): removing a staff account never rewrites history.",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "make": {
+            "type": "string"
+          },
+          "manualBlobKey": {
+            "description": "Private blob key of the owner's manual; never returned to clients.",
+            "nullable": true,
+            "type": "string"
+          },
+          "manufacturerUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "packVersion": {
+            "type": "number"
+          },
+          "photoChecklist": {
+            "additionalProperties": true,
+            "description": "Photo checklist: [{key, label}].",
+            "items": {
+              "type": "object"
+            },
+            "nullable": false,
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "building",
+              "published",
+              "retired"
+            ],
+            "type": "string"
+          },
+          "topics": {
+            "additionalProperties": true,
+            "description": "Topic list for this model: [{slug, title, examples[]}].",
+            "items": {
+              "type": "object"
+            },
+            "nullable": false,
+            "type": "array"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "variant": {
+            "description": "Boats: the engine, e.g. \"Yamaha F150 outboard\".",
+            "nullable": true,
+            "type": "string"
+          },
+          "yearFrom": {
+            "nullable": true,
+            "type": "number"
+          },
+          "yearTo": {
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "required": [
+          "topics",
+          "photoChecklist",
+          "id",
+          "category",
+          "make",
+          "model",
+          "yearFrom",
+          "yearTo",
+          "variant",
+          "aliases",
+          "status",
+          "packVersion",
+          "manualBlobKey",
+          "manufacturerUrl",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "GearStepDto": {
+        "properties": {
+          "mediaIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "type": "array"
+          },
+          "text": {
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "warning": {
+            "maxLength": 500,
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
         ],
         "type": "object"
       },
@@ -6341,6 +7428,17 @@
         },
         "type": "object"
       },
+      "LinkListingModelDto": {
+        "properties": {
+          "gearModelId": {
+            "description": "The gear model to link, or null to unlink.",
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "Listing": {
         "properties": {
           "addOns": {
@@ -6475,6 +7573,28 @@
           },
           "featuredUntil": {
             "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "gearGuideEnabled": {
+            "type": "boolean"
+          },
+          "gearGuideSettings": {
+            "additionalProperties": true,
+            "description": "SPLIT-1735. Gear Guide settings: { alwaysHandOffTopics: string[], window: rental_only | always }.",
+            "nullable": true,
+            "type": "object"
+          },
+          "gearModel": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GearModel"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "gearModelId": {
             "nullable": true,
             "type": "string"
           },
@@ -6747,6 +7867,7 @@
           "usagePolicy",
           "videoEmbeds",
           "estimatedValue",
+          "gearGuideSettings",
           "id",
           "name",
           "description",
@@ -6815,7 +7936,9 @@
           "isSponsored",
           "sponsoredUntil",
           "sponsorTier",
-          "icalFeedToken"
+          "icalFeedToken",
+          "gearModelId",
+          "gearGuideEnabled"
         ],
         "type": "object"
       },
@@ -6880,6 +8003,14 @@
               "$ref": "#/components/schemas/Listing"
             },
             "type": "array"
+          },
+          "geo": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BrowseGeoDto"
+              }
+            ],
+            "description": "SPLIT-1727: the radius centre applied to a location search; absent when the location matched by text only (a region, or no geocode)."
           },
           "limit": {
             "description": "The page size.",
@@ -7375,6 +8506,19 @@
         },
         "type": "object"
       },
+      "MergeGearModelsDto": {
+        "properties": {
+          "loserId": {
+            "description": "The duplicate to fold into the model in the path; it is retired.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loserId"
+        ],
+        "type": "object"
+      },
       "Message": {
         "properties": {
           "content": {
@@ -7697,6 +8841,8 @@
               "PACKAGE_STAFF_ASSIGNMENT_REJECTED",
               "LISTING_PUBLISHED_BY_STAFF",
               "LISTING_VIDEO_UNAVAILABLE",
+              "GEAR_GUIDE_GAP",
+              "GEAR_GUIDE_READY",
               "LISTING_VIDEO_ADDED_BY_STAFF",
               "PAYOUT_ALERT",
               "BOATER_LICENSE_REMINDER",
@@ -7754,6 +8900,24 @@
         "required": [
           "challengeToken",
           "code"
+        ],
+        "type": "object"
+      },
+      "OverrideFaqDto": {
+        "properties": {
+          "answer": {
+            "maxLength": 4000,
+            "type": "string"
+          },
+          "title": {
+            "description": "The question as the vendor words it for every renter to see (the FAQ item's title and example question).",
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "answer"
         ],
         "type": "object"
       },
@@ -8788,6 +9952,30 @@
         ],
         "type": "object"
       },
+      "RecordManualDto": {
+        "properties": {
+          "attested": {
+            "description": "Must be true: the caller attests they own or may share the manual. The attestation text is stored server-side.",
+            "type": "boolean"
+          },
+          "blobUrl": {
+            "description": "The private blob URL the client upload returned (https, on the private store, under manuals/<modelId>/).",
+            "format": "uri",
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "label": {
+            "description": "Which manual this is: 'hull', 'engine', 'manual' (default).",
+            "maxLength": 40,
+            "type": "string"
+          }
+        },
+        "required": [
+          "blobUrl",
+          "attested"
+        ],
+        "type": "object"
+      },
       "RefreshTokenDto": {
         "properties": {
           "refreshToken": {
@@ -9536,6 +10724,24 @@
         ],
         "type": "object"
       },
+      "SaveChatReplyDto": {
+        "properties": {
+          "title": {
+            "description": "The question as the vendor words it, fresh: the renter's own wording (names, codes) must not be copied into published content.",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "topicSlug": {
+            "description": "Topic slug; derived from the title when omitted.",
+            "maxLength": 80,
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      },
       "SelectedAddOnDto": {
         "properties": {
           "name": {
@@ -9922,6 +11128,23 @@
         ],
         "type": "object"
       },
+      "SetGearModelStatusDto": {
+        "properties": {
+          "status": {
+            "enum": [
+              "pending",
+              "building",
+              "published",
+              "retired"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
       "SetModerationBypassDto": {
         "properties": {
           "enabled": {
@@ -10143,6 +11366,19 @@
           "experienceBookingId": {
             "format": "uuid",
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "StartBuildDto": {
+        "properties": {
+          "force": {
+            "description": "Abandon a build that is still running and start a new one. Without it a running build is returned unchanged.",
+            "type": "boolean"
+          },
+          "resume": {
+            "description": "Re-queue the dead and pending steps of the latest build (attempts reset), keeping the finished ones. This is also what a build with a dead step does by default; send it to clear the retry back-off of a running one.",
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -10908,8 +12144,8 @@
         "properties": {
           "mode": {
             "enum": [
-              "dry_run",
-              "upload"
+              "upload",
+              "dry_run"
             ],
             "type": "string"
           }
@@ -11011,6 +12247,25 @@
         },
         "required": [
           "name"
+        ],
+        "type": "object"
+      },
+      "TurnFeedbackDto": {
+        "properties": {
+          "feedback": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "maxLength": 500,
+            "type": "string"
+          }
+        },
+        "required": [
+          "feedback"
         ],
         "type": "object"
       },
@@ -11388,6 +12643,56 @@
         "properties": {},
         "type": "object"
       },
+      "UpdateCategoryItemDto": {
+        "properties": {
+          "bodyMd": {
+            "maxLength": 8000,
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "procedure",
+              "fact",
+              "warning",
+              "faq",
+              "quirk"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "published",
+              "retired"
+            ],
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/GearStepDto"
+            },
+            "maxItems": 30,
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "maxLength": 40,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "topicSlug": {
+            "maxLength": 80,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "UpdateCommissionConfigDto": {
         "properties": {
           "defaultCommissionRate": {
@@ -11607,6 +12912,98 @@
           "rolloutPercentage": {
             "maximum": 100,
             "minimum": 0,
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateGearGuideSettingsDto": {
+        "properties": {
+          "alwaysHandOffTopics": {
+            "items": {
+              "maxLength": 80,
+              "type": "string"
+            },
+            "maxItems": 30,
+            "type": "array"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "window": {
+            "enum": [
+              "rental_only",
+              "always"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateGearModelDto": {
+        "properties": {
+          "aliases": {
+            "items": {
+              "maxLength": 160,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "category": {
+            "enum": [
+              "E-Bikes",
+              "Biking",
+              "Camping",
+              "RV",
+              "Hiking",
+              "Water Sports",
+              "Winter Sports",
+              "Snow Sports",
+              "Climbing",
+              "Surfing",
+              "Fishing",
+              "Golf",
+              "Kayaking",
+              "Skiing",
+              "Tennis",
+              "Boating",
+              "ATVs",
+              "Photography",
+              "Electronics",
+              "Cabins",
+              "Campsites",
+              "RV Sites",
+              "Glamping",
+              "Other"
+            ],
+            "type": "string"
+          },
+          "make": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "manufacturerUrl": {
+            "format": "uri",
+            "maxLength": 500,
+            "type": "string"
+          },
+          "model": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "variant": {
+            "maxLength": 160,
+            "type": "string"
+          },
+          "yearFrom": {
+            "maximum": 2100,
+            "minimum": 1900,
+            "type": "number"
+          },
+          "yearTo": {
+            "maximum": 2100,
+            "minimum": 1900,
             "type": "number"
           }
         },
@@ -11995,6 +13392,56 @@
         },
         "type": "object"
       },
+      "UpdateListingItemDto": {
+        "properties": {
+          "bodyMd": {
+            "maxLength": 8000,
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "procedure",
+              "fact",
+              "warning",
+              "faq",
+              "quirk"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "published",
+              "retired"
+            ],
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/GearStepDto"
+            },
+            "maxItems": 30,
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "maxLength": 40,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "topicSlug": {
+            "maxLength": 80,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "UpdateListingRouteDto": {
         "properties": {},
         "type": "object"
@@ -12035,6 +13482,45 @@
         },
         "type": "object"
       },
+      "UpdateModelItemDto": {
+        "properties": {
+          "bodyMd": {
+            "maxLength": 8000,
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/GearStepDto"
+            },
+            "maxItems": 30,
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "topicSlug": {
+            "maxLength": 80,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateModelMediaDto": {
+        "properties": {
+          "alt": {
+            "maxLength": 300,
+            "nullable": true,
+            "type": "string"
+          },
+          "caption": {
+            "maxLength": 500,
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "UpdateNotificationPreferenceDto": {
         "properties": {
           "category": {
@@ -12043,7 +13529,8 @@
               "REVIEW_REQUEST",
               "LISTING_INQUIRY",
               "PRICE_ALERT",
-              "NEW_MESSAGE"
+              "NEW_MESSAGE",
+              "GEAR_GUIDE"
             ],
             "type": "string"
           },
@@ -12510,6 +13997,88 @@
         },
         "required": [
           "verificationType"
+        ],
+        "type": "object"
+      },
+      "UpsertCategoryItemDto": {
+        "properties": {
+          "bodyMd": {
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "E-Bikes",
+              "Biking",
+              "Camping",
+              "RV",
+              "Hiking",
+              "Water Sports",
+              "Winter Sports",
+              "Snow Sports",
+              "Climbing",
+              "Surfing",
+              "Fishing",
+              "Golf",
+              "Kayaking",
+              "Skiing",
+              "Tennis",
+              "Boating",
+              "ATVs",
+              "Photography",
+              "Electronics",
+              "Cabins",
+              "Campsites",
+              "RV Sites",
+              "Glamping",
+              "Other"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "procedure",
+              "fact",
+              "warning",
+              "faq",
+              "quirk"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "default": "draft",
+            "enum": [
+              "draft",
+              "published",
+              "retired"
+            ],
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/GearStepDto"
+            },
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          },
+          "topicSlug": {
+            "example": "water-heater-bypass",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "topicSlug",
+          "title",
+          "bodyMd",
+          "category"
         ],
         "type": "object"
       },
@@ -14743,6 +16312,1295 @@
         "summary": "Per-vendor revenue breakdown, filterable by date + category.",
         "tags": [
           "Finance"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-guide/gaps": {
+      "get": {
+        "operationId": "AdminGearGuideController_gaps",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "open",
+              "enum": [
+                "open",
+                "answered",
+                "dismissed"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Gear Guide gaps across all listings, newest first (default: open)",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-guide/stats": {
+      "get": {
+        "operationId": "AdminGearGuideController_getStats",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 7,
+              "maximum": 90,
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Quality and cost dashboard over the last N days (1..90, default 7)",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models": {
+      "get": {
+        "operationId": "AdminGearModelController_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "enum": [
+                "E-Bikes",
+                "Biking",
+                "Camping",
+                "RV",
+                "Hiking",
+                "Water Sports",
+                "Winter Sports",
+                "Snow Sports",
+                "Climbing",
+                "Surfing",
+                "Fishing",
+                "Golf",
+                "Kayaking",
+                "Skiing",
+                "Tennis",
+                "Boating",
+                "ATVs",
+                "Photography",
+                "Electronics",
+                "Cabins",
+                "Campsites",
+                "RV Sites",
+                "Glamping",
+                "Other"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "pending",
+                "building",
+                "published",
+                "retired"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List and search gear models",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      },
+      "post": {
+        "operationId": "AdminGearModelController_create",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGearModelDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GearModel"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a gear model",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/_diag/pdf-runtime": {
+      "get": {
+        "operationId": "AdminGearModelController_pdfRuntime",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Diagnostic: can this runtime parse and rasterize a PDF? (no input; builds a probe PDF in memory)",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/category-items": {
+      "get": {
+        "operationId": "AdminGearModelController_listCategoryItems",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "enum": [
+                "E-Bikes",
+                "Biking",
+                "Camping",
+                "RV",
+                "Hiking",
+                "Water Sports",
+                "Winter Sports",
+                "Snow Sports",
+                "Climbing",
+                "Surfing",
+                "Fishing",
+                "Golf",
+                "Kayaking",
+                "Skiing",
+                "Tennis",
+                "Boating",
+                "ATVs",
+                "Photography",
+                "Electronics",
+                "Cabins",
+                "Campsites",
+                "RV Sites",
+                "Glamping",
+                "Other"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "draft",
+                "published",
+                "retired"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GearKnowledgeItem"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List category-scope knowledge items",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      },
+      "post": {
+        "operationId": "AdminGearModelController_createCategoryItem",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertCategoryItemDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GearKnowledgeItem"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a category-scope knowledge item",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/category-items/{itemId}": {
+      "delete": {
+        "operationId": "AdminGearModelController_removeCategoryItem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a category-scope knowledge item",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      },
+      "put": {
+        "operationId": "AdminGearModelController_updateCategoryItem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategoryItemDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GearKnowledgeItem"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a category-scope knowledge item",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/seed-baseline": {
+      "post": {
+        "operationId": "AdminGearModelController_seedBaseline",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Load the RV and Boating category baseline (idempotent)",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}": {
+      "get": {
+        "operationId": "AdminGearModelController_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GearModel"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get one gear model",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      },
+      "put": {
+        "operationId": "AdminGearModelController_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGearModelDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GearModel"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a gear model",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/build": {
+      "get": {
+        "operationId": "AdminGearModelController_getBuild",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The latest build of the model: steps, attempts, errors and cost",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      },
+      "post": {
+        "operationId": "AdminGearModelController_build",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartBuildDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start (or restart, with force) the pack build: one outbox-driven job per step. A running build is returned unchanged.",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/build/run-next": {
+      "post": {
+        "operationId": "AdminGearModelController_runNext",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Run the next pending build step inline (up to about 240 s); safe alongside the cron drain",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/items": {
+      "get": {
+        "operationId": "AdminGearGuideController_listItems",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "draft",
+                "published",
+                "retired"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A model's knowledge items (optionally by status), with their review state",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/items/{itemId}": {
+      "put": {
+        "operationId": "AdminGearGuideController_updateItem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateModelItemDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edit a model's DRAFT item (title, topic, body, steps with their warnings); voids a prior approval",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/items/{itemId}/approve": {
+      "post": {
+        "operationId": "AdminGearGuideController_approveItem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Stamp a draft item as reviewed (reviewedAt, reviewedBy). Publish does not gate on it.",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/items/{itemId}/retire": {
+      "post": {
+        "operationId": "AdminGearGuideController_retireItem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reject a draft item: it is retired and never published",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/manual-url": {
+      "post": {
+        "operationId": "AdminGearModelController_manualUrl",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FetchManualUrlDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fetch a manufacturer manual (https PDF, up to 50 MB) into the private store",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/manuals": {
+      "get": {
+        "operationId": "AdminGearModelController_listManuals",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the manuals of the model (never their storage keys)",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/manuals/{manualId}": {
+      "delete": {
+        "operationId": "AdminGearModelController_removeManual",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "manualId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a manual (its file is deleted from the private store)",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/manuals/{manualId}/url": {
+      "get": {
+        "operationId": "AdminGearModelController_manualSignedUrl",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "manualId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A signed read URL for a manual, valid for 300 seconds. The only way a manual is ever opened.",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/media": {
+      "get": {
+        "operationId": "AdminGearGuideController_listMedia",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A model's figures and photos (never storage keys)",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/media/{mediaId}": {
+      "put": {
+        "operationId": "AdminGearGuideController_updateMedia",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "mediaId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateModelMediaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edit a figure caption and/or alt text",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/merge": {
+      "post": {
+        "operationId": "AdminGearModelController_merge",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeGearModelsDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Merge a duplicate model into this one (the duplicate is retired)",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/publish": {
+      "post": {
+        "operationId": "AdminGearModelController_publish",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publish the draft pack: items go live, packVersion +1, older cached answers are dropped",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/status": {
+      "patch": {
+        "operationId": "AdminGearModelController_setStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetGearModelStatusDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GearModel"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set the status of a gear model",
+        "tags": [
+          "admin-gear-guide"
+        ]
+      }
+    },
+    "/api/v1/admin/gear-models/{id}/topics/refresh-questions": {
+      "post": {
+        "operationId": "AdminGearModelController_refreshTopicQuestions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rewrite the model's suggested topic questions in natural wording from the item titles and kinds. No rebuild, no AI; idempotent. Category-list topics keep their written questions.",
+        "tags": [
+          "admin-gear-guide"
         ]
       }
     },
@@ -22729,6 +25587,30 @@
           },
           {
             "in": "query",
+            "name": "radiusKm",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lng",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lat",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
             "name": "location",
             "required": false,
             "schema": {
@@ -24410,6 +27292,1448 @@
         ]
       }
     },
+    "/api/v1/gear-guide/bookings/{bookingId}/ask": {
+      "post": {
+        "operationId": "GearGuideAskController_ask",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bookingId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stream",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A UUID the client generates per question. A repeat with the same key from the same renter on the same booking within 10 minutes does NOT create a second turn or call the AI again: if the first request finished, its answer is replayed (SSE: `meta` then `answer`; ?stream=false: the same JSON); if the first is still running the answer is 409 GEAR_GUIDE_REQUEST_IN_PROGRESS; the same key with a different question is 422 GEAR_GUIDE_IDEMPOTENCY_KEY_REUSED. A malformed key is 400 GEAR_GUIDE_INVALID_IDEMPOTENCY_KEY. Safe to retry after a dropped connection.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The answer: an SSE stream (default) or, with ?stream=false, the final answer as JSON."
+          },
+          "409": {
+            "description": "GEAR_GUIDE_REQUEST_IN_PROGRESS: the first request with this Idempotency-Key is still being answered."
+          },
+          "422": {
+            "description": "GEAR_GUIDE_IDEMPOTENCY_KEY_REUSED: this Idempotency-Key was used for a different question."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ask the Gear Guide about a booking. Streams Server-Sent Events (meta, delta, retract, answer, error); ?stream=false returns the final answer as JSON. `retract` ({}) means every delta so far is withdrawn: clear the draft, a replacement stream and the final answer (possibly a hand-off) follow. Without sessionId a NEW session starts; pass the sessionId from `meta` to continue a conversation. The `answer` payload (SSE and JSON alike) carries `vendor_verified` (boolean: a vendor vouched for the cached answer; false for a live answer) and, on every entry of `sources`, an `origin` of `manual`, `vendor` or `category`.",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/bookings/{bookingId}/pack": {
+      "get": {
+        "operationId": "GearGuideAskController_pack",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bookingId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The offline pack for this booking: topics, published items, ready answers and media. ETag / If-None-Match supported (304).",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/bookings/{bookingId}/session": {
+      "get": {
+        "operationId": "GearGuideAskController_session",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bookingId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The booking's Gear Guide conversation so far",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/bookings/{bookingId}/topics": {
+      "get": {
+        "operationId": "GearGuideAskController_topics",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bookingId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suggested questions: the topics the guide covers for this gear, and the listing's quirks",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/conversations/{conversationId}/messages/{messageId}/save": {
+      "post": {
+        "operationId": "VendorGearGuideController_saveChatReply",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveChatReplyDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Save the caller's OWN chat reply to the Gear Guide of the listing the conversation is about (the caller must own it and have the guide on): a listing-scope verified FAQ item",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/gaps/open-count": {
+      "get": {
+        "operationId": "VendorGearGuideController_openGapCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Open gaps across every listing the caller owns (the nav badge), and per listing",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/listings/{id}/faq": {
+      "get": {
+        "operationId": "GearGuideController_faq",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GearAnswerCache"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The answers the guide already has for this listing (model's and listing's)",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/listings/{id}/faq/{topic}": {
+      "put": {
+        "operationId": "VendorGearGuideController_overrideFaq",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "topic",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverrideFaqDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GearAnswerCache"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the answer on a topic for THIS listing with the vendor's own wording (verified, listing scope)",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/listings/{id}/faq/{topic}/approve": {
+      "post": {
+        "operationId": "VendorGearGuideController_approveFaq",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "topic",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GearAnswerCache"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vouch for the guide's answer on a topic for THIS listing (Host-verified): a listing-scope verified cache entry plus a listing FAQ item. The shared model answer is untouched.",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/listings/{id}/faq/{topic}/hide": {
+      "delete": {
+        "operationId": "VendorGearGuideController_unhideFaq",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "topic",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Show a hidden topic again for this listing",
+        "tags": [
+          "gear-guide"
+        ]
+      },
+      "post": {
+        "operationId": "VendorGearGuideController_hideFaq",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "topic",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hide a topic for this listing: the guide no longer answers it from any cache, and it leaves the offline pack",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/listings/{id}/gaps": {
+      "get": {
+        "operationId": "GearGuideController_listGaps",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "open",
+              "enum": [
+                "open",
+                "answered",
+                "dismissed"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GearGuideGap"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Questions the guide could not answer (open by default)",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/listings/{id}/gaps/{gapId}/answer": {
+      "post": {
+        "operationId": "GearGuideController_answerGap",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "gapId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerGapDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GearGuideGap"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Answer a gap: creates a FAQ item and a verified cache entry",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/listings/{id}/gaps/{gapId}/dismiss": {
+      "post": {
+        "operationId": "GearGuideController_dismissGap",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "gapId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GearGuideGap"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Dismiss a gap without answering it",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/listings/{id}/items": {
+      "get": {
+        "operationId": "GearGuideController_listItems",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GearKnowledgeItem"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the listing's own knowledge items",
+        "tags": [
+          "gear-guide"
+        ]
+      },
+      "post": {
+        "operationId": "GearGuideController_createItem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateListingItemDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GearKnowledgeItem"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a knowledge item to the listing",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/listings/{id}/items/draft-from-notes": {
+      "post": {
+        "operationId": "GearGuideController_draftFromNotes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftFromNotesDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GearKnowledgeItem"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Turn free-text notes into DRAFT knowledge items (AI)",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/listings/{id}/items/{itemId}": {
+      "delete": {
+        "operationId": "GearGuideController_removeItem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a knowledge item of the listing",
+        "tags": [
+          "gear-guide"
+        ]
+      },
+      "put": {
+        "operationId": "GearGuideController_updateItem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateListingItemDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GearKnowledgeItem"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a knowledge item of the listing",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/listings/{id}/media": {
+      "get": {
+        "operationId": "GearGuideController_listMedia",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GearMedia"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the listing's Gear Guide media",
+        "tags": [
+          "gear-guide"
+        ]
+      },
+      "post": {
+        "operationId": "GearGuideController_addMedia",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateListingMediaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GearMedia"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Attach a photo, figure or video embed to the listing",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/listings/{id}/model": {
+      "put": {
+        "operationId": "GearGuideController_linkModel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkListingModelDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Link (or unlink) the listing to a gear model",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/listings/{id}/settings": {
+      "get": {
+        "operationId": "GearGuideController_getSettings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Gear Guide settings of the listing",
+        "tags": [
+          "gear-guide"
+        ]
+      },
+      "patch": {
+        "operationId": "GearGuideController_updateSettings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGearGuideSettingsDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update the Gear Guide settings of the listing",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/listings/{listingId}/preview-ask": {
+      "post": {
+        "operationId": "GearGuideAskController_previewAsk",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "listingId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stream",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A listing's owner or an admin tries the Gear Guide as a renter would, with no booking. Same pipeline; it never writes the answer cache.",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/models": {
+      "get": {
+        "operationId": "GearGuideController_searchModels",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Search gear models to link a listing to",
+        "tags": [
+          "gear-guide"
+        ]
+      },
+      "post": {
+        "operationId": "VendorGearGuideController_createModel",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVendorGearModelDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Find the model with this make, model and variant, or add it as PENDING (ops build its pack). `created` says which.",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/models/{id}": {
+      "get": {
+        "operationId": "VendorGearGuideController_getModel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A model as a vendor sees it: identity, photo checklist, how many OTHER listings use it, and whether a manual is waiting for a build",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/models/{id}/build": {
+      "get": {
+        "operationId": "VendorGearGuideController_getBuild",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The build status of a model the caller's listing uses: a state (no_manual, awaiting_build, building, in_review, published, failed) and counts, never costs or errors. Read only: a vendor cannot start a build.",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/models/{id}/manual": {
+      "post": {
+        "operationId": "GearGuideController_addManual",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordManualDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record a manual uploaded to the private store, with the attestation that the caller may share it",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/models/{id}/manual/upload-token": {
+      "post": {
+        "operationId": "GearGuideController_manualUploadToken",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Client-upload handshake for a manual (PDF, up to 50 MB, private store, manuals/<modelId>/). Complete with POST models/:id/manual.",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/models/{id}/manuals": {
+      "get": {
+        "operationId": "GearGuideController_listManuals",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The model's manuals (label, pages, size; never the file or its key) and the exact attestation text and version a vendor accepts when adding one",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/turns/{turnId}/escalate": {
+      "post": {
+        "operationId": "GearGuideAskController_escalate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "turnId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hand the question to the vendor: it goes into the booking's messages, becomes a gap in the vendor's Gear Guide, and notifies them. Repeating it changes nothing.",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/gear-guide/turns/{turnId}/feedback": {
+      "post": {
+        "operationId": "GearGuideAskController_feedback",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "turnId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TurnFeedbackDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Thumbs up or down on an answer",
+        "tags": [
+          "gear-guide"
+        ]
+      }
+    },
+    "/api/v1/geo/resolve-place": {
+      "get": {
+        "operationId": "GeoController_resolvePlace",
+        "parameters": [
+          {
+            "description": "A browse location as typed or shared in a link",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "example": "Minneapolis, Minnesota",
+              "maxLength": 120,
+              "minLength": 2,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Geo"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "AppController_getHealth",
@@ -25109,7 +29433,39 @@
             "name": "location",
             "required": false,
             "schema": {
+              "maxLength": 200,
               "type": "string"
+            }
+          },
+          {
+            "description": "SPLIT-1727 — centre of a radius location search (the web autocomplete\nknows the coordinates of the place the renter picked). `lat` and `lng`\ncome as a pair: either alone is a 400. Without them, a city-level\n`location` is geocoded server-side; a region-level one stays text-only.",
+            "in": "query",
+            "name": "lat",
+            "required": false,
+            "schema": {
+              "maximum": 90,
+              "minimum": -90,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lng",
+            "required": false,
+            "schema": {
+              "maximum": 180,
+              "minimum": -180,
+              "type": "number"
+            }
+          },
+          {
+            "description": "SPLIT-1727 — search radius in km (default 40 ≈ 25 mi).",
+            "in": "query",
+            "name": "radiusKm",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "number"
             }
           },
           {
@@ -25205,7 +29561,8 @@
               "enum": [
                 "createdAt",
                 "pricePerDay",
-                "averageRating"
+                "averageRating",
+                "distance"
               ],
               "type": "string"
             }
@@ -25412,7 +29769,39 @@
             "name": "location",
             "required": false,
             "schema": {
+              "maxLength": 200,
               "type": "string"
+            }
+          },
+          {
+            "description": "SPLIT-1727 — centre of a radius location search (the web autocomplete\nknows the coordinates of the place the renter picked). `lat` and `lng`\ncome as a pair: either alone is a 400. Without them, a city-level\n`location` is geocoded server-side; a region-level one stays text-only.",
+            "in": "query",
+            "name": "lat",
+            "required": false,
+            "schema": {
+              "maximum": 90,
+              "minimum": -90,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lng",
+            "required": false,
+            "schema": {
+              "maximum": 180,
+              "minimum": -180,
+              "type": "number"
+            }
+          },
+          {
+            "description": "SPLIT-1727 — search radius in km (default 40 ≈ 25 mi).",
+            "in": "query",
+            "name": "radiusKm",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "number"
             }
           },
           {
@@ -25508,7 +29897,8 @@
               "enum": [
                 "createdAt",
                 "pricePerDay",
-                "averageRating"
+                "averageRating",
+                "distance"
               ],
               "type": "string"
             }
@@ -27386,6 +31776,30 @@
           {
             "in": "query",
             "name": "minPrice",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "radiusKm",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lng",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lat",
             "required": false,
             "schema": {
               "type": "number"
@@ -29411,7 +33825,39 @@
             "name": "location",
             "required": false,
             "schema": {
+              "maxLength": 200,
               "type": "string"
+            }
+          },
+          {
+            "description": "SPLIT-1727 — centre of a radius location search (the web autocomplete\nknows the coordinates of the place the renter picked). `lat` and `lng`\ncome as a pair: either alone is a 400. Without them, a city-level\n`location` is geocoded server-side; a region-level one stays text-only.",
+            "in": "query",
+            "name": "lat",
+            "required": false,
+            "schema": {
+              "maximum": 90,
+              "minimum": -90,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lng",
+            "required": false,
+            "schema": {
+              "maximum": 180,
+              "minimum": -180,
+              "type": "number"
+            }
+          },
+          {
+            "description": "SPLIT-1727 — search radius in km (default 40 ≈ 25 mi).",
+            "in": "query",
+            "name": "radiusKm",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "number"
             }
           },
           {
@@ -29507,7 +33953,8 @@
               "enum": [
                 "createdAt",
                 "pricePerDay",
-                "averageRating"
+                "averageRating",
+                "distance"
               ],
               "type": "string"
             }
@@ -29709,7 +34156,39 @@
             "name": "location",
             "required": false,
             "schema": {
+              "maxLength": 200,
               "type": "string"
+            }
+          },
+          {
+            "description": "SPLIT-1727 — centre of a radius location search (the web autocomplete\nknows the coordinates of the place the renter picked). `lat` and `lng`\ncome as a pair: either alone is a 400. Without them, a city-level\n`location` is geocoded server-side; a region-level one stays text-only.",
+            "in": "query",
+            "name": "lat",
+            "required": false,
+            "schema": {
+              "maximum": 90,
+              "minimum": -90,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lng",
+            "required": false,
+            "schema": {
+              "maximum": 180,
+              "minimum": -180,
+              "type": "number"
+            }
+          },
+          {
+            "description": "SPLIT-1727 — search radius in km (default 40 ≈ 25 mi).",
+            "in": "query",
+            "name": "radiusKm",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "number"
             }
           },
           {
@@ -29805,7 +34284,8 @@
               "enum": [
                 "createdAt",
                 "pricePerDay",
-                "averageRating"
+                "averageRating",
+                "distance"
               ],
               "type": "string"
             }

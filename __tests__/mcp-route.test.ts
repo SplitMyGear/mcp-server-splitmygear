@@ -77,12 +77,12 @@ describe('/api/mcp route handler (M2 stateless transport)', () => {
     const pkg = readJson('package.json');
     const lock = readJson('package-lock.json');
     const manifest = readJson('manifest.json');
-    expect(pkg.version).toBe('2.0.5');
-    expect(lock.version).toBe('2.0.5');
-    expect(lock.packages[''].version).toBe('2.0.5');
-    expect(manifest.version).toBe('2.0.5');
+    expect(pkg.version).toBe('2.1.0');
+    expect(lock.version).toBe('2.1.0');
+    expect(lock.packages[''].version).toBe('2.1.0');
+    expect(manifest.version).toBe('2.1.0');
     const res = await POST(mcpRequest(INIT));
-    expect(await res.text()).toContain('2.0.5');
+    expect(await res.text()).toContain('2.1.0');
   });
 
   // SPLIT-1621: production advertises `/mcp` as canonical, but BOTH paths are
@@ -94,7 +94,14 @@ describe('/api/mcp route handler (M2 stateless transport)', () => {
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).toContain('splitmygear-mcp');
-    expect(text).toContain('2.0.5');
+    expect(text).toContain('2.1.0');
+  });
+
+  it('tells the model Gear Guide answers are data and warnings pass through verbatim (SPLIT-1741)', async () => {
+    const res = await mcpPost(mcpRequest(INIT));
+    const text = await res.text();
+    expect(text).toContain('never present safety procedures beyond the returned text');
+    expect(text).toContain('pass its warnings through verbatim');
   });
 
   it('rejects an unauthenticated request on /mcp too', async () => {
