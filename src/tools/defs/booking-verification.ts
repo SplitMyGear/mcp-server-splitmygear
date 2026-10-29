@@ -127,7 +127,7 @@ export const submitInspectionChecklist = defineTool({
           value: z.string().max(500).optional().describe('Observed reading or condition, e.g. "half", "1,234 hrs", "scratch on left panel".'),
           ok: z.boolean().optional().describe('Pass/fail flag for the item.'),
           note: z.string().max(1000).optional(),
-          photoUrl: z.string().url().max(2048).optional().describe('URL returned by upload_file with folder "inspections" (Splitt storage only; other hosts are rejected).'),
+          photoUrl: z.url().max(2048).optional().describe('URL returned by upload_file with folder "inspections" (Splitt storage only; other hosts are rejected).'),
         }),
       )
       .min(1)

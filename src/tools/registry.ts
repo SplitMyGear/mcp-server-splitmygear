@@ -25,7 +25,7 @@
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult, ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
-import type { ZodRawShape, ZodTypeAny, objectOutputType } from 'zod';
+import type { z } from 'zod';
 import type { PrincipalKind } from '@/middleware/auth';
 import { canActAsVendor, canBookRentals, canManageVendorPayouts, canViewVendorFinance } from '@/lib/roles';
 import { aiUnavailableMessage, isAiUnavailable, type AiText, type Result } from './_shared';
@@ -69,7 +69,17 @@ export interface ToolContext {
   scopes?: ToolScope[];
 }
 
-export interface ToolDef<Shape extends ZodRawShape = ZodRawShape> {
+/**
+ * A tool's input: zod schemas keyed by argument name. Registered as the tool's
+ * `inputSchema` raw shape; the SDK wraps it in an object schema to validate a
+ * call and to serve it as JSON Schema in tools/list.
+ */
+export type ToolShape = Readonly<{ [k: string]: z.ZodType }>;
+
+/** The parsed arguments a handler receives: the shape's output (defaults applied, optional keys optional). */
+export type ToolArgs<Shape extends ToolShape> = z.output<z.ZodObject<Shape>>;
+
+export interface ToolDef<Shape extends ToolShape = ToolShape> {
   name: string;
   title: string;
   description: string;
@@ -77,11 +87,11 @@ export interface ToolDef<Shape extends ZodRawShape = ZodRawShape> {
   scope: ToolScope;
   inputSchema: Shape;
   annotations: ToolAnnotations;
-  handler: (args: objectOutputType<Shape, ZodTypeAny>, ctx: ToolContext) => Promise<CallToolResult>;
+  handler: (args: ToolArgs<Shape>, ctx: ToolContext) => Promise<CallToolResult>;
 }
 
 /** Identity helper that pins the shape type so handlers get typed args. */
-export function defineTool<Shape extends ZodRawShape>(def: ToolDef<Shape>): ToolDef<Shape> {
+export function defineTool<Shape extends ToolShape>(def: ToolDef<Shape>): ToolDef<Shape> {
   return def;
 }
 
@@ -112,7 +122,7 @@ export function isToolVisible(access: ToolAccess, ctx: ToolContext, scope?: Tool
   }
 }
 
-export function isToolAllowed(def: Pick<ToolDef<ZodRawShape>, 'access' | 'scope'>, ctx: ToolContext): boolean {
+export function isToolAllowed(def: Pick<ToolDef, 'access' | 'scope'>, ctx: ToolContext): boolean {
   return isToolVisible(def.access, ctx, def.scope);
 }
 
@@ -169,7 +179,7 @@ export function withStatusHint(message: string, status?: number): string {
   return message;
 }
 
-export function registerTools(server: McpServer, ctx: ToolContext, defs: ReadonlyArray<ToolDef<ZodRawShape>>): string[] {
+export function registerTools(server: McpServer, ctx: ToolContext, defs: ReadonlyArray<ToolDef>): string[] {
   const registered: string[] = [];
   for (const def of defs) {
     if (!isToolAllowed(def, ctx)) continue;
@@ -181,7 +191,7 @@ export function registerTools(server: McpServer, ctx: ToolContext, defs: Readonl
         inputSchema: def.inputSchema,
         annotations: def.annotations,
       },
-      async (args: objectOutputType<ZodRawShape, ZodTypeAny>) => {
+      async (args: ToolArgs<ToolShape>) => {
         if (!isToolVisible(def.access, ctx)) {
           return fail(def.access === 'public' ? 'Not available' : ACCESS_DENIED[def.access]);
         }
@@ -200,6 +210,6 @@ export function registerTools(server: McpServer, ctx: ToolContext, defs: Readonl
 }
 
 /** Widen a typed def to the registry's element type (keeps `defineTool` inference at the call site). */
-export function toolList(...defs: Array<ToolDef<ZodRawShape>>): ToolDef<ZodRawShape>[] {
+export function toolList(...defs: Array<ToolDef>): ToolDef[] {
   return defs;
 }

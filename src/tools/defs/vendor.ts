@@ -39,7 +39,7 @@ const listingFields = {
   latitude: z.number().min(-90).max(90).optional().describe('Map pin. Required for a stay.'),
   longitude: z.number().min(-180).max(180).optional().describe('Map pin. Required for a stay.'),
   imageUrls: z
-    .array(z.string().url().max(2048))
+    .array(z.url().max(2048))
     .max(20)
     .optional()
     .describe('Publicly reachable image URLs. Publishing needs at least 3 photos (upload_file returns a URL for your own photo).'),
@@ -555,7 +555,7 @@ const experienceFields = {
   whatToBring: z.array(z.string().max(120)).max(30).optional(),
   requirements: z.string().max(2000).optional(),
   cancellationPolicy: z.string().max(500).optional(),
-  imageUrls: z.array(z.string().url().max(2048)).max(20).optional(),
+  imageUrls: z.array(z.url().max(2048)).max(20).optional(),
   guidanceType: z
     .enum(['self_guided', 'staff_guided'])
     .optional()

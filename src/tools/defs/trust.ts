@@ -21,13 +21,13 @@ import { uuid, pagination, READ, WRITE, DESTRUCTIVE, UNTRUSTED_NOTE, token } fro
 
 const FORMAL_NOTE = 'This is a formal process that affects money; confirm the details with the user before calling it.';
 
-const evidenceUrl = z.string().url().max(2048);
+const evidenceUrl = z.url().max(2048);
 
 /** One claim evidence item (the backend's EvidenceItemDto minus the admin-only internalOnly flag). */
 const claimEvidenceItem = z.object({
   type: z.enum(CLAIM_EVIDENCE_TYPES).describe('photo or receipt_pdf carry a fileUrl from upload_file (folder "claims"); statement carries text only.'),
   fileUrl: evidenceUrl.optional().describe('Required for photo / receipt_pdf: the url returned by upload_file with folder "claims".'),
-  bookingVerificationId: z.string().uuid().optional().describe('Optional link to a pickup / return inspection photo set.'),
+  bookingVerificationId: z.guid().optional().describe('Optional link to a pickup / return inspection photo set.'),
   text: z.string().max(2000).optional().describe('Caption or statement text (required for statement).'),
 });
 
@@ -221,7 +221,7 @@ export const listIncidentalCharges = defineTool({
   scope: 'claims',
   inputSchema: {
     status: z.enum(INCIDENTAL_CHARGE_STATUSES).optional(),
-    bookingId: z.string().uuid().optional().describe('Only charges on this booking.'),
+    bookingId: z.guid().optional().describe('Only charges on this booking.'),
     ...pagination,
   },
   annotations: READ,

@@ -1,5 +1,4 @@
 /** Every tool the server can expose, in listing order. The registry filters by principal and granted scopes. */
-import type { ZodRawShape } from 'zod';
 import type { ToolDef } from '../registry';
 import { discoveryTools } from './discovery';
 import { discoveryExtrasTools } from './discovery-extras';
@@ -20,9 +19,9 @@ import { messageTemplateTools } from './message-templates';
 import { vendorExtrasTools } from './vendor-extras';
 import { gearGuideTools } from './gear-guide';
 
-const widen = (defs: ReadonlyArray<unknown>): ToolDef<ZodRawShape>[] => defs as ToolDef<ZodRawShape>[];
+const widen = (defs: ReadonlyArray<unknown>): ToolDef[] => defs as ToolDef[];
 
-export const ALL_TOOLS: ReadonlyArray<ToolDef<ZodRawShape>> = [
+export const ALL_TOOLS: ReadonlyArray<ToolDef> = [
   // Public discovery
   ...widen(discoveryTools),
   ...widen(discoveryExtrasTools),

@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { defineTool, fail, fromResult } from '../registry';
 import { fleetTools as fleet } from '../fleet';
 import { dateError } from '../_shared';
-import { uuid, isoDate, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, token } from './common';
+import { uuid, isoDate, httpsUrl, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, token } from './common';
 
 /** Mirrors the backend's MAX_UNIT_YEAR (next year's models ship early). */
 const MAX_UNIT_YEAR = new Date().getFullYear() + 1;
@@ -191,7 +191,7 @@ export const logUnitMaintenance = defineTool({
     hoursReadingAt: z.number().int().min(0).max(10000000).optional().describe('Hour-meter or odometer reading at the time of service.'),
     cost: z.number().min(0).max(10000000).optional().describe('Parts and labor cost in USD (up to 2 decimals).'),
     attachmentUrls: z
-      .array(z.string().url().startsWith('https://').max(2048))
+      .array(httpsUrl(2048))
       .max(20)
       .optional()
       .describe('HTTPS URLs of receipts or photos already uploaded to Splitt (Splitt upload-host URLs only; other hosts are rejected).'),
