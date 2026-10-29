@@ -40,7 +40,7 @@ export const updateMyProfile = defineTool({
     lastName: z.string().min(1).max(100).optional(),
     phone: z.string().max(40).optional(),
     bio: z.string().max(1000).optional(),
-    profileImageUrl: z.string().url().max(2048).optional(),
+    profileImageUrl: z.url().max(2048).optional(),
     dateOfBirth: z.string().max(40).optional().describe('ISO date; must be 13+.'),
     storeName: z.string().max(120).optional().describe('Vendors only.'),
     storeDescription: z.string().max(2000).optional().describe('Vendors only.'),
@@ -88,7 +88,7 @@ export const markNotificationsRead = defineTool({
   description: 'Mark one notification (by id) or all notifications as read.',
   access: 'user',
   scope: 'profile',
-  inputSchema: { notificationId: z.string().uuid().optional().describe('Omit to mark ALL notifications read.') },
+  inputSchema: { notificationId: z.guid().optional().describe('Omit to mark ALL notifications read.') },
   annotations: WRITE_IDEMPOTENT,
   handler: async ({ notificationId }, ctx) =>
     fromResult(notificationId ? await accountTools.markNotificationRead(token(ctx), notificationId) : await accountTools.markAllNotificationsRead(token(ctx))),
@@ -282,7 +282,7 @@ export const bookExperience = defineTool({
   scope: 'bookings',
   inputSchema: {
     experienceId: uuid('experience'),
-    scheduleId: z.string().uuid().optional().describe('A schedule slot id from get_experience_details.'),
+    scheduleId: z.guid().optional().describe('A schedule slot id from get_experience_details.'),
     guests: z.number().int().min(1).max(50).describe('Number of adult guests.'),
     children: z.number().int().min(0).max(50).optional(),
     guestNotes: z.string().max(1000).optional(),
@@ -341,8 +341,8 @@ export const createReview = defineTool({
   scope: 'reviews',
   inputSchema: {
     type: z.enum(['listing', 'user']),
-    listingId: z.string().uuid().optional(),
-    reviewedUserId: z.string().uuid().optional(),
+    listingId: z.guid().optional(),
+    reviewedUserId: z.guid().optional(),
     rating: z.number().int().min(1).max(5),
     comment: z.string().max(2000).optional(),
   },
@@ -449,9 +449,9 @@ export const sendMessage = defineTool({
   inputSchema: {
     recipientId: uuid('recipient user'),
     content: z.string().min(1).max(5000),
-    conversationId: z.string().uuid().optional().describe('Existing conversation to post into (skips lookup).'),
-    listingId: z.string().uuid().optional().describe('Listing the conversation is about (new conversations only).'),
-    bookingId: z.string().uuid().optional().describe('Booking the conversation is about (new conversations only).'),
+    conversationId: z.guid().optional().describe('Existing conversation to post into (skips lookup).'),
+    listingId: z.guid().optional().describe('Listing the conversation is about (new conversations only).'),
+    bookingId: z.guid().optional().describe('Booking the conversation is about (new conversations only).'),
   },
   annotations: WRITE,
   handler: async (args, ctx) => {

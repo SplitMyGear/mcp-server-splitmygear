@@ -2,7 +2,27 @@
 import { z } from 'zod';
 import { LISTING_CATEGORY_IDS } from '@/tools/listing-categories';
 
-export const uuid = (what: string) => z.string().uuid().describe(`The ${what} id (UUID).`);
+/**
+ * Ids are matched as `z.guid()` (any 8-4-4-4-12 hex), never `z.uuid()`: zod 4's
+ * `uuid()` also enforces the RFC 9562 version and variant digits, which the
+ * backend does not, and Splitt's own seeded rows carry hand-assigned ids that
+ * fail them (`a0000000-0000-0000-0000-000000000001` from POST
+ * /admin/seed/test-data, the `00000200-…` E2E fixtures). `guid()` accepts
+ * exactly what zod 3's `uuid()` did and is still served as `format: "uuid"`.
+ * Every inline id field in these defs uses `z.guid()` for the same reason.
+ */
+export const uuid = (what: string) => z.guid().describe(`The ${what} id (UUID).`);
+
+/**
+ * An https URL of at most `max` characters. The prefix is checked first, on
+ * the raw input, and the URL check is added after it with `.check(z.url())`.
+ * In that order the field keeps zod 3's behaviour (zod 4's URL check trims its
+ * input before it parses, so `z.url().startsWith(…)` would let " https://…"
+ * through) and its served JSON Schema keeps `format: "uri"` next to the
+ * `^https://` pattern: zod 4 advertises the LAST string format it sees, so a
+ * trailing `.startsWith()` would replace it with `format: "starts_with"`.
+ */
+export const httpsUrl = (max: number, message?: string) => z.string().startsWith('https://', message).check(z.url()).max(max);
 export const isoDate = (what: string) => z.string().min(8).max(40).describe(`${what} as an ISO date, e.g. 2026-07-04 (or a full ISO timestamp).`);
 export const pagination = {
   limit: z.number().int().min(1).max(100).optional().describe('Max items to return (1–100, default 50).'),

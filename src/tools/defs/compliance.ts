@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { defineTool, fail, fromResult, ok } from '../registry';
 import { complianceApi, INSURANCE_COVERAGE_TYPES, WAIVER_KINDS } from '../compliance';
 import { dateError } from '../_shared';
-import { uuid, isoDate, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, UNTRUSTED_NOTE, token } from './common';
+import { uuid, isoDate, httpsUrl, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, UNTRUSTED_NOTE, token } from './common';
 
 // ── Insurance policies ───────────────────────────────────────────────────────
 
@@ -20,12 +20,7 @@ const policyNumber = z.string().min(1).max(120).describe('Policy number as print
 const coverageType = z.enum(INSURANCE_COVERAGE_TYPES).describe('Kind of coverage: general_liability, commercial_property, inland_marine, or other.');
 const perOccurrenceLimit = z.number().positive().max(9_999_999_999).describe('Per-occurrence coverage limit in USD (up to 2 decimals).');
 const aggregateLimit = z.number().positive().max(9_999_999_999).describe('Aggregate coverage limit in USD (up to 2 decimals).');
-const documentUrl = z
-  .string()
-  .url()
-  .startsWith('https://')
-  .max(1024)
-  .describe('URL of the uploaded declaration page / certificate of insurance (PDF or image): upload it first with upload_file using folder "insurance" and pass the returned url. URLs on other hosts are rejected by Splitt.');
+const documentUrl = httpsUrl(1024).describe('URL of the uploaded declaration page / certificate of insurance (PDF or image): upload it first with upload_file using folder "insurance" and pass the returned url. URLs on other hosts are rejected by Splitt.');
 
 /** Returns a message when the dates are not both valid with expiry strictly after effective; null when fine. */
 function policyDatesError(effectiveDate?: string, expiryDate?: string): string | null {
@@ -291,7 +286,7 @@ export const getRequiredWaivers = defineTool({
   access: 'user',
   scope: 'bookings',
   inputSchema: {
-    listingId: z.string().uuid().optional().describe('Scope to what is required to book this listing (platform + that vendor\'s waivers). Omit for the user\'s platform waivers only.'),
+    listingId: z.guid().optional().describe('Scope to what is required to book this listing (platform + that vendor\'s waivers). Omit for the user\'s platform waivers only.'),
   },
   annotations: READ,
   handler: async ({ listingId }, ctx) =>
@@ -328,7 +323,7 @@ export const signWaiver = defineTool({
     kind: z.enum(WAIVER_KINDS).describe('"platform" for a Splitt platform waiver, "vendor" for a vendor\'s own waiver (matches the `type` of the required waiver).'),
     waiverId: uuid('waiver'),
     signature: z.string().min(2).max(200).describe('The user\'s full legal name, exactly as they typed it, as their electronic signature.'),
-    bookingId: z.string().uuid().optional().describe('Booking this signature is for, if any.'),
+    bookingId: z.guid().optional().describe('Booking this signature is for, if any.'),
   },
   annotations: WRITE,
   handler: async ({ kind, waiverId, signature, bookingId }, ctx) => {

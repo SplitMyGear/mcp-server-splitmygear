@@ -27,7 +27,7 @@ const MEDIA_HOSTS_HINT = `https URLs on ${SERVICE_MEDIA_HOST_SUFFIXES.join(', ')
 const serviceMediaUrl = z
   .string()
   .max(2048)
-  .refine(isAllowedServiceMediaUrl, { message: `Media URLs must be ${MEDIA_HOSTS_HINT}` });
+  .refine(isAllowedServiceMediaUrl, { error: `Media URLs must be ${MEDIA_HOSTS_HINT}` });
 
 /** The four fields `CreateServiceDto` requires. */
 const requiredServiceFields = {

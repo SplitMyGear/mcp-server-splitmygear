@@ -11,6 +11,7 @@ jest.mock('../src/lib/backend-client', () => {
 });
 
 import { discoveryExtrasTools as extras, POI_RECIPES, SEARCH_ALERT_FREQUENCIES } from '../src/tools/discovery-extras';
+import { servedDescriptions } from './helpers/served-schema';
 import {
   discoveryExtrasTools as defs,
   CATEGORY_NAMES,
@@ -183,8 +184,8 @@ describe('discovery-extras tool defs', () => {
       expect(t.description.length).toBeGreaterThan(40);
       expect(t.description).not.toMatch(/—/);
       expect(t.annotations).toHaveProperty('readOnlyHint');
-      for (const field of Object.values(t.inputSchema)) {
-        expect(JSON.stringify(field.description ?? '')).not.toMatch(/—/);
+      for (const text of Object.values(servedDescriptions(t.inputSchema))) {
+        expect(JSON.stringify(text ?? '')).not.toMatch(/—/);
       }
     }
     expect(defs.filter((t) => t.annotations.destructiveHint).map((t) => t.name)).toEqual(['delete_search_alert', 'delete_saved_trip']);

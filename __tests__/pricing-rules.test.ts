@@ -10,7 +10,7 @@ jest.mock('../src/lib/backend-client', () => {
   return { BackendApiError, backendRequest: (...args: unknown[]) => mockBackendRequest(...args) };
 });
 
-import type { ZodTypeAny } from 'zod';
+import { servedDescriptions } from './helpers/served-schema';
 import { pricingRulesApi } from '../src/tools/pricing-rules';
 import {
   pricingRulesTools,
@@ -154,8 +154,8 @@ describe('pricingRulesTools defs', () => {
       expect(def.annotations).toHaveProperty('readOnlyHint');
       expect(def.description).not.toContain(EM_DASH);
       expect(def.title).not.toContain(EM_DASH);
-      for (const schema of Object.values(def.inputSchema) as ZodTypeAny[]) {
-        expect(schema.description ?? '').not.toContain(EM_DASH);
+      for (const text of Object.values(servedDescriptions(def.inputSchema))) {
+        expect(text ?? '').not.toContain(EM_DASH);
       }
     }
   });

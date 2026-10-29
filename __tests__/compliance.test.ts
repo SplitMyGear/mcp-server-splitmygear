@@ -1,7 +1,7 @@
 /** Contract tests for the compliance backends (insurance policies + waivers): exact method/path/body/token per call, and the tool defs. */
 export {};
-import type { ZodRawShape } from 'zod';
 import type { ToolDef, ToolContext } from '../src/tools/registry';
+import { servedDescriptions } from './helpers/served-schema';
 
 const mockBackendRequest = jest.fn();
 jest.mock('../src/lib/backend-client', () => {
@@ -31,8 +31,8 @@ function lastCall() {
   return { method: c[0], path: c[1], opts: c[2] ?? {} };
 }
 
-const defs = complianceTools as unknown as ToolDef<ZodRawShape>[];
-function tool(name: string): ToolDef<ZodRawShape> {
+const defs = complianceTools as unknown as ToolDef[];
+function tool(name: string): ToolDef {
   const t = defs.find((d) => d.name === name);
   if (!t) throw new Error(`no tool ${name}`);
   return t;
@@ -150,8 +150,8 @@ describe('complianceTools defs', () => {
       expect(TOOL_SCOPES).toContain(t.scope);
       expect(t.annotations).toHaveProperty('readOnlyHint');
       expect(typeof t.handler).toBe('function');
-      for (const schema of Object.values(t.inputSchema)) {
-        expect(schema.description ?? '').not.toMatch(/—/);
+      for (const text of Object.values(servedDescriptions(t.inputSchema))) {
+        expect(text ?? '').not.toMatch(/—/);
       }
     }
     const vendorSide = ['list_my_insurance_policies', 'add_insurance_policy', 'update_insurance_policy', 'delete_insurance_policy', 'get_insurance_document_link', 'list_my_waivers', 'create_waiver', 'update_waiver', 'delete_waiver'];

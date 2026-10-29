@@ -37,6 +37,7 @@ import {
 } from '../src/tools/defs/services';
 import { TOOL_SCOPES, type ToolContext } from '../src/tools/registry';
 import { z } from 'zod';
+import { servedDescriptions } from './helpers/served-schema';
 
 const T = 'h.p.s';
 const S = '11111111-1111-4111-8111-111111111111';
@@ -229,7 +230,7 @@ describe('service tool defs', () => {
       expect(t.title.length).toBeGreaterThan(2);
       expect(t.description.length).toBeGreaterThan(40);
       expect(t.description).not.toMatch(/\u2014/);
-      for (const schema of Object.values(t.inputSchema)) expect(schema.description ?? '').not.toMatch(/\u2014/);
+      for (const text of Object.values(servedDescriptions(t.inputSchema))) expect(text ?? '').not.toMatch(/\u2014/);
       expect(t.annotations).toHaveProperty('readOnlyHint');
     }
     const byName = Object.fromEntries(serviceTools.map((t) => [t.name, t]));
@@ -294,14 +295,14 @@ describe('service tool defs', () => {
     expect(create.safeParse({ title: 't', description: 'd', price: 5, category: 'delivery', imageUrls: ['https://evil.example/a.jpg'] }).success).toBe(false);
     expect(create.safeParse({ title: 't', description: 'd', price: 5, category: 'delivery', videoUrls: ['http://images.unsplash.com/a.mp4'] }).success).toBe(false);
     expect(create.safeParse({ title: 't', description: 'd', price: 5, category: 'delivery', latitude: 91 }).success).toBe(false);
-    expect(create.shape.title.description).toMatch(/title/i);
+    expect(servedDescriptions(createService.inputSchema).title).toMatch(/title/i);
     expect(create.shape.title.isOptional()).toBe(false);
     const update = z.object(updateService.inputSchema);
     expect(update.safeParse({ serviceId: S, status: 'published' }).success).toBe(true);
     expect(update.safeParse({ serviceId: S, status: 'live' }).success).toBe(false);
     expect(update.safeParse({ serviceId: 'x', title: 't' }).success).toBe(false);
     expect(update.shape.title.isOptional()).toBe(true);
-    expect(update.shape.title.description).toMatch(/title/i);
+    expect(servedDescriptions(updateService.inputSchema).title).toMatch(/title/i);
     expect(z.object(deleteService.inputSchema).safeParse({ serviceId: 'x' }).success).toBe(false);
     expect(z.object(listMyServices.inputSchema).safeParse({}).success).toBe(true);
   });

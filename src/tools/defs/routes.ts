@@ -20,7 +20,7 @@ import {
   MAX_LINKED_ROUTES_PER_LISTING,
   MAX_GPX_BYTES,
 } from '../routes';
-import { uuid, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, UNTRUSTED_NOTE, token } from './common';
+import { uuid, httpsUrl, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, UNTRUSTED_NOTE, token } from './common';
 
 const SITE_URL = 'https://go-splitt.com';
 
@@ -28,7 +28,7 @@ const SITE_URL = 'https://go-splitt.com';
 
 const latitude = z.number().min(-90).max(90);
 const longitude = z.number().min(-180).max(180);
-const httpsUrl = (max: number) => z.string().url().max(max).startsWith('https://', 'Must be an https:// URL.');
+const httpsOnly = (max: number) => httpsUrl(max, 'Must be an https:// URL.');
 
 const geometrySchema = z
   .array(z.array(z.number()).min(2).max(3))
@@ -58,7 +58,7 @@ const poiSchema = z.object({
 const permitSchema = z.object({
   name: z.string().min(1).max(160).describe('Permit or pass name, e.g. "Northwest Forest Pass".'),
   authority: z.string().max(160).optional().describe('Who issues it.'),
-  url: httpsUrl(500).optional().describe('Where to buy or read about it (https only).'),
+  url: httpsOnly(500).optional().describe('Where to buy or read about it (https only).'),
   required: z.boolean().describe('true if renters must hold it; false if recommended.'),
   cost: z.string().max(40).optional().describe('Free text, e.g. "$5/day".'),
   notes: z.string().max(280).optional(),
@@ -75,7 +75,7 @@ const routeOptionalFields = {
   seasonality: z.string().max(120).optional().describe('When the route is usable, e.g. "May to October".'),
   permits: z.array(permitSchema).max(20).optional().describe('Permits or passes renters need.'),
   source: z.enum(ROUTE_CREATE_SOURCES).optional().describe('How the geometry was produced (default drawn).'),
-  sourceRef: httpsUrl(500).optional().describe('Origin of the route (https URL), if any.'),
+  sourceRef: httpsOnly(500).optional().describe('Origin of the route (https URL), if any.'),
 };
 
 const routeName = z.string().min(1).max(140).describe('Public route name.');
@@ -83,6 +83,14 @@ const routeSummary = z.string().max(4000).describe('Public description of the ro
 const routeDifficulty = z.enum(ROUTE_DIFFICULTY_LEVELS).describe('Manual difficulty; omit to let Splitt compute it from the track and activity.');
 const routeDuration = z.number().int().min(1).max(14400).describe('Manual estimated duration in minutes; omit to let Splitt compute it.');
 const activityType = z.enum(ROUTE_ACTIVITY_TYPES).describe('What the route is for; drives the computed difficulty and duration.');
+
+/**
+ * An update_route field that may also be null, to drop the stored value. zod 4
+ * serves a nullable as an anyOf and leaves the field's description inside its
+ * first branch; zod 3 also set it on the property itself, which is where
+ * clients read a parameter's docs, so it is put back there.
+ */
+const clearable = <T extends z.ZodType>(field: T) => field.nullable().optional().describe(field.description ?? '');
 
 const shareSlug = z
   .string()
@@ -174,10 +182,10 @@ export const updateRoute = defineTool({
     routeId: uuid('route'),
     name: routeName.optional(),
     activityType: activityType.optional(),
-    summary: routeSummary.nullable().optional(),
-    difficulty: routeDifficulty.nullable().optional(),
-    estimatedDurationMinutes: routeDuration.nullable().optional(),
-    destinationId: z.string().uuid().nullable().optional().describe('Curated Splitt destination (park, area) this route belongs to; null clears it.'),
+    summary: clearable(routeSummary),
+    difficulty: clearable(routeDifficulty),
+    estimatedDurationMinutes: clearable(routeDuration),
+    destinationId: z.guid().nullable().optional().describe('Curated Splitt destination (park, area) this route belongs to; null clears it.'),
     ...routeOptionalFields,
   },
   annotations: WRITE_IDEMPOTENT,
@@ -304,7 +312,7 @@ export const setListingRoutes = defineTool({
   scope: 'listings',
   inputSchema: {
     listingId: uuid('listing'),
-    routeIds: z.array(z.string().uuid()).max(MAX_LINKED_ROUTES_PER_LISTING).describe('Library route ids in display order; [] clears all attachments.'),
+    routeIds: z.array(z.guid()).max(MAX_LINKED_ROUTES_PER_LISTING).describe('Library route ids in display order; [] clears all attachments.'),
   },
   annotations: WRITE_IDEMPOTENT,
   handler: async ({ listingId, routeIds }, ctx) => {
@@ -334,8 +342,8 @@ const legacyRouteFields = {
   distanceKm: z.number().min(0).max(100000).optional(),
   elevationGainM: z.number().int().min(0).max(100000).optional(),
   estimatedDurationMinutes: z.number().int().min(0).max(100000).optional(),
-  gpxUrl: httpsUrl(500).optional().describe('Link to a downloadable GPX (https only; shown as an outbound link, never fetched).'),
-  mapUrl: httpsUrl(500).optional().describe('Link to an external map (https only).'),
+  gpxUrl: httpsOnly(500).optional().describe('Link to a downloadable GPX (https only; shown as an outbound link, never fetched).'),
+  mapUrl: httpsOnly(500).optional().describe('Link to an external map (https only).'),
   startLatitude: latitude.optional(),
   startLongitude: longitude.optional(),
   waypoints: z

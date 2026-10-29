@@ -7,10 +7,10 @@
 export {};
 import fs from 'fs';
 import path from 'path';
-import { z } from 'zod';
 import { ALL_TOOLS } from '../src/tools/defs';
-import { TOOL_SCOPES, type ToolAccess } from '../src/tools/registry';
+import { TOOL_SCOPES, type ToolAccess, type ToolShape } from '../src/tools/registry';
 import { SCOPE_DESCRIPTIONS } from '../src/lib/oauth/scopes';
+import { servedDescriptions } from './helpers/served-schema';
 
 const ROOT = path.join(__dirname, '..');
 const UPDATE = process.env.UPDATE_DOCS === '1';
@@ -24,13 +24,15 @@ const ACCESS_LABEL: Record<ToolAccess, string> = {
   vendor_owner: 'Vendor owner',
 };
 
-function describeShape(shape: Record<string, z.ZodTypeAny>): string {
+function describeShape(shape: ToolShape): string {
   const entries = Object.entries(shape);
   if (entries.length === 0) return '_none_';
+  // Argument docs exactly as tools/list serves them (see helpers/served-schema).
+  const served = servedDescriptions(shape);
   return entries
     .map(([name, schema]) => {
       const optional = schema.isOptional();
-      const desc = schema.description ? ` ${schema.description}` : '';
+      const desc = served[name] ? ` ${served[name]}` : '';
       return `\`${name}\`${optional ? '' : ' (required)'}${desc}`;
     })
     .join('<br>');
@@ -58,7 +60,7 @@ function renderMarkdown(): string {
     md += `| Tool | Scope | What it does | Arguments |\n|---|---|---|---|\n`;
     for (const t of tools) {
       const flags = [t.annotations.readOnlyHint ? 'read-only' : t.annotations.destructiveHint ? 'destructive' : 'write'];
-      md += `| \`${t.name}\`<br>_${t.title}_ (${flags.join(', ')}) | \`${t.scope}\` | ${t.description.replace(/\|/g, '\\|')} | ${describeShape(t.inputSchema as Record<string, z.ZodTypeAny>).replace(/\|/g, '\\|')} |\n`;
+      md += `| \`${t.name}\`<br>_${t.title}_ (${flags.join(', ')}) | \`${t.scope}\` | ${t.description.replace(/\|/g, '\\|')} | ${describeShape(t.inputSchema).replace(/\|/g, '\\|')} |\n`;
     }
     md += `\n`;
   }
