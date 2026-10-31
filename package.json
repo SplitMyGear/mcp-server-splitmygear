@@ -3,6 +3,7 @@
   "version": "2.1.0",
   "description": "MCP Server for Splitt - AI-first rental platform",
   "private": true,
+  "engines": { "node": "24.x" },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
