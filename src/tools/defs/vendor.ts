@@ -541,12 +541,6 @@ const experienceFields = {
   category: z.enum(['tours', 'food', 'outdoor', 'arts', 'fitness', 'wellness', 'music', 'sports', 'workshop', 'photography', 'other']).optional(),
   minGuests: z.number().int().min(1).optional(),
   maxGuests: z.number().int().min(1).optional(),
-  pricePerChild: z.number().min(0).optional(),
-  flatRatePrice: z
-    .number()
-    .min(0)
-    .optional()
-    .describe('Price for the whole booking in USD, instead of per person. Required (greater than $0) when pricingMode is flat_rate, which also requires guidanceType staff_guided.'),
   location: z.string().max(200).optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
@@ -560,32 +554,23 @@ const experienceFields = {
     .enum(['self_guided', 'staff_guided'])
     .optional()
     .describe('staff_guided when a guide or instructor leads it; self_guided (the default) when guests go on their own.'),
-  pricingMode: z
-    .enum(['per_person', 'flat_rate'])
-    .optional()
-    .describe('per_person (the default) charges each guest; flat_rate charges one price per booking and needs guidanceType staff_guided.'),
 };
 
 /**
- * The backend's CreateExperienceDto requires pricePerPerson only for the
- * default per_person pricing; a flat_rate package instead needs flatRatePrice
- * above $0 and guidanceType staff_guided. Checked here so a package built with
- * only flatRatePrice doesn't reach the backend still needing pricePerPerson
- * (SPLIT-1608).
+ * SPLIT-1847: every package, self- or staff-guided, is priced as ONE total
+ * for the whole booking. The backend forces pricingMode 'flat_rate' and 400s
+ * an explicit 'per_person', so the tools take only the total and send the
+ * mode themselves; there is no per-person or per-child price to offer.
  */
-function experiencePriceError(args: { pricingMode?: 'per_person' | 'flat_rate'; guidanceType?: 'self_guided' | 'staff_guided'; pricePerPerson?: number; flatRatePrice?: number }): string | null {
-  if (args.pricingMode === 'flat_rate') {
-    if (!(args.flatRatePrice !== undefined && args.flatRatePrice > 0)) return 'pricingMode flat_rate needs flatRatePrice, the whole-booking price, greater than $0.';
-    if (args.guidanceType !== 'staff_guided') return 'pricingMode flat_rate also needs guidanceType staff_guided.';
-    return null;
-  }
-  return args.pricePerPerson === undefined ? 'Provide pricePerPerson (or pricingMode flat_rate with flatRatePrice and guidanceType staff_guided).' : null;
-}
+const totalPrice = z
+  .number()
+  .positive()
+  .describe('Total price in USD for the whole booking, whatever the group size (up to maxGuests). Guests are not charged per person.');
 
 export const createExperience = defineTool({
   name: 'create_experience',
   title: 'Create an experience',
-  description: 'Create a hosted experience (tour, class, guided trip) as a draft. Add schedule slots with add_experience_schedule, then set_experience_status(publish).',
+  description: 'Create a hosted experience (tour, class, guided trip) as a draft, priced as one total for the whole booking. Add schedule slots with add_experience_schedule, then set_experience_status(publish).',
   access: 'vendor',
   scope: 'experiences',
   inputSchema: {
@@ -593,15 +578,12 @@ export const createExperience = defineTool({
     description: z.string().min(20).max(5000),
     duration: z.number().min(0.25).describe('Length of the experience.'),
     durationUnit: z.enum(['minutes', 'hours', 'days']),
-    pricePerPerson: z.number().min(0).optional().describe('Required unless pricingMode is flat_rate.'),
+    flatRatePrice: totalPrice,
     ...experienceFields,
   },
   annotations: WRITE,
-  handler: async (args, ctx) => {
-    const err = experiencePriceError(args);
-    if (err) return fail(err);
-    return fromResult(await experienceTools.createExperience(token(ctx), args));
-  },
+  handler: async (args, ctx) =>
+    fromResult(await experienceTools.createExperience(token(ctx), { ...args, pricingMode: 'flat_rate' })),
 });
 
 export const updateExperience = defineTool({
@@ -616,13 +598,15 @@ export const updateExperience = defineTool({
     description: z.string().min(20).max(5000).optional(),
     duration: z.number().min(0.25).optional(),
     durationUnit: z.enum(['minutes', 'hours', 'days']).optional(),
-    pricePerPerson: z.number().min(0).optional(),
+    flatRatePrice: totalPrice.optional(),
     ...experienceFields,
   },
   annotations: WRITE_IDEMPOTENT,
   handler: async ({ experienceId, ...rest }, ctx) => {
     if (Object.values(rest).every((v) => v === undefined)) return fail('Pass at least one field to update.');
-    return fromResult(await experienceTools.updateExperience(experienceId, token(ctx), rest));
+    // SPLIT-1847: a new total always goes with the only pricing mode there is.
+    const body = rest.flatRatePrice !== undefined ? { ...rest, pricingMode: 'flat_rate' as const } : rest;
+    return fromResult(await experienceTools.updateExperience(experienceId, token(ctx), body));
   },
 });
 

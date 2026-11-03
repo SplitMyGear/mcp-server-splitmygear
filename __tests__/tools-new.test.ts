@@ -187,8 +187,8 @@ describe('experienceTools (new surface)', () => {
     expect(lastCall()).toMatchObject({ method: 'GET', path: '/packages/bookings/my' });
     await experienceTools.transitionExperienceBooking('eb1', 'complete', T);
     expect(lastCall()).toMatchObject({ method: 'POST', path: '/packages/bookings/eb1/complete' });
-    await experienceTools.createExperience(T, { title: 't', description: 'd', duration: 2, durationUnit: 'hours', pricePerPerson: 50 });
-    expect(lastCall()).toMatchObject({ method: 'POST', path: '/packages', opts: { body: { title: 't', duration: 2, durationUnit: 'hours', pricePerPerson: 50 } } });
+    await experienceTools.createExperience(T, { title: 't', description: 'd', duration: 2, durationUnit: 'hours', flatRatePrice: 50, pricingMode: 'flat_rate' });
+    expect(lastCall()).toMatchObject({ method: 'POST', path: '/packages', opts: { body: { title: 't', duration: 2, durationUnit: 'hours', flatRatePrice: 50, pricingMode: 'flat_rate' } } });
     await experienceTools.setExperienceStatus('e1', 'publish', T);
     expect(lastCall()).toMatchObject({ method: 'POST', path: '/packages/e1/publish' });
     await experienceTools.addSchedule('e1', T, { date: '2026-07-01', startTime: '09:00' });
