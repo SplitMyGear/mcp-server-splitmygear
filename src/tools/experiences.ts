@@ -25,10 +25,9 @@ import { call, compact } from './_shared';
 type ExperienceRecord = Record<string, unknown>;
 
 /**
- * Fields of the backend's CreateExperienceDto the MCP exposes. pricePerPerson
- * is required only for the default per_person pricing; a flat_rate package
- * instead needs flatRatePrice and guidanceType staff_guided (SPLIT-1608),
- * enforced client-side in defs/vendor.ts before either ever reaches here.
+ * Fields of the backend's CreateExperienceDto the MCP exposes. SPLIT-1847:
+ * every package is priced as one total for the whole booking (flatRatePrice,
+ * pricingMode 'flat_rate'); defs/vendor.ts sends the mode itself.
  */
 export interface ExperienceInput {
   title: string;
@@ -39,8 +38,6 @@ export interface ExperienceInput {
   durationUnit: string;
   minGuests?: number;
   maxGuests?: number;
-  pricePerPerson?: number;
-  pricePerChild?: number;
   flatRatePrice?: number;
   location?: string;
   latitude?: number;
@@ -52,7 +49,7 @@ export interface ExperienceInput {
   cancellationPolicy?: string;
   imageUrls?: string[];
   guidanceType?: 'self_guided' | 'staff_guided';
-  pricingMode?: 'per_person' | 'flat_rate';
+  pricingMode?: 'flat_rate';
 }
 
 const AUTH_REQUIRED =

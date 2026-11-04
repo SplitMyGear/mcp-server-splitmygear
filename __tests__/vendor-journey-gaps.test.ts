@@ -477,80 +477,61 @@ describe('delete_experience', () => {
   });
 });
 
-describe('create_experience and update_experience accept guidanceType and pricingMode', () => {
-  const base = { title: 'Sunset kayak tour', description: 'A guided two-hour paddle at golden hour.', duration: 2, durationUnit: 'hours', pricePerPerson: 60 };
-
-  it('create_experience forwards both to the backend', async () => {
-    mockBackendRequest.mockResolvedValue({ id: EXPERIENCE });
-    // flat_rate also needs flatRatePrice and guidanceType staff_guided (see the dedicated block below); supply both here too.
-    const parsed = z.object(createExperience.inputSchema).parse({ ...base, guidanceType: 'staff_guided', pricingMode: 'flat_rate', flatRatePrice: 150 });
-    const result = await createExperience.handler(parsed, ctx);
-    expect(result.isError).toBeUndefined();
-    expect(mockBackendRequest.mock.calls[0][2].body).toMatchObject({ guidanceType: 'staff_guided', pricingMode: 'flat_rate' });
-  });
-
-  it('update_experience forwards both too', async () => {
-    mockBackendRequest.mockResolvedValue({ id: EXPERIENCE });
-    const parsed = z.object(updateExperience.inputSchema).parse({ experienceId: EXPERIENCE, guidanceType: 'self_guided', pricingMode: 'per_person' });
-    const result = await updateExperience.handler(parsed, ctx);
-    expect(result.isError).toBeUndefined();
-    expect(mockBackendRequest.mock.calls[0][2].body).toMatchObject({ guidanceType: 'self_guided', pricingMode: 'per_person' });
-  });
-
-  it('rejects any other value for either field', () => {
-    const shape = z.object(createExperience.inputSchema);
-    expect(shape.safeParse({ ...base, guidanceType: 'robot_guided' }).success).toBe(false);
-    expect(shape.safeParse({ ...base, pricingMode: 'subscription' }).success).toBe(false);
-  });
-});
-
-describe('create_experience checks pricePerPerson vs flatRatePrice by pricingMode', () => {
+// SPLIT-1847: every package, self- or staff-guided, is priced as ONE total for
+// the whole booking. The tools take only flatRatePrice and send pricingMode
+// 'flat_rate' themselves; there is no per-person price left to offer.
+describe('create_experience and update_experience: one total for the whole booking (SPLIT-1847)', () => {
   const base = { title: 'Sunset kayak tour', description: 'A guided two-hour paddle at golden hour.', duration: 2, durationUnit: 'hours' };
+  const createShape = z.object(createExperience.inputSchema);
+  const updateShape = z.object(updateExperience.inputSchema);
 
-  it('the SDK now parses a flat_rate package with no pricePerPerson at all', () => {
-    const parsed = z.object(createExperience.inputSchema).parse({ ...base, pricingMode: 'flat_rate', guidanceType: 'staff_guided', flatRatePrice: 150 });
-    expect(parsed).not.toHaveProperty('pricePerPerson');
-    expect(parsed.flatRatePrice).toBe(150);
-  });
-
-  it('refuses flat_rate without a positive flatRatePrice, before calling the backend', async () => {
-    const parsed = z.object(createExperience.inputSchema).parse({ ...base, pricingMode: 'flat_rate', guidanceType: 'staff_guided' });
-    const result = await createExperience.handler(parsed, ctx);
-    expect(result.isError).toBe(true);
-    expect(text(result)).toMatch(/flatRatePrice/);
-    expect(mockBackendRequest).not.toHaveBeenCalled();
-  });
-
-  it('refuses flat_rate without guidanceType staff_guided, before calling the backend', async () => {
-    const parsed = z.object(createExperience.inputSchema).parse({ ...base, pricingMode: 'flat_rate', flatRatePrice: 150 });
-    const result = await createExperience.handler(parsed, ctx);
-    expect(result.isError).toBe(true);
-    expect(text(result)).toMatch(/guidanceType staff_guided/);
-    expect(mockBackendRequest).not.toHaveBeenCalled();
-  });
-
-  it('refuses the default per_person mode without pricePerPerson, before calling the backend', async () => {
-    const parsed = z.object(createExperience.inputSchema).parse({ ...base });
-    const result = await createExperience.handler(parsed, ctx);
-    expect(result.isError).toBe(true);
-    expect(text(result)).toMatch(/pricePerPerson/);
-    expect(mockBackendRequest).not.toHaveBeenCalled();
-  });
-
-  it('accepts and forwards a valid flat_rate package', async () => {
+  it.each(['self_guided', 'staff_guided'] as const)('create_experience sends a %s package as flat_rate with its total', async (guidanceType) => {
     mockBackendRequest.mockResolvedValue({ id: EXPERIENCE });
-    const parsed = z.object(createExperience.inputSchema).parse({ ...base, pricingMode: 'flat_rate', guidanceType: 'staff_guided', flatRatePrice: 150 });
+    const parsed = createShape.parse({ ...base, guidanceType, flatRatePrice: 150 });
     const result = await createExperience.handler(parsed, ctx);
     expect(result.isError).toBeUndefined();
-    expect(mockBackendRequest.mock.calls[0][2].body).toMatchObject({ flatRatePrice: 150, pricingMode: 'flat_rate', guidanceType: 'staff_guided' });
+    const body = mockBackendRequest.mock.calls[0][2].body;
+    expect(body).toMatchObject({ guidanceType, pricingMode: 'flat_rate', flatRatePrice: 150 });
+    expect(body).not.toHaveProperty('pricePerPerson');
   });
 
-  it('update_experience forwards flatRatePrice too', async () => {
+  it('create_experience requires a positive total', () => {
+    expect(createShape.safeParse(base).success).toBe(false);
+    expect(createShape.safeParse({ ...base, flatRatePrice: 0 }).success).toBe(false);
+    expect(createShape.safeParse({ ...base, flatRatePrice: -5 }).success).toBe(false);
+  });
+
+  it('no longer offers a per-person or per-child price, or a pricing mode', () => {
+    for (const key of ['pricePerPerson', 'pricePerChild', 'pricingMode']) {
+      expect(createExperience.inputSchema).not.toHaveProperty(key);
+      expect(updateExperience.inputSchema).not.toHaveProperty(key);
+    }
+  });
+
+  it('rejects an unknown guidanceType', () => {
+    expect(createShape.safeParse({ ...base, flatRatePrice: 150, guidanceType: 'robot_guided' }).success).toBe(false);
+  });
+
+  it('update_experience sends a new total as flat_rate', async () => {
     mockBackendRequest.mockResolvedValue({ id: EXPERIENCE });
-    const parsed = z.object(updateExperience.inputSchema).parse({ experienceId: EXPERIENCE, flatRatePrice: 200 });
+    const parsed = updateShape.parse({ experienceId: EXPERIENCE, flatRatePrice: 200 });
     const result = await updateExperience.handler(parsed, ctx);
     expect(result.isError).toBeUndefined();
-    expect(mockBackendRequest.mock.calls[0][2].body).toMatchObject({ flatRatePrice: 200 });
+    expect(mockBackendRequest.mock.calls[0][2].body).toMatchObject({ flatRatePrice: 200, pricingMode: 'flat_rate' });
+  });
+
+  it('update_experience leaves the pricing alone when no total is passed', async () => {
+    mockBackendRequest.mockResolvedValue({ id: EXPERIENCE });
+    const parsed = updateShape.parse({ experienceId: EXPERIENCE, guidanceType: 'self_guided' });
+    const result = await updateExperience.handler(parsed, ctx);
+    expect(result.isError).toBeUndefined();
+    const body = mockBackendRequest.mock.calls[0][2].body;
+    expect(body).toMatchObject({ guidanceType: 'self_guided' });
+    expect(body).not.toHaveProperty('pricingMode');
+  });
+
+  it('update_experience rejects a zero total', () => {
+    expect(updateShape.safeParse({ experienceId: EXPERIENCE, flatRatePrice: 0 }).success).toBe(false);
   });
 });
 
