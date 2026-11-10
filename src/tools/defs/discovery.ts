@@ -216,7 +216,7 @@ export const searchExperiences = defineTool({
     // included), so the tool enforces the same set from one shared module.
     category: experienceCategorySchema
       .optional()
-      .describe('Experience category (lowercase, exactly one of): tours, food, outdoor, arts, fitness, wellness, music, sports, workshop, photography, other'),
+      .describe('Experience category (lowercase, exactly one of): tours, stays, food, outdoor, arts, fitness, wellness, music, sports, workshop, photography, other'),
   },
   annotations: READ,
   handler: async (args) => {

@@ -21,6 +21,7 @@ import {
 // and prod on 2026-09-20.
 const BACKEND_PACKAGE_CATEGORIES = [
   'tours',
+  'stays',
   'food',
   'outdoor',
   'arts',

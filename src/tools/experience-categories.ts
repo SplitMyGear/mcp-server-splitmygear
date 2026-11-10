@@ -17,6 +17,7 @@ import { z } from 'zod';
  */
 export const EXPERIENCE_CATEGORIES = [
   'tours',
+  'stays',
   'food',
   'outdoor',
   'arts',

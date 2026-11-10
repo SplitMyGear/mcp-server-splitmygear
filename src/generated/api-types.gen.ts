@@ -12361,7 +12361,7 @@ export interface components {
         CreateExperienceForHostDto: {
             cancellationPolicy?: string;
             /** @enum {string} */
-            category?: "tours" | "food" | "outdoor" | "arts" | "fitness" | "wellness" | "music" | "sports" | "workshop" | "photography" | "other";
+            category?: "tours" | "stays" | "food" | "outdoor" | "arts" | "fitness" | "wellness" | "music" | "sports" | "workshop" | "photography" | "other";
             /** Format: uri */
             coverImage?: string;
             description: string;
@@ -12420,7 +12420,7 @@ export interface components {
         CreateExperienceOnBehalfDto: {
             cancellationPolicy?: string;
             /** @enum {string} */
-            category?: "tours" | "food" | "outdoor" | "arts" | "fitness" | "wellness" | "music" | "sports" | "workshop" | "photography" | "other";
+            category?: "tours" | "stays" | "food" | "outdoor" | "arts" | "fitness" | "wellness" | "music" | "sports" | "workshop" | "photography" | "other";
             /** Format: uri */
             coverImage?: string;
             description: string;
@@ -23249,7 +23249,7 @@ export interface operations {
                 lng?: number;
                 lat?: number;
                 location?: string;
-                category?: "tours" | "food" | "outdoor" | "arts" | "fitness" | "wellness" | "music" | "sports" | "workshop" | "photography" | "other";
+                category?: "tours" | "stays" | "food" | "outdoor" | "arts" | "fitness" | "wellness" | "music" | "sports" | "workshop" | "photography" | "other";
             };
             header?: never;
             path?: never;
@@ -26924,7 +26924,7 @@ export interface operations {
                 lng?: number;
                 lat?: number;
                 location?: string;
-                category?: "tours" | "food" | "outdoor" | "arts" | "fitness" | "wellness" | "music" | "sports" | "workshop" | "photography" | "other";
+                category?: "tours" | "stays" | "food" | "outdoor" | "arts" | "fitness" | "wellness" | "music" | "sports" | "workshop" | "photography" | "other";
             };
             header?: never;
             path?: never;
