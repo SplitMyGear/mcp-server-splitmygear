@@ -5,7 +5,7 @@
  * Library and link writes are vendor-only; the two reads are public.
  */
 import { z } from 'zod';
-import { defineTool, fail, fromResult } from '../registry';
+import { defineTool, fail, fromResult, ownerViewToken } from '../registry';
 import {
   routesApi,
   geometryError,
@@ -279,12 +279,12 @@ export const listListingRoutes = defineTool({
   title: 'Routes on a listing',
   description:
     'The routes/trails shown on a gear listing\'s page: library routes attached by the vendor (with shareSlug, metrics and map data) followed by legacy per-listing ' +
-    'route cards (source "legacy"). Public for published listings; the signed-in owner also sees a draft listing\'s routes. ' + UNTRUSTED_NOTE,
+    'route cards (source "legacy"). Public for published listings; the signed-in owner also sees a draft listing\'s routes when the connection was granted the listings permission. ' + UNTRUSTED_NOTE,
   access: 'public',
   scope: 'read',
   inputSchema: { listingId: uuid('listing') },
   annotations: READ,
-  handler: async ({ listingId }, ctx) => fromResult(await routesApi.listListingRoutes(listingId, ctx.token)),
+  handler: async ({ listingId }, ctx) => fromResult(await routesApi.listListingRoutes(listingId, ownerViewToken(ctx, 'listings'))),
 });
 
 // ── Listing <-> library route links ──────────────────────────────────────────

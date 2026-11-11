@@ -29,6 +29,7 @@ jest.mock('../../src/lib/backend-client', () => {
 // This suite is about the resource path, not the transport or the rate
 // limiter (which has its own suites); both budgets are stubbed open.
 jest.mock('@/middleware/rate-limit', () => ({
+  claimAuthAttempt: jest.fn().mockResolvedValue({ success: true, refund: async () => undefined }),
   rateLimiter: jest.fn().mockResolvedValue({ success: true, remaining: 5 }),
   toolCallRateLimiter: jest.fn().mockResolvedValue({ success: true }),
   countToolCalls: jest.fn().mockReturnValue(0),

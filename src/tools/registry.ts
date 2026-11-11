@@ -101,6 +101,20 @@ export function hasScope(ctx: ToolContext, scope: ToolScope): boolean {
 }
 
 /**
+ * SPLIT-1887: the token a PUBLIC read tool may forward to an endpoint that
+ * answers differently to the resource's owner (tax address, unpublished
+ * listings, moderation state). Public tools are callable on a `read` grant,
+ * but the owner view is data of the `listings` / `experiences` resource, so
+ * the user's token goes along only when that resource scope was granted too.
+ * Otherwise the call is anonymous and the backend returns the public shape,
+ * exactly what the operator key gets. Every public tool that forwards a token
+ * must take it from here, never from `ctx.token` directly.
+ */
+export function ownerViewToken(ctx: ToolContext, resourceScope: ToolScope): string | undefined {
+  return hasScope(ctx, resourceScope) ? ctx.token : undefined;
+}
+
+/**
  * Role/access visibility, plus (when `scope` is given) the OAuth scope check.
  * `isToolAllowed` is the same test phrased for a whole tool definition.
  */

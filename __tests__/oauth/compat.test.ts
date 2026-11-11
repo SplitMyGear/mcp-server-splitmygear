@@ -24,6 +24,7 @@ jest.mock('../../src/lib/backend-client', () => {
   return { BackendApiError, backendRequest: (...args: unknown[]) => mockBackendRequest(...args), backendBaseUrl: () => 'http://backend.test/api/v1' };
 });
 jest.mock('@/middleware/rate-limit', () => ({
+  claimAuthAttempt: jest.fn().mockResolvedValue({ success: true, refund: async () => undefined }),
   rateLimiter: jest.fn().mockResolvedValue({ success: true, remaining: 5 }),
   toolCallRateLimiter: jest.fn().mockResolvedValue({ success: true }),
   countToolCalls: jest.fn().mockReturnValue(0),

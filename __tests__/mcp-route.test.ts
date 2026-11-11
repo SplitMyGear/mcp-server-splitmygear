@@ -18,6 +18,7 @@ jest.mock('@/tools/messaging', () => ({ messagingTools: new Proxy({}, { get: () 
 // the tool-call budget has its own suite (tool-call-rate-limit.test.ts) which
 // exercises the REAL limiter through this same route.
 jest.mock('@/middleware/rate-limit', () => ({
+  claimAuthAttempt: jest.fn().mockResolvedValue({ success: true, refund: async () => undefined }),
   rateLimiter: jest.fn().mockResolvedValue({ success: true }),
   toolCallRateLimiter: jest.fn().mockResolvedValue({ success: true }),
   countToolCalls: jest.fn().mockReturnValue(0),

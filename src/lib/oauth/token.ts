@@ -6,7 +6,8 @@
  * to widen it.
  */
 import { verifyS256 } from './pkce';
-import { openAuthorizationCode, markCodeRedeemed, issueTokens, openRefreshToken, type RefreshTokenPayload } from './tokens';
+import { openAuthorizationCode, markCodeRedeemed, issueTokens, openRefreshToken, grantIdOf, type RefreshTokenPayload } from './tokens';
+import { isGrantRevoked } from './revocation';
 import { isOwnResource, oauthEnabled, resourceUrl } from './config';
 import { formatScope, isSubset, parseScopeParam, type ToolScope } from './scopes';
 import { backendRefresh, AuthBridgeError, type ClientContext } from './backend-auth';
@@ -98,6 +99,9 @@ async function refreshTokenGrant(p: Record<string, string>, ctx: ClientContext):
   if (p.client_id !== rt.cid) return oauthError('invalid_grant', 'Refresh token was issued to a different client');
   const revoked = clientRevoked(rt.cid);
   if (revoked) return revoked;
+  // SPLIT-1889: a grant revoked by its access token cannot be refreshed while
+  // the record lives (revoking the refresh token logs it out at the backend).
+  if (await isGrantRevoked(grantIdOf(rt))) return oauthError('invalid_grant', 'Refresh token has been revoked or expired; sign in again');
   const scopes = narrowedScopes(p.scope, rt.scp);
   if (scopes instanceof Response) return scopes;
   // A repeat of this exact refresh within the grace window (a retry, or a
@@ -117,6 +121,9 @@ async function rotateAtBackend(rt: RefreshTokenPayload, scopes: ToolScope[], ctx
       backendAccessToken: rotated.accessToken,
       backendRefreshToken: rotated.refreshToken,
       scopes,
+      // The connection keeps its grant id across refreshes, so revoking any of
+      // its tokens reaches the access tokens issued before the rotation too.
+      grantId: grantIdOf(rt),
     });
     if (!tokens) return { ok: false, error: { code: 'server_error', description: 'Could not issue tokens for this session', status: 500 } };
     return { ok: true, tokens };

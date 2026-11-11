@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { authMiddleware, type AuthResult } from '@/middleware/auth';
+import { authMiddleware, presentsCheckedCredential, type AuthResult } from '@/middleware/auth';
 import {
+  claimAuthAttempt,
   countToolCalls,
   rateLimiter,
   toolCallRateLimiter,
@@ -141,8 +142,16 @@ function rateLimited(result: RateLimitResult): Response {
 
 async function handleRequest(request: NextRequest) {
   try {
+    // SPLIT-1888: failed authentication is throttled per client IP BEFORE the
+    // credential is checked, so a burst of wrong operator keys or forged JWTs
+    // is answered 429 without reaching the backend. A valid credential hands
+    // its slot back, leaving authenticated traffic to the budgets below.
+    const attempt = presentsCheckedCredential(request) ? await claimAuthAttempt(request) : null;
+    if (attempt && !attempt.success) return rateLimited(attempt);
+
     const auth = await authMiddleware(request);
     if (!auth.success) return unauthorized(request, auth);
+    if (attempt) await attempt.refund();
 
     const rateLimit = await rateLimiter(request, auth.userId);
     if (!rateLimit.success) return rateLimited(rateLimit);

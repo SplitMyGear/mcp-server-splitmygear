@@ -17,6 +17,7 @@ jest.mock('../../src/lib/backend-client', () => {
 // Both budgets are stubbed open: this suite is about the OAuth flow, and the
 // tool-call budget has its own suite (tool-call-rate-limit.test.ts).
 jest.mock('@/middleware/rate-limit', () => ({
+  claimAuthAttempt: jest.fn().mockResolvedValue({ success: true, refund: async () => undefined }),
   rateLimiter: jest.fn().mockResolvedValue({ success: true, remaining: 5 }),
   toolCallRateLimiter: jest.fn().mockResolvedValue({ success: true }),
   countToolCalls: jest.fn().mockReturnValue(0),

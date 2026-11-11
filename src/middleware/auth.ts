@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import crypto from 'crypto';
 import { verifyBackendJwt } from '@/lib/jwt';
 import { looksLikeAccessEnvelope } from '@/lib/oauth/envelope';
-import { openAccessToken } from '@/lib/oauth/tokens';
+import { grantIdOf, openAccessToken } from '@/lib/oauth/tokens';
+import { isGrantRevoked } from '@/lib/oauth/revocation';
 import { oauthEnabled } from '@/lib/oauth/config';
 import { TOOL_SCOPES, type ToolScope } from '@/tools/registry';
 
@@ -47,6 +48,24 @@ export interface AuthResult {
 }
 
 /**
+ * SPLIT-1888: does this request carry a credential whose check can be guessed
+ * at or costs a backend call? An `x-api-key` (online guessing of the operator
+ * key) or a bearer that is not one of our sealed OAuth envelopes (a raw JWT,
+ * verified by a backend `GET /users/profile` when MCP_BACKEND_JWT_SECRET is
+ * unset). Those are charged against the per-IP failed-authentication budget
+ * before they are checked. A request with no credential costs nothing and must
+ * keep getting its 401 challenge (OAuth discovery starts there, often from a
+ * client's shared egress address), and an envelope is rejected in-process by
+ * its AES-GCM tag, so neither is charged.
+ */
+export function presentsCheckedCredential(request: NextRequest): boolean {
+  if (request.headers.get('x-api-key')) return true;
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) return false;
+  return !looksLikeAccessEnvelope(authHeader.substring(7).trim());
+}
+
+/**
  * Three ways in, deny-by-default:
  *  1. The operator API key (`x-api-key === MCP_API_KEY`) → kind `operator`,
  *     role `admin`, no per-user token (public/read tools only).
@@ -85,6 +104,9 @@ export async function authMiddleware(request: NextRequest): Promise<AuthResult> 
       if (!oauthEnabled()) return { success: false, error: 'Invalid token', invalidCredentials: true };
       const at = openAccessToken(bearer);
       if (!at) return { success: false, error: 'Invalid or expired token', invalidCredentials: true };
+      // SPLIT-1889: a connection revoked at /oauth/revoke stops working now,
+      // not when its access token expires (see lib/oauth/revocation.ts).
+      if (await isGrantRevoked(grantIdOf(at))) return { success: false, error: 'Token has been revoked', invalidCredentials: true };
       return { success: true, userId: at.sub, role: at.role || 'renter', email: at.email, token: at.bt, kind: 'oauth', scopes: at.scp };
     }
 

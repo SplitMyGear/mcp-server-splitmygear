@@ -33,6 +33,8 @@ export const AUTH_CODE_TTL_S = 120;
 export const REFRESH_TOKEN_TTL_S = 30 * 24 * 3600;
 /** Fallback access lifetime if the backend JWT carries no exp (it always does). */
 const DEFAULT_ACCESS_TTL_S = 15 * 60;
+/** Ceiling on a revocation record's lifetime, whatever a backend JWT claims. */
+const MAX_ACCESS_TTL_S = 24 * 3600;
 
 export interface AuthCodePayload {
   cid: string;
@@ -60,6 +62,12 @@ export interface AccessTokenPayload {
   bt: string;
   /** Granted scopes; the registry hides and refuses tools outside them. */
   scp: ToolScope[];
+  /**
+   * Grant id (SPLIT-1889): one per sign-in, carried through every refresh, so
+   * revoking any token of the connection revokes all of its access tokens.
+   * Absent on tokens issued before it existed (see grantIdOf).
+   */
+  sid?: string;
   exp: number;
   iat: number;
 }
@@ -75,6 +83,10 @@ export interface RefreshTokenPayload {
   bt: string;
   /** Granted scopes; a refresh may only narrow them. */
   scp: ToolScope[];
+  /** Grant id, the same as the access tokens of this connection (SPLIT-1889). */
+  sid?: string;
+  /** Lifetime in seconds of the access token issued with this refresh token (sizes a revocation record). */
+  atl?: number;
   exp: number;
   iat: number;
 }
@@ -164,6 +176,8 @@ export function issueTokens(params: {
   backendAccessToken: string;
   backendRefreshToken: string;
   scopes: ToolScope[];
+  /** The connection's grant id; omitted on the authorization_code grant, which starts a new one. */
+  grantId?: string;
 }): OAuthTokenResponse | null {
   // The token to wrap came straight from the backend's login/refresh response
   // over a server-to-server call — that is its provenance, so it is decoded
@@ -176,6 +190,7 @@ export function issueTokens(params: {
   const sub = claims.sub || params.user.id;
   const email = claims.email || params.user.email;
   const scp = coerceScopes(params.scopes);
+  const sid = params.grantId ?? crypto.randomBytes(16).toString('base64url');
   const access_token = seal<AccessTokenPayload>('at', {
     sub,
     role,
@@ -183,6 +198,7 @@ export function issueTokens(params: {
     cid: params.clientId,
     bt: params.backendAccessToken,
     scp,
+    sid,
     iat,
     exp,
   });
@@ -194,6 +210,8 @@ export function issueTokens(params: {
     brt: params.backendRefreshToken,
     bt: params.backendAccessToken,
     scp,
+    sid,
+    atl: Math.max(1, exp - iat),
     iat,
     exp: iat + REFRESH_TOKEN_TTL_S,
   });
@@ -215,4 +233,26 @@ export function openRefreshToken(token: string): RefreshTokenPayload | null {
   const payload = open<RefreshTokenPayload>('rt', token);
   if (!payload || typeof payload.sub !== 'string' || typeof payload.brt !== 'string') return null;
   return { ...payload, scp: coerceScopes(payload.scp) };
+}
+
+/**
+ * The grant a token belongs to (SPLIT-1889): its `sid`, or, for a token issued
+ * before grant ids existed, a digest of the backend JWT it was issued with. An
+ * access token and the refresh token issued beside it wrap the same backend
+ * JWT, so the fallback still pairs them; it just does not follow a refresh.
+ */
+export function grantIdOf(token: { sid?: string; bt: string }): string {
+  if (typeof token.sid === 'string' && token.sid) return token.sid;
+  return `bt.${crypto.createHash('sha256').update(token.bt).digest('base64url').slice(0, 32)}`;
+}
+
+/**
+ * How long a revocation record must live to outlive every access token of the
+ * grant issued so far: the lifetime of the access token issued with this one
+ * (an access token's own exp - iat; `atl` on a refresh token), never less than
+ * the default access lifetime, capped at a day (SPLIT-1889).
+ */
+export function revocationTtlS(accessLifetimeS: number | undefined): number {
+  const known = typeof accessLifetimeS === 'number' && Number.isFinite(accessLifetimeS) ? accessLifetimeS : 0;
+  return Math.min(Math.max(known, DEFAULT_ACCESS_TTL_S), MAX_ACCESS_TTL_S);
 }

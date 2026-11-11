@@ -1,7 +1,7 @@
 /** Public discovery tools: search, details, availability, pricing, reviews. Available to every principal. */
 import { z } from 'zod';
 import { isoDay, shiftDay } from '../blackout-dates';
-import { defineTool, ok, fail, fromResult, withStatusHint } from '../registry';
+import { defineTool, ok, fail, fromResult, ownerViewToken, withStatusHint } from '../registry';
 import { summarizeListing } from '../summaries';
 import { listingTools } from '../listings';
 import { pricingTools } from '../pricing';
@@ -50,13 +50,13 @@ export const getListingDetails = defineTool({
   title: 'Get listing details',
   description:
     'Full details for one listing: description, pricing (per day/hour, deposit, delivery, discounts), cancellation policy, ' +
-    'location, images, add-ons, owner and rating. Signed-in owners also see their private fields. ' + UNTRUSTED_NOTE,
+    'location, images, add-ons, owner and rating. Signed-in owners also see their private fields when the connection was granted the listings permission. ' + UNTRUSTED_NOTE,
   access: 'public',
   scope: 'read',
   inputSchema: { listingId: uuid('listing') },
   annotations: READ,
   handler: async ({ listingId }, ctx) => {
-    const listing = await listingTools.getListingDetails(listingId, ctx.token);
+    const listing = await listingTools.getListingDetails(listingId, ownerViewToken(ctx, 'listings'));
     if (!listing) return fail(`Listing ${listingId} was not found (it may be unpublished).`);
     // An owner's iCal URL is a bearer secret; ok() replaces it with a note (see secrets.ts).
     return ok(listing);
@@ -230,13 +230,13 @@ export const getExperienceDetails = defineTool({
   title: 'Get experience details',
   description:
     'Full details for an experience plus its upcoming schedule slots (scheduleId, date, start time, spots left, price). ' +
-    'A host also sees their own draft or archived experience here, with its slots. ' + UNTRUSTED_NOTE,
+    'A host also sees their own draft or archived experience here, with its slots, when the connection was granted the experiences permission. ' + UNTRUSTED_NOTE,
   access: 'public',
   scope: 'read',
   inputSchema: { experienceId: uuid('experience') },
   annotations: READ,
   handler: async ({ experienceId }, ctx) => {
-    const details = await experienceTools.getExperienceDetails(experienceId, ctx.token);
+    const details = await experienceTools.getExperienceDetails(experienceId, ownerViewToken(ctx, 'experiences'));
     return details ? ok(details) : fail(`Experience ${experienceId} was not found.`);
   },
 });

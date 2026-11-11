@@ -9,7 +9,7 @@ The server holds no database, payment or LLM client, and no backend service cred
 | Principal | Backend token | Reaches |
 | --- | --- | --- |
 | Operator key (`x-api-key`) | None. Reports role `admin`, but that role is never sent to the backend. | `public` tools in the `read` scope. Calls are anonymous on the backend. |
-| OAuth connection (`smg_at.…`) | The user's backend JWT, sealed in the access token. | Tools for the user's role, limited to the scopes they granted. |
+| OAuth connection (`smg_at.…`) | The user's backend JWT, sealed in the access token. | Tools for the user's role, limited to the scopes they granted. A `public` tool forwards the JWT only with the matching resource scope (see below). |
 | Raw backend JWT (`Authorization: Bearer`) | The caller's JWT, verified first (`src/lib/jwt.ts`). | Tools for the user's role, in every scope. |
 
 **Server secrets, none usable by a tool:**
@@ -30,6 +30,8 @@ No file under `src/tools` reads the environment; a test enforces this.
 | `vendor` | Vendor family and admin | `canActAsVendor` |
 | `vendor_finance` | Owner and admin | `canViewVendorFinance` |
 | `vendor_owner` | Owner and admin | `canManageVendorPayouts` |
+
+**Owner view on public tools (SPLIT-1887).** A few `public` tools read a resource the backend shows differently to its owner (tax address, unpublished state, moderation). They take the token from `ownerViewToken(ctx, scope)` in `src/tools/registry.ts`, never from `ctx.token`: `get_listing_details` and `list_listing_routes` forward it only with `listings`, `get_experience_details` only with `experiences`. Otherwise the call is anonymous. A test fails if a public tool reads `ctx.token` directly.
 
 These checks decide what is listed and callable. They are not the security boundary: the backend decides every forwarded call.
 

@@ -63,7 +63,7 @@ export interface RateLimitResult {
  * never colliding with a tool-call key would work today but only by accident —
  * the same accident that was bypass #3 in resolveClientId's history.
  */
-type Budget = 'req' | 'tools';
+type Budget = 'req' | 'tools' | 'authfail';
 
 const WINDOW_MS = 60 * 1000;
 const WINDOW_SECONDS = WINDOW_MS / 1000;
@@ -106,17 +106,22 @@ function limitsForTier() {
  */
 function resolveClientId(request: NextRequest, userId?: string): string {
   if (userId) return `user:${userId}`;
-  if (trustProxyHeaders()) {
-    const ip =
-      validIp(request.headers.get('x-vercel-forwarded-for')) ??
-      validIp(request.headers.get('x-real-ip')) ??
-      validIp(request.headers.get('x-forwarded-for'));
-    if (ip) return `ip:${ip}`;
-  }
+  const ip = trustedClientIp(request);
+  if (ip) return `ip:${ip}`;
   // No attributable network identity: one shared bucket. Deny-by-default auth
   // runs BEFORE this, so reaching here means an authenticated operator-key
   // caller, never the open internet.
   return 'operator';
+}
+
+/** The caller's address, only where a trusted proxy set it (see resolveClientId). */
+function trustedClientIp(request: NextRequest): string | undefined {
+  if (!trustProxyHeaders()) return undefined;
+  return (
+    validIp(request.headers.get('x-vercel-forwarded-for')) ??
+    validIp(request.headers.get('x-real-ip')) ??
+    validIp(request.headers.get('x-forwarded-for'))
+  );
 }
 
 function bucketKey(budget: Budget, clientId: string): string {
@@ -167,8 +172,12 @@ function consumeLocally(key: string, limit: number, cost: number, now: number): 
  * exact count, and the refund would only add a round-trip per refused request
  * during a flood.
  */
+function sharedWindowKey(key: string, now: number): string {
+  return `rl:${key}:${Math.floor(now / WINDOW_MS)}`;
+}
+
 async function consumeShared(key: string, limit: number, cost: number, now: number): Promise<RateLimitResult | null> {
-  const windowKey = `rl:${key}:${Math.floor(now / WINDOW_MS)}`;
+  const windowKey = sharedWindowKey(key, now);
   const count = await incrementWindow(windowKey, WINDOW_SECONDS, cost);
   if (count === null) return null;
   if (count > limit) {
@@ -290,4 +299,72 @@ export async function toolCallRateLimiter(
     ...result,
     error: `Rate limit exceeded. Maximum ${limits.toolCallsPerMinute} tool calls per minute (this request asked for ${toolCalls}).`,
   };
+}
+
+/**
+ * SPLIT-1888: the per-IP budget of FAILED authentications, charged BEFORE the
+ * credential is checked.
+ *
+ * The two budgets above are keyed by the authenticated principal, so they can
+ * only run after authentication. That left failed authentication unthrottled:
+ * a wrong operator key was never answered 429, and every unseen raw JWT costs
+ * a backend `GET /users/profile` (lib/jwt.ts verifyWithBackend), so each
+ * forged token an attacker sent became one backend call.
+ *
+ * Claim, then refund on success (the sign-in throttle's model, see
+ * lib/oauth/throttle.ts): the slot is consumed atomically up front, so a
+ * concurrent burst of forged tokens is counted 1, 2, 3 ... and everything past
+ * the ceiling is refused before it reaches the backend; a credential that
+ * turns out to be valid hands its slot back, so successful traffic never
+ * spends this budget and its own limits (the two budgets above) are
+ * unchanged. Same layers as the other budgets: the shared store when the
+ * limiter may use it, else the per-instance map.
+ *
+ * Keyed by the trusted client IP only (Vercel, or MCP_TRUST_PROXY_HEADERS=1;
+ * the same derivation as resolveClientId). Without one, every caller shares
+ * the `unattributed` bucket: a spoofable header must not mint fresh budgets.
+ */
+export const AUTH_FAILURES_PER_MINUTE = 5;
+
+export interface AuthAttemptClaim extends RateLimitResult {
+  /** Give the slot back; call it once the credential proved valid. */
+  refund: () => Promise<void>;
+}
+
+const NOTHING_TO_REFUND = async (): Promise<void> => {};
+
+function refundLocally(key: string, claimedAt: number): void {
+  const entry = rateLimitStore.get(key);
+  // Only the window the claim landed in: a newer window never owed this slot.
+  if (!entry || claimedAt > entry.resetTime || entry.resetTime - WINDOW_MS > claimedAt) return;
+  entry.count = Math.max(0, entry.count - 1);
+}
+
+export async function claimAuthAttempt(request: NextRequest): Promise<AuthAttemptClaim> {
+  if (!sharedStoreEnabled()) warnIfNoSharedStore();
+  else if (!limiterUsesSharedStore()) noteMemoryByChoice();
+  const key = bucketKey('authfail', `ip:${trustedClientIp(request) ?? 'unattributed'}`);
+  const limit = AUTH_FAILURES_PER_MINUTE;
+  const now = Date.now();
+
+  let result: RateLimitResult | null = null;
+  let charged: 'shared' | 'local' = 'local';
+  if (limiterUsesSharedStore()) {
+    result = await consumeShared(key, limit, 1, now);
+    if (result) charged = 'shared';
+  }
+  result ??= consumeLocally(key, limit, 1, now);
+
+  if (!result.success) {
+    return {
+      ...result,
+      refund: NOTHING_TO_REFUND,
+      error: `Too many failed authentication attempts from this address. Maximum ${limit} per minute.`,
+    };
+  }
+  const refund = async (): Promise<void> => {
+    if (charged === 'shared') await decrementWindow(sharedWindowKey(key, now), WINDOW_SECONDS);
+    else refundLocally(key, now);
+  };
+  return { ...result, refund };
 }
