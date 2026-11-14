@@ -182,8 +182,16 @@ describe('trustTools defs', () => {
 
     await fileDamageClaim.handler({ bookingId: B, description: 'Cracked frame on return', claimedAmount: 50, evidence: [{ type: 'photo', fileUrl: EVIDENCE }] }, ctx);
     expect(lastCall()).toMatchObject({ method: 'POST', path: '/claims', opts: { token: T, body: { bookingId: B, claimedAmount: 50, evidence: [{ type: 'photo', fileUrl: EVIDENCE }] } } });
-    await respondToClaim.handler({ claimId: C, response: 'accepted' }, { token: T });
-    expect(lastCall()).toMatchObject({ method: 'POST', path: `/claims/${C}/respond`, opts: { body: { response: 'accepted' } } });
+    // SPLIT-1909: accepting a claim is completed in the web app, never by the agent.
+    const callsBeforeAccept = mockBackendRequest.mock.calls.length;
+    const acceptedClaim = await respondToClaim.handler({ claimId: C, response: 'accepted' }, { token: T });
+    expect(mockBackendRequest.mock.calls.length).toBe(callsBeforeAccept);
+    expect(JSON.parse(text(acceptedClaim))).toMatchObject({
+      requiresUserConfirmation: true,
+      confirmUrl: `https://go-splitt.com/claims/${C}`,
+    });
+    await respondToClaim.handler({ claimId: C, response: 'disputed' }, { token: T });
+    expect(lastCall()).toMatchObject({ method: 'POST', path: `/claims/${C}/respond`, opts: { body: { response: 'disputed' } } });
     await addClaimEvidence.handler({ claimId: C, type: 'receipt_pdf', fileUrl: EVIDENCE, text: 'Repair invoice' }, { token: T });
     expect(lastCall()).toMatchObject({ method: 'POST', path: `/claims/${C}/evidence`, opts: { body: { type: 'receipt_pdf', fileUrl: EVIDENCE, text: 'Repair invoice' } } });
     const badItem = await addClaimEvidence.handler({ claimId: C, type: 'photo' }, { token: T });
@@ -203,16 +211,24 @@ describe('trustTools defs', () => {
     expect(lastCall()).toMatchObject({ method: 'POST', path: '/incidental-charges', opts: { token: T, body: { bookingId: B, type: 'fuel', amount: 45 } } });
     expect(lastCall().opts.body).not.toHaveProperty('evidence');
 
-    mockBackendRequest.mockResolvedValueOnce({ id: C, status: 'awaiting_payment', hostedInvoiceUrl: 'https://invoice.stripe.com/i/x' });
+    // SPLIT-1909: "accept" captures money, so it never runs from the agent: the
+    // tool hands back the web page where the renter reviews and accepts.
+    const callsBeforeAccept = mockBackendRequest.mock.calls.length;
     const accepted = await respondToIncidentalCharge.handler({ chargeId: C, action: 'accept' }, { token: T });
-    expect(lastCall()).toMatchObject({ method: 'POST', path: `/incidental-charges/${C}/respond`, opts: { body: { action: 'accept' } } });
+    expect(mockBackendRequest.mock.calls.length).toBe(callsBeforeAccept);
+    expect(accepted.isError).toBeFalsy();
     const payload = JSON.parse(text(accepted));
-    expect(payload.charge.hostedInvoiceUrl).toBe('https://invoice.stripe.com/i/x');
-    expect(payload.nextStep).toMatch(/hostedInvoiceUrl/);
+    expect(payload).toMatchObject({
+      requiresUserConfirmation: true,
+      confirmUrl: `https://go-splitt.com/incidental-charges/${C}`,
+    });
+    expect(payload.message).toMatch(/Nothing was accepted/);
 
-    mockBackendRequest.mockResolvedValueOnce({ id: C, status: 'captured' });
-    const captured = await respondToIncidentalCharge.handler({ chargeId: C, action: 'accept' }, { token: T });
-    expect(JSON.parse(text(captured))).toEqual({ id: C, status: 'captured' });
+    // A dispute moves no money and still goes through.
+    mockBackendRequest.mockResolvedValueOnce({ id: C, status: 'disputed' });
+    const disputed = await respondToIncidentalCharge.handler({ chargeId: C, action: 'dispute', note: 'The tank was full at return' }, { token: T });
+    expect(lastCall()).toMatchObject({ method: 'POST', path: `/incidental-charges/${C}/respond`, opts: { body: { action: 'dispute', note: 'The tank was full at return' } } });
+    expect(JSON.parse(text(disputed))).toMatchObject({ id: C, status: 'disputed' });
 
     await cancelIncidentalCharge.handler({ chargeId: C }, vendor);
     expect(lastCall()).toMatchObject({ method: 'POST', path: `/incidental-charges/${C}/cancel`, opts: { token: T } });
