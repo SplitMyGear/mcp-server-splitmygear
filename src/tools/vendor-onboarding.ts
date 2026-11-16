@@ -129,7 +129,7 @@ export function onboardingNextStep(status: string | null | undefined): string {
     case 'active':
       return 'The vendor account is active. If vendor tools are not visible yet, the user must sign in again so the new role is issued.';
     case 'rejected':
-      return 'The application was not approved. It cannot be restarted from here; the user should contact the Splitt team if they want it reconsidered.';
+      return 'The application was not approved. Try start_vendor_onboarding once; if it returns an error, the user should contact the Splitt team to have it reconsidered.';
     default:
       return 'Call get_vendor_onboarding_status to see the current step.';
   }

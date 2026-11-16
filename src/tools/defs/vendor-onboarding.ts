@@ -54,7 +54,7 @@ export const startVendorOnboarding = defineTool({
   title: 'Start vendor onboarding',
   description:
     'Begin becoming a vendor. When Splitt reviews vendors before admission, this files an application (status applied) and Splitt approves it before the wizard opens; otherwise it moves the signed-in renter from not_started to profile_pending so complete_vendor_business_profile can be called. ' +
-    'A rejected application cannot be restarted here (the user should contact Splitt). Idempotent while onboarding is already in progress (returns the current status); fails if the user is already a vendor. ' +
+    'When Splitt reviews vendors, a rejected application cannot be restarted here and this returns an error (the user should contact Splitt). Idempotent while onboarding is already in progress (returns the current status); fails if the user is already an approved vendor. ' +
     'Prefer apply_to_become_vendor when the user has an invite token or wants to describe their business to Splitt first. Returns the onboarding status view (steps, readyForReview) plus the next step.',
   access: 'user',
   scope: 'profile',

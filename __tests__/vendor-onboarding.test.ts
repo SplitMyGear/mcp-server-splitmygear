@@ -121,7 +121,7 @@ describe('onboardingNextStep', () => {
       waiver_pending: /get_vendor_agreement.*sign_vendor_agreement/,
       admin_review: /reviewing/,
       active: /active/,
-      rejected: /contact the Splitt team/, // SPLIT-1910: a rejection is final for self-service
+      rejected: /contact the Splitt team/, // SPLIT-1910: a rejection may be final (admission gate)
     };
     for (const status of VENDOR_ONBOARDING_STATUSES) expect(onboardingNextStep(status)).toMatch(expectations[status]);
     expect(onboardingNextStep(undefined)).toMatch(/get_vendor_onboarding_status/);
