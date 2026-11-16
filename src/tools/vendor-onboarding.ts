@@ -129,7 +129,7 @@ export function onboardingNextStep(status: string | null | undefined): string {
     case 'active':
       return 'The vendor account is active. If vendor tools are not visible yet, the user must sign in again so the new role is issued.';
     case 'rejected':
-      return 'The application was rejected. start_vendor_onboarding (or apply_to_become_vendor) restarts it.';
+      return 'The application was not approved. Try start_vendor_onboarding once; if it returns an error, the user should contact the Splitt team to have it reconsidered.';
     default:
       return 'Call get_vendor_onboarding_status to see the current step.';
   }
@@ -141,7 +141,7 @@ export const vendorOnboardingApi = {
     return call<VendorApplyResponse>('POST', '/vendor-onboarding/apply', { token, body: compact(input) });
   },
 
-  /** not_started / rejected -> profile_pending; a no-op while already in progress. */
+  /** not_started -> applied (admission review) or profile_pending; a no-op while already in progress. */
   start(token: string) {
     return call<OnboardingStatusView>('POST', '/vendor-onboarding/start', { token, body: {} });
   },
