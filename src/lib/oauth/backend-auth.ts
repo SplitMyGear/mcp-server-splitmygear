@@ -200,14 +200,32 @@ export async function backendLogin(email: string, password: string, ctx: ClientC
  * unauthenticated). Any failure, including the 3 s timeout, is read as "none
  * configured": the sign-in page then simply offers no social buttons, and the
  * password form keeps working.
+ *
+ * SPLIT-1921: this is called for every unauthenticated GET /oauth/authorize,
+ * so a SUCCESSFUL answer is kept in module memory for a minute (the provider
+ * set changes with a deploy, not per request). A failure is never cached, so
+ * the buttons come back on the next page load once the backend does; the
+ * per-IP authorize budget bounds how often a dead backend is asked.
  */
+const PROVIDERS_CACHE_TTL_MS = 60 * 1000;
+let providersCache: { providers: SocialProvider[]; until: number } | null = null;
+
 export async function backendSocialProviders(): Promise<SocialProvider[]> {
+  const now = Date.now();
+  if (providersCache && providersCache.until > now) return [...providersCache.providers];
   try {
     const r = (await backendRequest('GET', '/auth/providers', { timeoutMs: PROVIDERS_TIMEOUT_MS })) as Record<string, unknown> | null;
-    return SOCIAL_PROVIDERS.filter((p) => r?.[p] === true);
+    const providers = SOCIAL_PROVIDERS.filter((p) => r?.[p] === true);
+    providersCache = { providers, until: Date.now() + PROVIDERS_CACHE_TTL_MS };
+    return [...providers];
   } catch {
     return [];
   }
+}
+
+/** Test hook. */
+export function _resetProvidersCacheForTests(): void {
+  providersCache = null;
 }
 
 /**

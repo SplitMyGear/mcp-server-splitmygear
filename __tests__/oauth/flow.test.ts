@@ -31,6 +31,7 @@ import { GET as prmGet } from '../../src/app/.well-known/oauth-protected-resourc
 import { GET as asGet } from '../../src/app/.well-known/oauth-authorization-server/[[...path]]/route';
 import { POST as mcpPost } from '../../src/app/api/mcp/route';
 import { _resetThrottle } from '../../src/lib/oauth/throttle';
+import { _resetProvidersCacheForTests } from '../../src/lib/oauth/backend-auth';
 import { SCOPE_DESCRIPTIONS, TOOL_SCOPES } from '../../src/lib/oauth/scopes';
 import { ALL_TOOLS } from '../../src/tools/defs';
 
@@ -792,6 +793,7 @@ describe('hosted sign-in page: social links', () => {
     process.env.MCP_PUBLIC_URL = BASE;
     process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS = 'client.example';
     mockBackendRequest.mockReset();
+    _resetProvidersCacheForTests(); // SPLIT-1921: providers are cached for a minute; each case sets its own
   });
   afterEach(() => {
     delete process.env.MCP_OAUTH_SIGNING_KEY;
@@ -829,6 +831,7 @@ describe('hosted sign-in page: social links', () => {
     const req = hidden(both, 'req');
     expect(both).toContain(`provider=google&amp;req=${encodeURIComponent(req).replace(/&/g, '&amp;')}`);
 
+    _resetProvidersCacheForTests();
     mockBackendRequest.mockImplementation(async () => ({ google: true, apple: false }));
     const googleOnly = await loginPage();
     expect(googleOnly).toMatch(GOOGLE_LINK);
@@ -842,12 +845,14 @@ describe('hosted sign-in page: social links', () => {
     expect(none).not.toContain('/oauth/social/start');
     expect(none).toContain(PASSWORD_HINT);
 
+    _resetProvidersCacheForTests();
     const { BackendApiError } = jest.requireMock('../../src/lib/backend-client');
     mockBackendRequest.mockImplementation(async () => { throw new BackendApiError(504, 'Backend request timed out'); });
     const down = await loginPage();
     expect(down).not.toContain('/oauth/social/start');
     expect(down).toContain(PASSWORD_HINT);
 
+    _resetProvidersCacheForTests();
     // A garbage answer is not a configured provider either.
     mockBackendRequest.mockImplementation(async () => ({ google: 'yes', apple: 1 }));
     expect(await loginPage()).not.toContain('/oauth/social/start');

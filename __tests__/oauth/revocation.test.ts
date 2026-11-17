@@ -27,8 +27,9 @@ import { POST as register } from '../../src/app/oauth/register/route';
 import { POST as tokenPost } from '../../src/app/oauth/token/route';
 import { POST as revokePost } from '../../src/app/oauth/revoke/route';
 import { POST as mcpPost } from '../../src/app/api/mcp/route';
-import { issueTokens } from '../../src/lib/oauth/tokens';
-import { _resetRevocationsForTests } from '../../src/lib/oauth/revocation';
+import { grantIdOf, issueTokens, openRefreshToken, refreshRevocationTtlS, REFRESH_TOKEN_TTL_S } from '../../src/lib/oauth/tokens';
+import { _resetRevocationsForTests, isGrantRevoked } from '../../src/lib/oauth/revocation';
+import { BackendApiError } from '../../src/lib/backend-client';
 
 const KEY = 'unit-test-signing-key-with-at-least-32-bytes!!';
 const BASE = 'https://mcp.test';
@@ -215,5 +216,126 @@ describe('revocation across instances through the shared store (SPLIT-1889)', ()
 
     mockFetch.mockRejectedValue(new TypeError('fetch failed'));
     expect((await mcpPost(mcp(conn.access_token))).status).toBe(200);
+  });
+});
+
+describe('revoking a refresh token never silently lapses (SPLIT-1921)', () => {
+  let clientId: string;
+  const realFetch = global.fetch;
+  const mockFetch = jest.fn();
+  const store = new Map<string, string>();
+
+  beforeEach(async () => {
+    process.env.MCP_OAUTH_SIGNING_KEY = KEY;
+    process.env.MCP_PUBLIC_URL = BASE;
+    process.env.MCP_OAUTH_ALLOWED_REDIRECT_HOSTS = 'client.example';
+    _resetRevocationsForTests();
+    mockBackendRequest.mockReset();
+    clientId = await registerClient();
+  });
+
+  afterEach(() => {
+    (global as unknown as { fetch: typeof realFetch }).fetch = realFetch;
+    for (const k of ['MCP_OAUTH_SIGNING_KEY', 'MCP_PUBLIC_URL', 'MCP_OAUTH_ALLOWED_REDIRECT_HOSTS', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN']) delete process.env[k];
+  });
+
+  const grantOf = (refreshToken: string) => grantIdOf(openRefreshToken(refreshToken)!);
+  const backendPaths = () => mockBackendRequest.mock.calls.map((c) => c[1]);
+  const freshSession = () => ({ accessToken: backendJwt(), refreshToken: `brt-${seq++}` });
+
+  it('backend refresh times out: 503 temporarily_unavailable with Retry-After, grant already recorded', async () => {
+    const conn = connect(clientId);
+    mockBackendRequest.mockRejectedValue(new Error('The operation was aborted due to timeout'));
+    const res = await revoke(conn.refresh_token, clientId);
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe('temporarily_unavailable');
+    expect(res.headers.get('retry-after')).toBeTruthy();
+    expect(await isGrantRevoked(grantOf(conn.refresh_token))).toBe(true);
+    expect((await mcpPost(mcp(conn.access_token))).status).toBe(401);
+  });
+
+  it.each([500, 502, 429])('backend refresh answers %i: 503, grant recorded', async (status) => {
+    const conn = connect(clientId);
+    mockBackendRequest.mockRejectedValue(new BackendApiError(status, 'boom'));
+    const res = await revoke(conn.refresh_token, clientId);
+    expect(res.status).toBe(503);
+    expect(await isGrantRevoked(grantOf(conn.refresh_token))).toBe(true);
+  });
+
+  it.each([400, 401, 403])('backend refresh answers %i (token not valid): nothing left to revoke, 200', async (status) => {
+    const conn = connect(clientId);
+    mockBackendRequest.mockRejectedValue(new BackendApiError(status, 'invalid token'));
+    const res = await revoke(conn.refresh_token, clientId);
+    expect(res.status).toBe(200);
+    expect(await isGrantRevoked(grantOf(conn.refresh_token))).toBe(true);
+  });
+
+  it('happy path: refresh then logout once, 200', async () => {
+    const conn = connect(clientId);
+    mockBackendRequest.mockImplementation((_m: string, path: string) => Promise.resolve(path === '/auth/refresh' ? freshSession() : {}));
+    expect((await revoke(conn.refresh_token, clientId)).status).toBe(200);
+    expect(backendPaths()).toEqual(['/auth/refresh', '/auth/logout']);
+  });
+
+  it('refresh ok but logout fails twice: logout retried once, then 503 (the rotated token is held by no one else)', async () => {
+    const conn = connect(clientId);
+    mockBackendRequest.mockImplementation((_m: string, path: string) =>
+      path === '/auth/refresh' ? Promise.resolve(freshSession()) : Promise.reject(new BackendApiError(500, 'down')));
+    const res = await revoke(conn.refresh_token, clientId);
+    expect(res.status).toBe(503);
+    expect(backendPaths()).toEqual(['/auth/refresh', '/auth/logout', '/auth/logout']);
+    expect(await isGrantRevoked(grantOf(conn.refresh_token))).toBe(true);
+  });
+
+  it('refresh ok, first logout fails, the retry lands: 200', async () => {
+    const conn = connect(clientId);
+    let logouts = 0;
+    mockBackendRequest.mockImplementation((_m: string, path: string) => {
+      if (path === '/auth/refresh') return Promise.resolve(freshSession());
+      return ++logouts === 1 ? Promise.reject(new BackendApiError(500, 'blip')) : Promise.resolve({});
+    });
+    expect((await revoke(conn.refresh_token, clientId)).status).toBe(200);
+    expect(logouts).toBe(2);
+  });
+
+  it('access-token revoke is unchanged: no backend call, one access lifetime, 200', async () => {
+    const conn = connect(clientId);
+    expect((await revoke(conn.access_token, clientId)).status).toBe(200);
+    expect(mockBackendRequest).not.toHaveBeenCalled();
+  });
+
+  it('the grant record for a refresh-token revoke lasts the refresh token\'s remaining lifetime', async () => {
+    process.env.UPSTASH_REDIS_REST_URL = 'https://store.test';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'store-token';
+    store.clear();
+    mockFetch.mockReset();
+    mockFetch.mockImplementation(async (_url: string, init: { body: string }) => {
+      const [cmd, key, value] = JSON.parse(init.body) as string[];
+      if (cmd === 'SET') store.set(key, value);
+      return { ok: true, status: 200, text: async () => JSON.stringify({ result: cmd === 'SET' ? 'OK' : store.get(key) ?? null }) };
+    });
+    (global as unknown as { fetch: jest.Mock }).fetch = mockFetch;
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const conn = connect(clientId);
+    mockBackendRequest.mockImplementation((_m: string, path: string) => Promise.resolve(path === '/auth/refresh' ? freshSession() : {}));
+    mockFetch.mockClear();
+    await revoke(conn.refresh_token, clientId);
+    (console.warn as jest.Mock).mockRestore();
+    const set = mockFetch.mock.calls.map((c) => JSON.parse(c[1].body)).find((cmd) => cmd[0] === 'SET');
+    expect(set[1]).toMatch(/^mcp:revoked:/);
+    expect(set[3]).toBe('EX');
+    // Issued just now, so the remaining life is the full 30 days (allow clock tick).
+    expect(set[4]).toBeGreaterThan(REFRESH_TOKEN_TTL_S - 5);
+    expect(set[4]).toBeLessThanOrEqual(REFRESH_TOKEN_TTL_S);
+  });
+
+  it('refreshRevocationTtlS: remaining life, floored at the access record, capped at the refresh ceiling', () => {
+    const now = 1_000_000;
+    expect(refreshRevocationTtlS({ atl: 900, exp: now + 10 * 24 * 3600 }, now)).toBe(10 * 24 * 3600);
+    expect(refreshRevocationTtlS({ atl: 900, exp: now + 60 }, now)).toBe(900);
+    expect(refreshRevocationTtlS({ atl: 900, exp: now - 5 }, now)).toBe(900);
+    expect(refreshRevocationTtlS({ atl: 900, exp: now + 90 * 24 * 3600 }, now)).toBe(REFRESH_TOKEN_TTL_S);
+    expect(refreshRevocationTtlS({ exp: Number.NaN }, now)).toBe(900);
   });
 });

@@ -46,7 +46,7 @@ import {
 } from './backend-auth';
 import { pageHeaders, renderErrorPage, renderLoginPage, renderOtpPage } from './pages';
 import { coerceScopes, parseScopeParam, type ToolScope } from './scopes';
-import { claimAttempt, refundAttempt } from './throttle';
+import { claimAttempt, claimPublicBudget, refundAttempt } from './throttle';
 import { clientIp, isSameOriginPost, readParams, type OAuthErrorCode } from './http';
 
 /** How long a rendered sign-in page stays submittable. */
@@ -210,6 +210,14 @@ function clientContext(request: Request): ClientContext {
 
 export async function handleAuthorizeGet(request: Request): Promise<Response> {
   if (!oauthEnabled()) return html(renderErrorPage('Sign-in unavailable', 'OAuth sign-in is not enabled on this server.'), 404);
+  // SPLIT-1921: per-IP budget on this unauthenticated page. An error PAGE, not
+  // a redirect: the request is not yet validated, so the redirect_uri cannot be
+  // trusted with anything.
+  if (!(await claimPublicBudget('authorize', request))) {
+    const res = html(renderErrorPage('Too many requests', 'Too many sign-in requests from your network. Please wait a minute and try again.'), 429);
+    res.headers.set('Retry-After', '60');
+    return res;
+  }
   const url = requestUrl(request);
   const q = (name: string) => url.searchParams.get(name) ?? undefined;
 
