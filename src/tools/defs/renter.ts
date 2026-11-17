@@ -12,6 +12,8 @@ import { experienceTools } from '../experiences';
 import { listingTools } from '../listings';
 import { contentTools } from '../content';
 import { dateRangeError } from '../_shared';
+import { confirmInWebApp, bookingConfirmUrl } from '../confirm-in-web';
+import { isVendorFamily } from '@/lib/roles';
 import { uuid, isoDate, pagination, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, PROTECTION_PLANS, UNTRUSTED_NOTE, token } from './common';
 
 // ── Account ──────────────────────────────────────────────────────────────────
@@ -220,7 +222,7 @@ export const getBookingHistory = defineTool({
 export const previewCancellation = defineTool({
   name: 'preview_cancellation',
   title: 'Preview cancellation refund',
-  description: 'What the renter would get back if they cancelled now, per the listing\'s cancellation policy. Always show this before cancel_booking.',
+  description: 'What the renter would get back if they cancelled now, per the listing\'s cancellation policy. Always show this before handing over the cancel_booking link.',
   access: 'user',
   scope: 'bookings',
   inputSchema: { bookingId: uuid('booking') },
@@ -232,31 +234,56 @@ export const cancelBooking = defineTool({
   name: 'cancel_booking',
   title: 'Cancel booking',
   description:
-    'Cancel a pending or confirmed rental booking. Renters get the policy-based refund (see preview_cancellation first and confirm with the user). ' +
-    'Vendors may cancel bookings on their listings; passing reason "severe_weather" records a weather cancellation. ' +
-    'An unpaid checkout (status "draft") cannot be cancelled: it is released automatically if not paid.',
+    'Get the link where the signed-in user cancels a rental booking. This tool does NOT cancel anything: a cancellation is final (the renter forfeits per the listing\'s policy, or a vendor\'s ' +
+    'confirmed booking is cancelled and the renter refunded), so it is completed by the person in the Splitt web app. It makes no change and returns requiresUserConfirmation: true with a confirmUrl ' +
+    'to give the user. For a renter, call preview_cancellation first and tell the user what they would get back. Vendors cancel bookings on their listings from their bookings page, where ' +
+    'the severe-weather option is offered. An unpaid checkout (status "draft") cannot be cancelled: it is released automatically if not paid.',
   access: 'user',
   scope: 'bookings',
   inputSchema: {
     bookingId: uuid('booking'),
     reason: z.enum(['severe_weather']).optional().describe('Vendor/admin only.'),
   },
-  annotations: DESTRUCTIVE,
-  handler: async ({ bookingId, reason }, ctx) => {
-    const result = await bookingTools.cancelBooking(bookingId, token(ctx), reason);
-    return result.success ? ok({ message: result.message, booking: result.booking }) : fail(result.error ?? 'Failed to cancel booking');
+  // SPLIT-1924: no backend call is made, so this is a read, not a destructive write.
+  annotations: READ,
+  handler: async ({ bookingId }, ctx) => {
+    // SPLIT-1924: the cancel itself runs in the web app, never from the agent (see ../confirm-in-web).
+    const vendor = isVendorFamily(ctx.role);
+    return confirmInWebApp(
+      bookingConfirmUrl(ctx.role, bookingId),
+      vendor
+        ? 'Nothing was cancelled. Cancelling a booking is final and refunds the renter, so it can only be done by the vendor in Splitt. ' +
+            'Give the user this link to open the booking and cancel it there if they agree.'
+        : 'Nothing was cancelled. Cancelling a booking is final and the renter may forfeit part of the payment under the cancellation policy, so it can only be done by the renter in Splitt. ' +
+            'Call preview_cancellation to tell the user what they would get back, then give them this link to open the booking and cancel it there if they agree.',
+    );
   },
 });
 
 export const respondToRescheduleProposal = defineTool({
   name: 'respond_to_reschedule_proposal',
   title: 'Respond to reschedule proposal',
-  description: 'Accept or decline new dates a vendor proposed for the renter\'s booking. Declining CANCELS the booking with a full refund; confirm with the user first.',
+  description:
+    'Accept or decline new dates a vendor proposed for the renter\'s booking. "accept" moves the booking to the proposed dates. ' +
+    '"decline" is NOT performed here: declining CANCELS the booking and refunds the renter in full, and that is final, so the tool makes no change and returns a confirmUrl ' +
+    'for the renter to open and decline in the Splitt web app. Only the renter who booked can respond.',
   access: 'user',
   scope: 'bookings',
   inputSchema: { bookingId: uuid('booking'), action: z.enum(['accept', 'decline']) },
+  // Kept destructive: "accept" still writes (it can settle a price difference).
   annotations: DESTRUCTIVE,
-  handler: async ({ bookingId, action }, ctx) => fromResult(await bookingTools.respondToRescheduleProposal(bookingId, action, token(ctx))),
+  handler: async ({ bookingId, action }, ctx) => {
+    // SPLIT-1924: the backend's decline cancels the booking with a full refund (SPLIT-911) and only the
+    // renter may call it, so it always goes to the renter's list. Accepting is unchanged.
+    if (action === 'decline') {
+      return confirmInWebApp(
+        bookingConfirmUrl('renter', bookingId),
+        'Nothing was declined and the booking was not cancelled. Declining the proposed dates cancels the booking and refunds the renter in full, and that is final, ' +
+          'so it can only be done by the renter in Splitt. Give the user this link to open the booking and decline the new dates there if they agree.',
+      );
+    }
+    return fromResult(await bookingTools.respondToRescheduleProposal(bookingId, action, token(ctx)));
+  },
 });
 
 export const getPersonalizedRecommendations = defineTool({
