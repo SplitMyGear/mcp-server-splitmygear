@@ -11,7 +11,9 @@
  * A record only has to outlive the access tokens issued before it, so it is
  * kept for one access-token lifetime (tokens.ts revocationTtlS) and then
  * expires on its own: nothing is stored per request or per token, only per
- * revoked connection.
+ * revoked connection. Revoking a REFRESH token keeps it for that token's
+ * remaining life instead (SPLIT-1921), because the record is also what stops
+ * the refresh grant when the backend logout did not land.
  *
  * Layers, the same as the authorization-code replay cache (tokens.ts
  * markCodeRedeemed): the shared store when configured

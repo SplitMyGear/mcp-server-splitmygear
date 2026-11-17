@@ -256,3 +256,17 @@ export function revocationTtlS(accessLifetimeS: number | undefined): number {
   const known = typeof accessLifetimeS === 'number' && Number.isFinite(accessLifetimeS) ? accessLifetimeS : 0;
   return Math.min(Math.max(known, DEFAULT_ACCESS_TTL_S), MAX_ACCESS_TTL_S);
 }
+
+/**
+ * How long a revocation record must live when a REFRESH token is revoked
+ * (SPLIT-1921): as long as that refresh token could still be redeemed, i.e. its
+ * sealed `exp` (issue time + REFRESH_TOKEN_TTL_S, unix seconds) minus now.
+ * One access-token lifetime was not enough: the record is also what makes the
+ * refresh grant refuse the connection (token.ts), so once it lapsed a refresh
+ * token whose backend logout had failed would mint access tokens again. Never
+ * shorter than the access-token record, never longer than the refresh ceiling.
+ */
+export function refreshRevocationTtlS(rt: { atl?: number; exp: number }, nowS: number = nowSeconds()): number {
+  const remaining = Number.isFinite(rt.exp) ? Math.floor(rt.exp - nowS) : 0;
+  return Math.min(Math.max(remaining, revocationTtlS(rt.atl)), REFRESH_TOKEN_TTL_S);
+}

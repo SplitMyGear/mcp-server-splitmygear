@@ -41,6 +41,7 @@
  * Either way the backend's own per-IP / per-email login throttle is the real
  * control: it is fed the end-user IP via the trusted relay headers.
  */
+import { clientIp } from './http';
 import { decrementWindow, getCount, incrementWindow, sharedStoreEnabled, warnIfNoSharedStore } from '@/lib/shared-store';
 
 const WINDOW_MS = 10 * 60 * 1000;
@@ -48,10 +49,22 @@ const WINDOW_S = WINDOW_MS / 1000;
 const MAX_ATTEMPTS = 10;
 const MAX_KEYS = 10_000;
 
+/**
+ * A budget other than the sign-in failure default (SPLIT-1921): the public
+ * pages (authorize GET, client registration) count EVERY request per client
+ * IP, with their own ceiling and window. Callers use a key prefix of their own
+ * (`authorize:ip:...`) so the counters never mix with the sign-in ones.
+ */
+export interface Budget {
+  max: number;
+  windowMs: number;
+}
+const SIGN_IN_BUDGET: Budget = { max: MAX_ATTEMPTS, windowMs: WINDOW_MS };
+
 const attempts = new Map<string, { count: number; resetAt: number }>();
 
-function sharedKey(key: string, now: number): string {
-  return `mcp:login:${key}:${Math.floor(now / WINDOW_MS)}`;
+function sharedKey(key: string, now: number, windowMs: number = WINDOW_MS): string {
+  return `mcp:login:${key}:${Math.floor(now / windowMs)}`;
 }
 
 function locallyThrottled(key: string, now: number): boolean {
@@ -61,13 +74,13 @@ function locallyThrottled(key: string, now: number): boolean {
 }
 
 /** Increment the per-instance counter and return the count AFTER this hit. */
-function recordLocally(key: string, now: number): number {
+function recordLocally(key: string, now: number, windowMs: number = WINDOW_MS): number {
   if (attempts.size > MAX_KEYS) {
     for (const [k, v] of attempts) if (now > v.resetAt) attempts.delete(k);
   }
   const entry = attempts.get(key);
   if (!entry || now > entry.resetAt) {
-    attempts.set(key, { count: 1, resetAt: now + WINDOW_MS });
+    attempts.set(key, { count: 1, resetAt: now + windowMs });
     return 1;
   }
   entry.count += 1;
@@ -119,16 +132,16 @@ export async function isThrottled(key: string, now = Date.now()): Promise<boolea
  * un-refunded it cannot extend one: the window's TTL is set once (`EXPIRE NX`)
  * and never pushed out.
  */
-export async function claimAttempt(key: string, now = Date.now()): Promise<boolean> {
+export async function claimAttempt(key: string, now = Date.now(), budget: Budget = SIGN_IN_BUDGET): Promise<boolean> {
   warnIfNoSharedStore();
   // Always claimed locally too, so the per-instance layer keeps a usable
   // history for the requests where the store turns out to be unreachable.
-  const localCount = recordLocally(key, now);
+  const localCount = recordLocally(key, now, budget.windowMs);
   if (sharedStoreEnabled()) {
-    const shared = await incrementWindow(sharedKey(key, now), WINDOW_S);
-    if (shared !== null) return shared <= MAX_ATTEMPTS;
+    const shared = await incrementWindow(sharedKey(key, now, budget.windowMs), Math.ceil(budget.windowMs / 1000));
+    if (shared !== null) return shared <= budget.max;
   }
-  return localCount <= MAX_ATTEMPTS;
+  return localCount <= budget.max;
 }
 
 /**
@@ -154,6 +167,30 @@ export async function recordAttempt(key: string, now = Date.now()): Promise<void
 
 export function clearAttempts(key: string): void {
   attempts.delete(key);
+}
+
+/**
+ * Per-IP request budgets for the two unauthenticated pages that do real work
+ * per hit (SPLIT-1921): GET /oauth/authorize (a signed envelope, plus a backend
+ * providers call) and POST /oauth/register. Every request counts, none is
+ * refunded. Ceilings sit far above a real client (a person signing in, an MCP
+ * client registering once per install); they only stop a loop.
+ */
+export const PUBLIC_BUDGETS = {
+  authorize: { max: 60, windowMs: 60 * 1000 },
+  register: { max: 20, windowMs: 60 * 60 * 1000 },
+} as const satisfies Record<string, Budget>;
+
+/**
+ * Claim one request of `scope`'s budget for the caller's IP; false = over budget.
+ * Keyed on the trusted client IP only, like the sign-in gate: without one
+ * (no trusted proxy) there is nothing safe to key on, a spoofable header must
+ * not mint fresh budgets, so the budget is skipped rather than shared by all.
+ */
+export async function claimPublicBudget(scope: keyof typeof PUBLIC_BUDGETS, request: Request): Promise<boolean> {
+  const ip = clientIp(request);
+  if (!ip) return true;
+  return claimAttempt(`${scope}:ip:${ip}`, Date.now(), PUBLIC_BUDGETS[scope]);
 }
 
 /** Test hook. */

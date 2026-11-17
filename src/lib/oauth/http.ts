@@ -43,8 +43,8 @@ export type OAuthErrorCode =
   | 'invalid_redirect_uri'
   | 'invalid_client_metadata';
 
-export function oauthError(error: OAuthErrorCode, description: string, status = 400): Response {
-  return json({ error, error_description: description }, status);
+export function oauthError(error: OAuthErrorCode, description: string, status = 400, headers: Record<string, string> = {}): Response {
+  return json({ error, error_description: description }, status, headers);
 }
 
 export function preflight(): Response {
