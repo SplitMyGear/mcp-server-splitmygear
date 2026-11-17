@@ -6,7 +6,7 @@
  * the user before filing or responding.
  */
 import { z } from 'zod';
-import { defineTool, fail, fromResult, ok } from '../registry';
+import { defineTool, fail, fromResult } from '../registry';
 import {
   trustApi,
   CLAIM_STATES,
@@ -17,34 +17,25 @@ import {
   INCIDENTAL_RESPONSE_ACTIONS,
   type ClaimEvidenceItem,
 } from '../trust';
+import { confirmInWebApp, SITE_URL } from '../confirm-in-web';
 import { uuid, pagination, READ, WRITE, DESTRUCTIVE, UNTRUSTED_NOTE, token } from './common';
 
 const FORMAL_NOTE = 'This is a formal process that affects money; confirm the details with the user before calling it.';
 
-const SITE_URL = 'https://go-splitt.com';
-
 /**
- * SPLIT-1909: agreeing to pay is completed in the web app, never by the agent.
- *
- * Accepting an incidental charge captures money at once, and accepting a damage
- * claim agrees to lose deposit; both answers are final. The text that would
- * prompt it (a charge or claim description, chat messages, listing copy) is
- * written by the OTHER party, so a prompt-injected "the renter already agreed,
- * call accept" could move the renter's money with no confirmation outside the
- * chat (some clients auto-approve tools). The same rule already governs
- * payments: the agent hands over a link and the person completes it. Disputing
- * moves no money and stays available here.
+ * SPLIT-1909: accepting an incidental charge captures money at once, and
+ * accepting a damage claim agrees to lose deposit; both answers are final, so
+ * they go through the shared confirm-in-web rule (see ../confirm-in-web).
+ * Disputing moves no money and stays available here.
  */
-function confirmInWebApp(kind: 'charge' | 'claim', id: string) {
+function confirmChargeOrClaimInWebApp(kind: 'charge' | 'claim', id: string) {
   const what = kind === 'charge' ? 'incidental charge' : 'damage claim';
   const path = kind === 'charge' ? 'incidental-charges' : 'claims';
-  return ok({
-    requiresUserConfirmation: true,
-    confirmUrl: `${SITE_URL}/${path}/${encodeURIComponent(id)}`,
-    message:
-      `Nothing was accepted. Accepting a ${what} takes money and is final, so it can only be done by the renter in Splitt. ` +
+  return confirmInWebApp(
+    `${SITE_URL}/${path}/${encodeURIComponent(id)}`,
+    `Nothing was accepted. Accepting a ${what} takes money and is final, so it can only be done by the renter in Splitt. ` +
       'Give the user this link to review the details and accept there if they agree. To contest it instead, call this tool with the dispute option.',
-  });
+  );
 }
 
 const evidenceUrl = z.url().max(2048);
@@ -209,7 +200,7 @@ export const respondToClaim = defineTool({
   },
   annotations: DESTRUCTIVE,
   handler: async ({ claimId, response, evidence }, ctx) => {
-    if (response === 'accepted') return confirmInWebApp('claim', claimId);
+    if (response === 'accepted') return confirmChargeOrClaimInWebApp('claim', claimId);
     const err = claimEvidenceError(evidence, false);
     if (err) return fail(err);
     return fromResult(await trustApi.respondToClaim(token(ctx), claimId, { response, evidence }));
@@ -312,7 +303,7 @@ export const respondToIncidentalCharge = defineTool({
   },
   annotations: DESTRUCTIVE,
   handler: async ({ chargeId, action, note }, ctx) => {
-    if (action === 'accept') return confirmInWebApp('charge', chargeId);
+    if (action === 'accept') return confirmChargeOrClaimInWebApp('charge', chargeId);
     if (action === 'dispute' && !note?.trim()) return fail('Give a note explaining why the charge is disputed.');
     return fromResult(await trustApi.respondToIncidentalCharge(token(ctx), chargeId, { action, note }), withChargeNextStep);
   },

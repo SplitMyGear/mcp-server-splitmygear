@@ -61,7 +61,7 @@ These checks decide what is listed and callable. They are not the security bound
 | `attach_route_to_listing` | vendor | listings | write |
 | `book_experience` | user | bookings | write |
 | `book_service` | user | bookings | write |
-| `cancel_booking` | user | bookings | write (destructive) |
+| `cancel_booking` | user | bookings | read |
 | `cancel_experience_booking` | user | bookings | write (destructive) |
 | `cancel_incidental_charge` | vendor | claims | write (destructive) |
 | `cancel_service_booking` | user | bookings | write (destructive) |
