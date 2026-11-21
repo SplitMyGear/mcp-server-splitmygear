@@ -1,5 +1,7 @@
 /**
- * Vendor pricing: seasonal rate rules (SPLIT-1284) and dynamic pricing.
+ * Vendor pricing: rate rules (SPLIT-1284 seasonal stays; SPLIT-1947 day rates
+ * for gear: weekday rates and date overrides, by day, hour or departure) and
+ * dynamic pricing.
  * Thin clients of the `/rentals/:id/rate-rules` family on the listing
  * controller and of `/dynamic-pricing/*`. The backend enforces ownership per
  * listing/rule and, for every MUTATION, the `change_pricing` vendor-seat
@@ -23,9 +25,13 @@ export interface RateRuleInput {
   endDate: string;
   /** UTC weekdays 0 (Sun) to 6 (Sat); omit/null for every day in the range. */
   weekdayMask?: number[] | null;
-  /** Absolute per-night rate in USD; mutually exclusive with ratePct. */
+  /** Absolute per-day (gear) or per-night (stay) rate in USD; mutually exclusive with ratePct. */
   nightlyRate?: number | null;
-  /** Integer percentage adjustment (-90..500) of the base rate; mutually exclusive with nightlyRate. */
+  /** SPLIT-1945: absolute per-hour rate in USD for flexible hourly rentals; mutually exclusive with ratePct. */
+  hourlyRate?: number | null;
+  /** SPLIT-1948: absolute price per departure in USD for fixed-departure listings; mutually exclusive with ratePct. */
+  slotRate?: number | null;
+  /** Integer percentage adjustment (-90..500) of the base rate of whatever unit is priced; mutually exclusive with every absolute rate. */
   ratePct?: number | null;
   /** Minimum nights when this date is the check-in night (1..90). */
   minNights?: number | null;

@@ -26,10 +26,17 @@ export function backendBaseUrl(): string {
 
 export class BackendApiError extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  /**
+   * The backend's machine-readable error code, when its error envelope carries
+   * one (e.g. `FIXED_SLOT_REQUIRED`, SPLIT-1948). Callers branch on this, never
+   * on the human message, which the backend may reword.
+   */
+  readonly code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.name = 'BackendApiError';
     this.status = status;
+    if (code !== undefined) this.code = code;
   }
 }
 
@@ -99,10 +106,16 @@ export async function backendRequest<T = unknown>(
   }
 
   if (!response.ok) {
-    throw new BackendApiError(response.status, extractErrorMessage(parsed, response.status));
+    throw new BackendApiError(response.status, extractErrorMessage(parsed, response.status), extractErrorCode(parsed));
   }
 
   return parsed as T;
+}
+
+function extractErrorCode(parsed: unknown): string | undefined {
+  if (!parsed || typeof parsed !== 'object') return undefined;
+  const code = (parsed as { code?: unknown }).code;
+  return typeof code === 'string' && code ? code : undefined;
 }
 
 function extractErrorMessage(parsed: unknown, status: number): string {

@@ -76,10 +76,50 @@ export function summarizeBooking(booking: unknown): unknown {
 /** Listing fields that are long text, media lists or the owner's profile; get_listing_details returns them. */
 const LISTING_DETAIL_FIELDS = ['description', 'careGuide', 'imageUrls', 'imageFocalPoints', 'videoUrls', 'owner', 'addOns'];
 
+/**
+ * SPLIT-1947 (backend SPLIT-1946): the denormalized "from / to" columns the
+ * backend keeps for a listing with rate rules, per unit priced. NULL (dropped
+ * as empty) on a listing without rules; equal from/to when the rules never move
+ * the price. They are summarized into one `fromPrice` line below and never
+ * passed raw, so a listing whose rates do not vary reads exactly as before.
+ */
+const PRICE_RANGE_FIELDS = [
+  ['priceFromDay', 'priceToDay', 'day'],
+  ['priceFromHour', 'priceToHour', 'hour'],
+  ['priceFromSlot', 'priceToSlot', 'departure'],
+] as const;
+const PRICE_RANGE_KEYS: string[] = ['hasRateRules', ...PRICE_RANGE_FIELDS.flatMap(([from, to]) => [from, to])];
+
+/** A money column (the backend serializes DECIMAL as a string such as "45.00") as a positive number, or null. */
+function moneyValue(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * "from $45/day" for each unit whose rate rules make the price vary (lowest
+ * below highest), joined with "; " for a listing priced two ways; undefined
+ * when no rate varies. A stay's day is a night.
+ */
+export function fromPriceLabel(listing: Row): string | undefined {
+  const parts: string[] = [];
+  for (const [fromKey, toKey, unit] of PRICE_RANGE_FIELDS) {
+    const from = moneyValue(listing[fromKey]);
+    const to = moneyValue(listing[toKey]);
+    if (from === null || to === null || !(from < to)) continue;
+    const per = unit === 'day' && listing.bookingType === 'nightly' ? 'night' : unit;
+    parts.push(`from $${Number.isInteger(from) ? from : from.toFixed(2)}/${per}`);
+  }
+  return parts.length ? parts.join('; ') : undefined;
+}
+
 /** A listing as a list row: scalar fields as they are, long text and media reduced to a preview and counts. */
 export function summarizeListing(listing: unknown): unknown {
   if (!isRow(listing)) return listing;
-  const out = withoutEmpty(listing, LISTING_DETAIL_FIELDS);
+  const out = withoutEmpty(listing, [...LISTING_DETAIL_FIELDS, ...PRICE_RANGE_KEYS]);
+  const fromPrice = fromPriceLabel(listing);
+  if (fromPrice) out.fromPrice = fromPrice;
   const description = preview(listing.description);
   if (description) out.descriptionPreview = description;
   const images = Array.isArray(listing.imageUrls) ? listing.imageUrls : [];

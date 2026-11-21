@@ -174,6 +174,7 @@ These checks decide what is listed and callable. They are not the security bound
 | `list_calendar_feeds` | vendor | listings | read |
 | `list_categories` | public | read | read |
 | `list_claims` | user | claims | read |
+| `list_departures` | public | read | read |
 | `list_destinations` | public | read | read |
 | `list_disputes` | user | claims | read |
 | `list_experience_host_bookings` | vendor | experiences | read |

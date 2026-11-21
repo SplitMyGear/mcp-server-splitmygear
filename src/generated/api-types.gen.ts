@@ -886,6 +886,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/gear-models/{id}/manuals/{manualId}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept a vendor's pending manual into one of the model's 3 slots, so the next build reads it (409 when the slots are full) */
+        post: operations["AdminGearModelController_acceptManual"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/gear-models/{id}/manuals/{manualId}/url": {
         parameters: {
             query?: never;
@@ -999,6 +1016,595 @@ export interface paths {
         put?: never;
         /** Rewrite the model's suggested topic questions in natural wording from the item titles and kinds. No rebuild, no AI; idempotent. Category-list topics keep their written questions. */
         post: operations["AdminGearModelController_refreshTopicQuestions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-card-reports/liability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Outstanding gift card liability at each month end (admin) */
+        get: operations["AdminGiftCardReportsController_liability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-card-reports/liability/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Outstanding liability by month, CSV (admin) */
+        get: operations["AdminGiftCardReportsController_liabilityCsv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-card-reports/sales-by-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gift card sales by purchaser state and month, for escheat (admin) */
+        get: operations["AdminGiftCardReportsController_salesByState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-card-reports/sales-by-state/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sales by purchaser state, CSV (admin) */
+        get: operations["AdminGiftCardReportsController_salesByStateCsv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-card-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the gift card and Splitt Credit settings (admin) */
+        get: operations["AdminGiftCardSettingsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change one or several gift card or credit settings (admin) */
+        patch: operations["AdminGiftCardSettingsController_update"];
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/accounts/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One Splitt Credit account: balances, lots, open holds, recent ledger. 404 no account. */
+        get: operations["AdminGiftCardsController_accountDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/accounts/{userId}/cash-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * C5: record the cash-out of a whole balance under $15. Body: `reason`,
+         *     `requestId`, `method` (`check`, `ach`, `stripe_refund`, `other`) and
+         *     `reference` (how to find the payment). It moves NO money at Stripe: the
+         *     operator sends the cash by `method`; the answer says so (`moneyMoved:
+         *     false`). 403 `CASH_OUT_SELF` (the account is yours), 404 unknown user, 409 `CASH_OUT_NOTHING_AVAILABLE`,
+         *     `CASH_OUT_OPEN_HOLDS`, `CASH_OUT_FROZEN_CREDIT`, `CASH_OUT_AT_OR_ABOVE_LIMIT`
+         *     or `ADMIN_REQUEST_ID_REUSED`, 400 for a malformed body.
+         */
+        post: operations["AdminGiftCardCreditController_cashOut"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/accounts/{userId}/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An account's ledger rows, newest first, `limit` and `offset`. 404 no account. */
+        get: operations["AdminGiftCardsController_accountLedger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * C4: the adjustment requests, newest first. `?status=pending|approved|
+         *     rejected|expired` (a pending request past its 24 hours reads `expired`),
+         *     `limit` (1 to 100, default 50) and `offset`.
+         */
+        get: operations["AdminGiftCardCreditController_listAdjustments"];
+        put?: never;
+        /**
+         * C4: ask for a manual adjustment. Body: `accountUserId`, `amount` (signed
+         *     dollars, two decimals, never zero, at most 5000 either way), `reason`,
+         *     `requestId` (which becomes the request's id). It sits `pending` for 24
+         *     hours until a DIFFERENT admin approves it. 403 `ADJUSTMENT_SELF_REQUEST` (the
+         *     account is yours), 404 unknown user, 409
+         *     `INSUFFICIENT_CREDIT` for a debit larger than what is available (balance
+         *     less holds and frozen credit), 409 `ADMIN_REQUEST_ID_REUSED` (the id
+         *     belongs to another request), 400 for a malformed body.
+         */
+        post: operations["AdminGiftCardCreditController_requestAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/adjustments/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * C4: approve a request another admin made; the ledger moves in the same
+         *     transaction. Body: `reason`, `requestId`. 403 `ADJUSTMENT_SELF_APPROVAL` (you
+         *     asked for it), 403 `ADJUSTMENT_BENEFICIARY_APPROVAL` (it credits your own
+         *     account), 404 unknown request, 409 `ADJUSTMENT_REQUEST_NOT_PENDING`
+         *     (already approved, rejected or expired), `ADJUSTMENT_REQUEST_EXPIRED`,
+         *     `INSUFFICIENT_CREDIT` (a debit the account can no longer cover: nothing is
+         *     written and the request stays pending), `ADMIN_REQUEST_ID_REUSED`; 400 for
+         *     a malformed id or body.
+         */
+        post: operations["AdminGiftCardCreditController_approveAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/adjustments/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * C4: reject a pending request. Any admin may, the requester included (a
+         *     withdrawal): a rejection moves no money. Body: `reason`, `requestId`. 404
+         *     unknown request, 409 `ADJUSTMENT_REQUEST_NOT_PENDING`, 400.
+         */
+        post: operations["AdminGiftCardCreditController_rejectAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/cards/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One card or lot with its ledger rows and its owner's open holds. 404 unknown. */
+        get: operations["AdminGiftCardsController_cardDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/cards/{id}/freeze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminGiftCardsController_freezeLot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/cards/{id}/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A card's ledger rows, newest first, `limit` and `offset`. 404 unknown. */
+        get: operations["AdminGiftCardsController_cardLedger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/cards/{id}/unfreeze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1868 (C3): lift the freezes an ADMIN put on a lot. A freeze from a
+         *     dispute, an early fraud warning or a refund is not lifted here. 404 unknown
+         *     card, 409 `GIFT_CARD_LOT_NOT_FROZEN` (nothing to lift) or
+         *     `GIFT_CARD_LOT_NOT_ADMIN_FROZEN` (frozen by the system only), 400, and the
+         *     same `requestId` rules as the freeze.
+         */
+        post: operations["AdminGiftCardsController_unfreezeLot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminGiftCardsController_lookup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One order with its card, its card's ledger rows and its owner's open holds. 404 unknown. */
+        get: operations["AdminGiftCardsController_orderDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/orders/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Release a held order: the card is issued and delivered when due. */
+        post: operations["AdminGiftCardsController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/orders/{id}/dispute-refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1874: refund the buyer in full instead, after the dispute was won.
+         *     Same 404, 409 and 400 as the reissue; 502 `GIFT_CARD_REFUND_PENDING` when
+         *     Stripe did not finish the refund (the order stays in the queue as a void
+         *     card with a refund pending; reject finishes it).
+         */
+        post: operations["AdminGiftCardsController_refundAfterDispute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/orders/{id}/recipient": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1871: re-address a gift (a support fix after a typo or a bounce). An
+         *     issued or held card nobody has redeemed, with no limit; the code rotates
+         *     (the old one stops working at once) and an issued, due card is emailed
+         *     now. The reason and both addresses (the body and `previousRecipientEmail`)
+         *     land in the audit row.
+         */
+        post: operations["AdminGiftCardsController_changeRecipient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/orders/{id}/refund/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1874: ask Stripe to refund a failed gift card refund again. 404
+         *     unknown order, 409 `GIFT_CARD_REFUND_NOT_FAILED` (no failed refund),
+         *     `GIFT_CARD_REFUND_ALREADY_SETTLED` or `GIFT_CARD_REFUND_REFUSED` (Stripe
+         *     will not refund that card again: settle it), 502
+         *     `GIFT_CARD_REFUND_RETRY_FAILED`, 400 for a malformed id or reason.
+         */
+        post: operations["AdminGiftCardsController_retryRefund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/orders/{id}/refund/settle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1874: record that a failed gift card refund was paid outside Stripe
+         *     (the SPLIT-1850 pattern): a reference and a reason, kept on the sale row.
+         *     404 unknown order, 409 `GIFT_CARD_REFUND_NOT_FAILED` or
+         *     `GIFT_CARD_REFUND_ALREADY_SETTLED`, 400 for a malformed id, reference or
+         *     reason. A second call is refused, never recorded twice.
+         */
+        post: operations["AdminGiftCardsController_settleRefund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/orders/{id}/reissue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1874: reissue a card whose dispute was won. The unclaimed card the
+         *     dispute voided is issued again to the same recipient: a fresh code (current
+         *     key) is delivered by the normal path, and the order leaves the queue. 404
+         *     unknown order, 409 `GIFT_CARD_DISPUTE_NOT_RESOLVED` when the order is not
+         *     waiting on this decision, 400 for a malformed id or reason, 500
+         *     `GIFT_CARDS_NOT_CONFIGURED` while the code keys are unusable.
+         */
+        post: operations["AdminGiftCardsController_reissue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/orders/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject a held order: the card is voided and the sale refunded in full. */
+        post: operations["AdminGiftCardsController_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/orders/{id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1868 (C3): send the recipient a fresh code at the same address (the
+         *     old code stops working), under the purchaser's resend rules: a delivered,
+         *     unclaimed, issued card with a resend left. To reach another address, or
+         *     one that failed, use the recipient change. 404 unknown order, 409
+         *     `GIFT_CARD_NOT_RESENDABLE` or `GIFT_CARD_RECIPIENT_SUPPRESSED`, 503
+         *     `GIFT_CARD_EMAIL_FAILED` (nothing changed, the old code still works), 400,
+         *     and the same `requestId` rules.
+         */
+        post: operations["AdminGiftCardsController_resend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/orders/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1868 (C3): void an issued or held card nobody has received or
+         *     claimed and refund the sale in full (the support form of the purchaser's
+         *     cancel). 404 unknown order, 409 `GIFT_CARD_NOT_VOIDABLE` (delivered,
+         *     claimed, or in a state with nothing to void), 502 `GIFT_CARD_REFUND_PENDING`
+         *     (Stripe did not finish the refund: the card IS void; send the same request
+         *     again, or any void of the order, to finish it), 400, and the same
+         *     `requestId` rules.
+         */
+        post: operations["AdminGiftCardsController_voidOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/payout-holds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SPLIT-1869: vendor payout shares paid with Splitt Credit from a gift card
+         *     under a fraud signal (its sale disputed or flagged by an early fraud
+         *     warning, the card frozen, or bought by the vendor paid), oldest first,
+         *     whether or not a payout was already minted for them.
+         */
+        get: operations["AdminGiftCardsController_listPayoutHolds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/payout-holds/{transactionId}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1869: release one held share (the credit-funded payment row): the
+         *     next payout run, or the vendor's next withdrawal, may pay it. A signal
+         *     that lands later holds it again. 404 unknown, 409 not held or already
+         *     paid out, 400 for a malformed id or reason.
+         */
+        post: operations["AdminGiftCardsController_releasePayoutHold"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gift-cards/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Held orders, oldest first, with the reasons the gate held them. */
+        get: operations["AdminGiftCardsController_reviewQueue"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1189,6 +1795,38 @@ export interface paths {
         patch: operations["AdminController_setListingVisibility"];
         trace?: never;
     };
+    "/api/v1/admin/package-refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminPackageRefundsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/package-refunds/{bookingId}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminPackageRefundsController_resolve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/package-staff": {
         parameters: {
             query?: never;
@@ -1254,6 +1892,28 @@ export interface paths {
          *     still receive `{ payouts: [...] }` (shape unchanged), now bounded.
          */
         get: operations["AdminController_getAllPayouts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/payouts/totals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET /admin/payouts/totals
+         *     SPLIT-1774 (audit G-12): `{ totals: [{ status, count, amount }] }`, one
+         *     entry per payout status over EVERY payout (zeros included), so the finance
+         *     KPIs no longer sum a 50-row page. Same door as GET /admin/payouts.
+         */
+        get: operations["AdminController_getPayoutTotals"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1492,6 +2152,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/rental-refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminRentalRefundsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/rental-refunds/owed/{bookingId}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1862: what a booking owes beyond a bounced row that pays it: Stripe refused
+         *     the refund outright, or it is what a partial lost chargeback left. `partial` is set
+         *     when part of it moved and the rest failed: it is still owed, and still listed.
+         */
+        post: operations["AdminRentalRefundsController_resolveOwed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/rental-refunds/{refundRowId}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminRentalRefundsController_resolve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/reports/business": {
         parameters: {
             query?: never;
@@ -1588,6 +2301,86 @@ export interface paths {
         /** Update the caller's report cadence / opt-in flags. */
         put: operations["PlatformReportController_updateSubscription"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/rewards/grant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminRewardsController_grant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/rewards/programs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminRewardsController_listPrograms"];
+        put?: never;
+        post: operations["AdminRewardsController_createProgram"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/rewards/programs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["AdminRewardsController_updateProgram"];
+        trace?: never;
+    };
+    "/api/v1/admin/rewards/programs/{id}/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminRewardsController_ledger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/rewards/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminRewardsController_voidReward"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3361,6 +4154,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/booking-verification/{id}/checklist/{index}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream a booking verification checklist item photo through the API (party or admin). No shareable link is issued. */
+        get: operations["BookingVerificationController_getChecklistPhoto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/booking-verification/{id}/photos/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream a booking verification photo through the API (party or admin). No shareable link is issued. */
+        get: operations["BookingVerificationController_getPhoto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bookings": {
         parameters: {
             query?: never;
@@ -3909,6 +4736,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/campaigns/audience/recipients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1933: POST /campaigns/audience/recipients — the audience a send would
+         *     use, as a table (first 500 by email) plus the total and, for an explicit
+         *     `recipientEmails` list, the typed addresses that were left out and why.
+         *     Entitlement matches `GET :id/recipients` (a READ of the resolved audience);
+         *     it is a POST only because the criteria travel in the body, so it shares the
+         *     audience-preview rate bucket.
+         */
+        post: operations["CampaignsController_audienceRecipients"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/campaigns/audience/segments": {
         parameters: {
             query?: never;
@@ -3941,38 +4792,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/campaigns/{id}/click": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["CampaignsController_recordClick"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/campaigns/{id}/conversion": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["CampaignsController_recordConversion"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/campaigns/{id}/duplicate": {
         parameters: {
             query?: never;
@@ -3983,22 +4802,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["CampaignsController_duplicate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/campaigns/{id}/open": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["CampaignsController_recordOpen"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4020,7 +4823,7 @@ export interface paths {
          *     contacts/CSV block removed in SPLIT-410). CRM-entitlement-guarded like every
          *     other authenticated campaign route. Unknown id → 404 (findOne guard inside
          *     the service). NOTE: per-recipient send/open/click engagement is NOT tracked
-         *     (the model only keeps campaign-level aggregate counters via the beacons), so
+         *     (the model only keeps campaign-level aggregate counters via the Resend webhook), so
          *     this is the campaign's *audience*, not per-recipient engagement rows.
          */
         get: operations["CampaignsController_getRecipients"];
@@ -4308,6 +5111,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/claims/{id}/evidence/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream a claim evidence document through the API (party or admin). No shareable link is issued. */
+        get: operations["ClaimsController_getEvidence"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/claims/{id}/resolve": {
         parameters: {
             query?: never;
@@ -4342,6 +5162,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/claims/{id}/settle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Re-drive the deposit settlement of a resolved damage claim (operations_write entitlement) */
+        post: operations["ClaimsController_settle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contact": {
         parameters: {
             query?: never;
@@ -4361,6 +5198,62 @@ export interface paths {
          *     bots that fill the hidden `website` field are silently dropped (no DB write).
          */
         post: operations["ContactController_submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/credit/balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** `{ balance, available, held, frozen }`, zeros before the first claim. */
+        get: operations["CreditController_balance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/credit/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's credit history, newest first, by cursor. */
+        get: operations["CreditController_ledger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/credit/step-up": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1834 (design 9, threat T5): check the password and email a
+         *     one-time code; a checkout applying more than $500 of credit sends it back
+         *     as `stepUpCode`. 401 for a wrong password, 429 during the resend
+         *     cooldown or past the send cap, and past {@link CREDIT_STEP_UP_BUCKET}.
+         */
+        post: operations["CreditController_stepUp"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4450,6 +5343,23 @@ export interface paths {
         head?: never;
         /** Update a dispute (operations_write entitlement) */
         patch: operations["DisputesController_update"];
+        trace?: never;
+    };
+    "/api/v1/disputes/{id}/evidence/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream a dispute evidence document through the API (party or admin). No shareable link is issued. */
+        get: operations["DisputesController_getEvidence"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/distribution/google-things-to-do/packages/{id}/landing": {
@@ -4702,6 +5612,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/email-templates/seed-seasonal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EmailTemplatesController_seedSeasonal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/email-templates/test-send": {
         parameters: {
             query?: never;
@@ -4756,15 +5682,17 @@ export interface paths {
          *     → 400 carrying `unknownVariables` (a typo must fail LOUDLY at authoring
          *     time, not render as a literal `{{typo}}` in a renter's inbox).
          *
-         *     SPLIT-1367: a `nonOverridable` catalog key (the security emails) → 403 for
-         *     EVERY caller including ADMIN — those bodies carry one-time secrets and are
-         *     owned by code.
+         *     SPLIT-1367: a `nonOverridable` catalog key → 403 for EVERY caller including
+         *     ADMIN. No key carries the flag since SPLIT-1382, which made the security
+         *     emails editable; their one-time secrets are protected by the placement
+         *     rules instead (a 400 carrying `missingVariables` / `restrictedPlacements`).
          *
          *     What protects a renter's inbox here is NOT a role gate (operator directive:
          *     a `crm_write` teammate authors this copy) but the SPLIT-1374 properties that
          *     hold for every caller: the save-time and render-time sanitiser (tag and
          *     attribute allowlist, exact first-party host match, code-owned shell), the
-         *     variable palette, and the nonOverridable list above.
+         *     variable palette, the SPLIT-1384 strict link policy and the SPLIT-1382
+         *     secret-token rules.
          *
          *     SPLIT-1383: all three WRITE routes are additionally rate limited per ACTOR
          *     (`CRM_WRITE_BUCKET`, 30/10min). Deliberately a NON-admin bucket, since these
@@ -4893,7 +5821,7 @@ export interface paths {
          *     Mirrors the Stripe webhook contract exactly (payment.controller.ts):
          *      - `@Public()`, because the provider sends no Authorization header; the
          *        Standard Webhooks signature over the RAW body is the authentication.
-         *      - `@SkipThrottle()` for the per-instance ThrottlerGuard, and an exact-path
+         *      - `@SkipAllThrottlers()` for the per-instance ThrottlerGuard, and an exact-path
          *        entry in `GlobalAnonThrottleGuard`'s skip list for the cross-instance
          *        anonymous-IP ceiling. A delivery burst (Resend retries plus a campaign
          *        blast's opens/clicks) must never 429, or the provider backs off and
@@ -5682,6 +6610,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/gear-guide/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Is the Gear Guide on? `enabled` is the global switch (every vendor surface follows it); `renter` is whether the caller, as a renter, is inside the rollout. Never a 403. */
+        get: operations["GearGuideAskController_availabilityFor"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/gear-guide/bookings/{bookingId}/ask": {
         parameters: {
             query?: never;
@@ -5726,7 +6671,8 @@ export interface paths {
         /** The booking's Gear Guide conversation so far */
         get: operations["GearGuideAskController_session"];
         put?: never;
-        post?: never;
+        /** Record questions the renter's device answered offline (tier ondevice), once it is back online. The booking's renter only (anyone else: 404); the renter's Gear Guide switches apply (403 GEAR_GUIDE_DISABLED), the booking window does not. Only the question and metadata are stored. Idempotent per clientTurnId. 429 GEAR_GUIDE_LIMIT_REACHED past 100 offline answers per booking per day. */
+        post: operations["GearGuideAskController_recordOffline"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5740,7 +6686,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Suggested questions: the topics the guide covers for this gear, and the listing's quirks */
+        /** Suggested questions: the topics the guide covers for this gear, and the listing's quirks. When the guide is not open for this booking the answer is still 200, `{ available: false, reason }` (GEAR_GUIDE_DISABLED, GEAR_GUIDE_NOT_ELIGIBLE or GEAR_GUIDE_OUTSIDE_WINDOW); a booking the caller may not see is 404. */
         get: operations["GearGuideAskController_topics"];
         put?: never;
         post?: never;
@@ -6105,7 +7051,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Client-upload handshake for a manual (PDF, up to 50 MB, private store, manuals/<modelId>/). Complete with POST models/:id/manual. */
+        /** Upload handshake for a manual (PDF, up to 50 MB, private store, manuals/<modelId>/). blob.generate-presigned-url returns a presigned upload URL payload; blob.generate-client-token returns a legacy client token (transitional, SPLIT-1779). Complete with POST models/:id/manual. */
         post: operations["GearGuideController_manualUploadToken"];
         delete?: never;
         options?: never;
@@ -6125,6 +7071,23 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gear-guide/models/{id}/manuals/{manualId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Withdraw the caller's own manual while it still waits for review (its file is deleted from the private store). 404 for someone else's, 409 once accepted. */
+        delete: operations["GearGuideController_withdrawManual"];
         options?: never;
         head?: never;
         patch?: never;
@@ -6174,6 +7137,169 @@ export interface paths {
         get: operations["GeoController_resolvePlace"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gift-cards/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a gift card to the caller's Splitt Credit. */
+        post: operations["GiftCardRedeemController_claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gift-cards/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Public: presets, limits, disclosures for the purchase page. */
+        get: operations["GiftCardsController_getConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gift-cards/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's own orders, newest first (recipient emails masked). */
+        get: operations["GiftCardsController_listOrders"];
+        put?: never;
+        /** Start a purchase: the order, its card, and a Stripe Checkout URL. */
+        post: operations["GiftCardsController_createOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gift-cards/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One of the caller's orders. 403 for someone else's, 404 when unknown. */
+        get: operations["GiftCardsController_getOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gift-cards/orders/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a paid card that has not been delivered yet: it is voided and the
+         *     full amount is refunded to the original card.
+         */
+        post: operations["GiftCardsController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gift-cards/orders/{id}/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1819 — back to the Stripe payment page of an order still awaiting
+         *     payment (the purchaser closed the tab). Returns the SAME Checkout Session
+         *     while Stripe says it is open, never a new one; 409 once it is complete or
+         *     expired (the webhook settles the order). No body: the order id, checked by
+         *     ParseUUIDPipe, is the only input.
+         *
+         *     Audited as a SUMMARY: the result is a payable Checkout URL, which has no
+         *     business being copied into the append-only audit table.
+         */
+        post: operations["GiftCardsController_resumeCheckout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gift-cards/orders/{id}/recipient": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SPLIT-1871: send the gift to a different address (or to the same one
+         *     again after a failed delivery). Issued, unredeemed cards only, at most 2
+         *     changes per card, each using one of its fresh codes. The old code stops
+         *     working at once; a new one is emailed now when the card is due (else at
+         *     its scheduled time). 403 for someone else's order or an account that may
+         *     not buy gift cards, 404 when unknown, 409 when the card cannot change (or
+         *     the address is suppressed), 400 for a bad body.
+         *
+         *     Audited in full: the body is the new address, and the answer carries the
+         *     previous one, so the audit row records the whole change.
+         */
+        post: operations["GiftCardsController_changeRecipient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gift-cards/orders/{id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send the recipient a FRESH code (the old one stops working). Delivered,
+         *     unclaimed cards only, at most 3 times, at most once an hour.
+         */
+        post: operations["GiftCardsController_resend"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6297,6 +7423,23 @@ export interface paths {
         put?: never;
         /** Filer or admin cancels a pending/disputed charge */
         post: operations["IncidentalChargesController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/incidental-charges/{id}/evidence/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream an incidental charge evidence document through the API (party or admin). No shareable link is issued. */
+        get: operations["IncidentalChargesController_getEvidence"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -7984,7 +9127,7 @@ export interface paths {
         put?: never;
         /**
          * Stripe webhook endpoint — must be @Public() since Stripe sends raw requests without JWT.
-         *     SPLIT-628: @SkipThrottle — Stripe delivery bursts (retries + live traffic
+         *     SPLIT-628: @SkipAllThrottlers — Stripe delivery bursts (retries + live traffic
          *     spikes) must never 429; the signature verification in the pipeline is the
          *     gate (the anonymous-IP ceiling in GlobalAnonThrottleGuard skips this path
          *     too — see its webhook skip list).
@@ -8765,6 +9908,57 @@ export interface paths {
         put: operations["ReviewController_editResponse"];
         post: operations["ReviewController_respond"];
         delete: operations["ReviewController_removeResponse"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rewards/applicable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's progress and usable rewards with the listing's vendor. */
+        get: operations["RewardsController_applicable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rewards/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every program the caller has any standing in. */
+        get: operations["RewardsController_mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rewards/programs/by-listing/{listingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Public headline terms for a listing page ("Rent 5 times, get $50 off"). */
+        get: operations["RewardsController_programForListing"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -10318,6 +11512,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/vendor/rewards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everything the vendor's rewards page shows, in one read. `program: null`
+         *     (a 200, not a 404) when the vendor is not enrolled or rewards are switched
+         *     off: the vendor dashboard asks this on every load to decide whether to
+         *     show a "Rewards" entry at all, and "no" is the usual answer.
+         */
+        get: operations["VendorRewardsController_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vendor/rewards/program": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["VendorRewardsController_updateProgram"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/vendor/stripe-connect/onboard": {
         parameters: {
             query?: never;
@@ -10399,7 +11631,7 @@ export interface paths {
          *     StripeConnectService.handleConnectWebhook on the SHARED pipeline. New
          *     semantics: missing/invalid signature or unset secret → 400 WITH the
          *     reason; processing failure → 500 (Stripe retries); duplicate → 200 no-op.
-         *     @SkipThrottle: Stripe delivery bursts must never 429 — the signature
+         *     @SkipAllThrottlers: Stripe delivery bursts must never 429 — the signature
          *     verification inside the pipeline is the gate (the anonymous-IP ceiling in
          *     GlobalAnonThrottleGuard skips this path too).
          */
@@ -10639,7 +11871,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** SPLIT-871: issue a client token for a direct-to-Blob KYC document upload (up to 20MB, bypassing the multipart 15MB/serverless body-size path). Complete with POST /verifications/finalize. */
+        /** SPLIT-871/SPLIT-1656: authorize a direct-to-Blob KYC document upload (up to 20MB, bypassing the multipart 15MB/serverless body-size path). blob.generate-presigned-url returns a presigned upload URL payload; the removed legacy blob.generate-client-token answers 400. Complete with POST /verifications/finalize. */
         post: operations["VerificationController_createUploadToken"];
         delete?: never;
         options?: never;
@@ -11191,6 +12423,57 @@ export interface components {
             pricing?: "per_day" | "per_booking";
             required?: boolean;
         };
+        AdminCashOutDto: {
+            /** @enum {string} */
+            method: "check" | "ach" | "stripe_refund" | "other";
+            /** @example Holder asked to cash out, identity confirmed by email (ticket 4821). */
+            reason: string;
+            /**
+             * @description How to find the payment: a check number, an ACH trace, a refund id.
+             * @example Check 1042
+             */
+            reference: string;
+            /**
+             * Format: uuid
+             * @description One fresh uuid per click: a repeat of it does nothing.
+             */
+            requestId: string;
+        };
+        AdminChangeGiftCardRecipientDto: {
+            /** @example Purchaser confirmed the right address by email (ticket 4821) */
+            reason: string;
+            /**
+             * Format: email
+             * @example alex@example.com
+             */
+            recipientEmail: string;
+            /**
+             * @description The recipient's name for the email. Omit it to keep the current one; an empty string removes it.
+             * @example Alex
+             */
+            recipientName?: string;
+        };
+        AdminGiftCardActionDto: {
+            /** @example Holder reported the account compromised (ticket 4821). */
+            reason: string;
+            /**
+             * Format: uuid
+             * @description One fresh uuid per click: a repeat of it does nothing.
+             */
+            requestId: string;
+        };
+        AdminGiftCardLookupDto: {
+            /**
+             * @description Most matches returned (an email can match many orders).
+             * @default 10
+             */
+            limit: number;
+            /**
+             * @description An order, card or user id; a purchaser or recipient email; or a gift card code.
+             * @example alex@example.com
+             */
+            q: string;
+        };
         AdminModerationOverrideDto: {
             reason: string;
             /** @enum {string} */
@@ -11298,6 +12581,12 @@ export interface components {
             year: number;
         };
         ApplyVendorDto: {
+            /**
+             * @description SPLIT-1929: where the applicant came from and their tracking consent.
+             *     Recorded best-effort after the application is filed (never on a honeypot
+             *     hit) and used for the consent-gated Lead conversion.
+             */
+            attribution?: components["schemas"]["MarketingAttributionDto"];
             /** @description Free-text "what gear do you want to list?" — captured in the audit trail. */
             businessInterest?: string;
             /** @description Storefront / business name — persisted to `user.storeName`. */
@@ -11309,6 +12598,13 @@ export interface components {
             inviteToken?: string;
             lastName?: string;
             password?: string;
+            /**
+             * @description SPLIT-1928: Terms-of-Service acceptance, mirroring /register. Required
+             *     `true` (400 otherwise). Only the public (anonymous) path creates an account
+             *     and records the acceptance; a signed-in applicant already accepted at signup.
+             *     The web form (/partners) is the only client (Android/iOS never call apply).
+             */
+            termsAccepted?: boolean;
             /** @description Honeypot — a filled value means a bot; the submission is dropped silently. */
             website?: string;
         };
@@ -11353,6 +12649,12 @@ export interface components {
             minTotalSpent?: number;
             minTrustScore?: number;
             plannedTripWindow?: components["schemas"]["PlannedTripWindowDto"];
+            /**
+             * @description SPLIT-1933: explicit recipient list. When non-empty the audience is EXACTLY
+             *     the eligible members of this list and every other criterion is ignored. An
+             *     address with no marketing opt-in on record is never mailed.
+             */
+            recipientEmails?: string[];
             registeredBeforeDays?: number;
             registeredWithinDays?: number;
             roles?: string[];
@@ -11373,6 +12675,16 @@ export interface components {
              * @example 2026-06-20
              */
             startDate: string;
+        };
+        BlobClientTokenPayloadDto: {
+            clientPayload?: string | null;
+            multipart?: boolean;
+            pathname: string;
+        };
+        BlobClientTokenRequestDto: {
+            payload: components["schemas"]["BlobClientTokenPayloadDto"];
+            /** @enum {string} */
+            type: "blob.generate-client-token" | "blob.generate-presigned-url";
         };
         BlockResponseDto: {
             blocked: boolean;
@@ -11565,12 +12877,21 @@ export interface components {
             verificationStatus: "none" | "pickup_pending" | "pickup_verified" | "return_pending" | "return_verified" | "disputed";
         };
         BookingAttributionDto: {
+            adConsent?: boolean;
+            analyticsConsent?: boolean;
             campaign?: string;
+            fbclid?: string;
             funnel?: string;
+            /**
+             * @description SPLIT-1929: ad-platform click ids and the visitor's tracking consent, for
+             *     the server-side conversion path. Optional like everything above.
+             */
+            gclid?: string;
             medium?: string;
             optionId?: string;
             source?: string;
             surface?: string;
+            ttclid?: string;
         };
         BookingCoverageDetailsDto: {
             /** @description Deductible amount (number inside jsonb). */
@@ -11583,7 +12904,7 @@ export interface components {
         BookingRefundDto: {
             /**
              * Format: decimal
-             * @description Refunded amount (DECIMAL string).
+             * @description Refunded amount BEFORE tax (DECIMAL string): what the vendor/platform split covers.
              * @example 195.00
              */
             amount: string;
@@ -11605,6 +12926,23 @@ export interface components {
              * @enum {string}
              */
             reasonCode?: "early_return" | "unused_days" | "service_issue" | "goodwill" | "overcharge" | "other";
+            /**
+             * @description SPLIT-1860: how an admin paid a refund Stripe could not send. Absent on any other refund, and for anyone but the guest and admins (so are creditAmount and cardAmount).
+             * @enum {string}
+             */
+            settledAs?: "outside_stripe" | "splitt_credit";
+            /**
+             * Format: decimal
+             * @description SPLIT-1777: the sales tax returned with this refund (DECIMAL string, "0.00" when none).
+             * @example 195.00
+             */
+            taxAmount: string;
+            /**
+             * Format: decimal
+             * @description SPLIT-1777: what the renter actually got back, `amount + taxAmount` (DECIMAL string).
+             * @example 195.00
+             */
+            totalAmount: string;
         };
         BookingResponseDto: {
             /** @description Cancellation policy snapshotted at booking time, or null. */
@@ -11751,6 +13089,11 @@ export interface components {
             vendorName?: string | null;
             /** @description SPLIT-912: the vendor's PRIVATE operational note on this booking. Present ONLY on vendor-context reads (the listing owner or an admin: GET /bookings/for-my-listings, GET /bookings/:id as the owner, and the PATCH /bookings/:id/vendor-notes response). The key is ABSENT entirely from any renter-facing payload; it is stripped in the projection, not merely hidden by the client. */
             vendorNotes?: string | null;
+            /**
+             * @description SPLIT-1774: the VENDOR's share of the booking's payment (the latest PAYMENT transaction `vendorPayout`: commission and the protection premium already taken out; tax never included). Present on the vendor booking list (GET /bookings/for-my-listings, /bookings/vendor-bookings) only; null before checkout. A JSON number (server-coerced DECIMAL).
+             * @example 396
+             */
+            vendorPayout?: number | null;
             /**
              * @description Pickup/return verification state.
              * @enum {string}
@@ -12017,6 +13360,7 @@ export interface components {
                     fromDays?: number;
                     toDays?: number;
                 };
+                recipientEmails?: string[];
                 registeredBeforeDays?: number;
                 registeredWithinDays?: number;
                 role?: string;
@@ -12066,6 +13410,12 @@ export interface components {
             minTotalSpent?: number;
             minTrustScore?: number;
             plannedTripWindow?: components["schemas"]["PlannedTripWindowDto"];
+            /**
+             * @description SPLIT-1933: explicit recipient list. When non-empty the audience is EXACTLY
+             *     the eligible members of this list and every other criterion is ignored. An
+             *     address with no marketing opt-in on record is never mailed.
+             */
+            recipientEmails?: string[];
             registeredBeforeDays?: number;
             registeredWithinDays?: number;
             role?: string;
@@ -12077,8 +13427,16 @@ export interface components {
         CancellationPreviewDto: {
             /** @description The refund the renter TRULY receives if they cancel now: equals `policyRefundAmount` when captured, else 0 (an authorized hold is released; an unpaid booking was never charged). */
             actualRefundAmount: number;
+            /** @description SPLIT-1777: the sales tax that comes back with `actualRefundAmount` (which is pre-tax): the same tax portion the real refund folds in. */
+            actualRefundTax: number;
+            /** @description SPLIT-1777: what the renter actually gets back if they cancel now, tax included: `actualRefundAmount + actualRefundTax`. */
+            actualRefundTotal: number;
+            /** @description When `cancellable` is false: the same `code` and `message` the cancel 409 returns (BOOKING_ALREADY_STARTED, BOOKING_ALREADY_PICKED_UP or BOOKING_OVERDUE_FLAGGED). */
+            blockedReason?: Record<string, never> | null;
             /** @description The booking this preview is for. */
             bookingId: string;
+            /** @description False when the renter's own cancel would be refused right now (the rental has started, been picked up, or is flagged not returned). */
+            cancellable: boolean;
             /** @description The cancellation policy that governs the refund (snapshotted on the booking, falling back to the listing's current policy). Null when neither is set. */
             cancellationPolicy?: string | null;
             /**
@@ -12110,6 +13468,18 @@ export interface components {
             instructions: string[];
             title: string;
         };
+        ChangeGiftCardRecipientDto: {
+            /**
+             * Format: email
+             * @example alex@example.com
+             */
+            recipientEmail: string;
+            /**
+             * @description The recipient's name for the email. Omit it to keep the current one; an empty string removes it.
+             * @example Alex
+             */
+            recipientName?: string;
+        };
         ClaimEvidence: {
             /** @description Optional link to a return/pickup booking-verification photo set. */
             bookingVerificationId: string | null;
@@ -12119,6 +13489,13 @@ export interface components {
             createdAt: string;
             /** @description URL of the uploaded file (null for a `statement`-only attachment). */
             fileUrl: string | null;
+            /**
+             * @description SPLIT-1881: projected on read (`GET /claims/:id`) when the evidence row has
+             *     a stored file (`fileUrl` in DB), even when `fileUrl` is stripped to `null`
+             *     because the file lives in the private store and is fetched via the
+             *     authenticated bytes route (`GET /claims/:id/evidence/:index`).
+             */
+            hasFile?: boolean;
             id: string;
             /**
              * @description Admin-only internal note. NEVER leaks into a renter/vendor party view —
@@ -12131,6 +13508,13 @@ export interface components {
             type: "photo" | "receipt_pdf" | "statement";
             uploadedBy: string;
             uploader: components["schemas"]["User"];
+        };
+        ClaimGiftCardDto: {
+            /**
+             * @description The gift card code from the email.
+             * @example SPLT-XXXXX-XXXXX-XXXXX-XXXXX-X
+             */
+            code: string;
         };
         CloseDisputeDto: {
             disputeId: string;
@@ -12181,6 +13565,7 @@ export interface components {
             /** @enum {string} */
             contentFormat?: "text" | "html";
             excerpt?: string;
+            /** Format: uri */
             imageUrl?: string;
             /** @enum {string} */
             status?: "draft" | "published" | "archived";
@@ -12188,6 +13573,7 @@ export interface components {
             title: string;
         };
         CreateBookingDto: {
+            applyReward?: boolean;
             /**
              * @description SPLIT-1575 — where the booking came from (the Google Things to do landing
              *     parameters). Optional; recorded best-effort in `booking_attribution` after
@@ -12285,6 +13671,10 @@ export interface components {
             bookingId: string;
             /** Format: uri */
             cancelUrl?: string;
+            /** @description Splitt Credit to apply, in dollars (2 decimals at most). The response says what applied. */
+            creditAmount?: number;
+            /** @description The code from POST /credit/step-up; required to apply more than $500 of Splitt Credit. */
+            stepUpCode?: string;
             /** Format: uri */
             successUrl?: string;
         };
@@ -12323,6 +13713,25 @@ export interface components {
             /** Format: uuid */
             participantId: string;
         };
+        CreateCreditAdjustmentDto: {
+            /**
+             * Format: uuid
+             * @description The account holder (a user id).
+             */
+            accountUserId: string;
+            /**
+             * @description Signed dollars, two decimals at most, never zero.
+             * @example -12.5
+             */
+            amount: number;
+            /** @example Goodwill for the cancelled trip (ticket 4821). */
+            reason: string;
+            /**
+             * Format: uuid
+             * @description One fresh uuid per click: a repeat of it does nothing.
+             */
+            requestId: string;
+        };
         CreateDisputeDto: {
             /** @description The ID of the booking being disputed */
             bookingId: string;
@@ -12355,6 +13764,10 @@ export interface components {
         CreateExperienceCheckoutSessionDto: {
             /** Format: uri */
             cancelUrl?: string;
+            /** @description Splitt Credit to apply, in dollars (2 decimals at most). The response says what applied. */
+            creditAmount?: number;
+            /** @description The code from POST /credit/step-up; required to apply more than $500 of Splitt Credit. */
+            stepUpCode?: string;
             /** Format: uri */
             successUrl?: string;
         };
@@ -12370,8 +13783,9 @@ export interface components {
             /**
              * @description SPLIT-1214 — the whole-booking price. `Min(0.01)`, not `Min(0)`: a flat
              *     rate of $0 is not a free package, it is an unset one, and the mode's whole
-             *     point is that this number is the ONLY thing charged. Still `IsOptional`
-             *     because clearing the mode back to per-person may legitimately send null.
+             *     point is that this number is the ONLY thing charged. `IsOptional` here
+             *     because a partial update may leave the stored price untouched; the service
+             *     400s a package whose merged state has no positive total.
              */
             flatRatePrice?: number;
             /** @enum {string} */
@@ -12391,20 +13805,17 @@ export interface components {
             minGuests?: number;
             pricePerChild?: number;
             /**
-             * @description SPLIT-1214: required for a per-person package (the default), OPTIONAL for a
-             *     flat-rate one — that vendor is never asked for a per-head number, so
-             *     demanding one would make the flat-rate wizard unsubmittable. `ValidateIf`
-             *     (not `IsOptional`) so a per-person body still gets the original
-             *     "should not be empty" 400 rather than falling through to the column's
-             *     NOT NULL and surfacing as a 500 (Gotcha #1, the reason this DTO exists).
-             *     The service defaults the absent value to 0.
+             * @description SPLIT-1847: OPTIONAL. Packages are priced as one total for the whole
+             *     booking (`flatRatePrice`), so no vendor is asked for a per-head rate. Still
+             *     accepted (and stored) so an older client that sends it is not rejected by
+             *     `forbidNonWhitelisted`; the service defaults an absent value to 0 because
+             *     the column is NOT NULL.
              */
-            pricePerPerson: number;
+            pricePerPerson?: number;
             /**
-             * @description SPLIT-1214: 'per_person' (default) | 'flat_rate'. Whether flat_rate is
-             *     ALLOWED here — it requires a staff-guided package — is not decidable from
-             *     this body alone on a partial update, so that invariant lives in the
-             *     service against the merged state (`pricingModeViolation`).
+             * @description SPLIT-1214/1840: 'flat_rate' is the only mode a package may be written in
+             *     (self-guided or staff-guided); omit it and the service applies it. An
+             *     explicit 'per_person' is refused with a 400 by the service.
              * @enum {string}
              */
             pricingMode?: "per_person" | "flat_rate";
@@ -12429,8 +13840,9 @@ export interface components {
             /**
              * @description SPLIT-1214 — the whole-booking price. `Min(0.01)`, not `Min(0)`: a flat
              *     rate of $0 is not a free package, it is an unset one, and the mode's whole
-             *     point is that this number is the ONLY thing charged. Still `IsOptional`
-             *     because clearing the mode back to per-person may legitimately send null.
+             *     point is that this number is the ONLY thing charged. `IsOptional` here
+             *     because a partial update may leave the stored price untouched; the service
+             *     400s a package whose merged state has no positive total.
              */
             flatRatePrice?: number;
             /** @enum {string} */
@@ -12447,20 +13859,17 @@ export interface components {
             minGuests?: number;
             pricePerChild?: number;
             /**
-             * @description SPLIT-1214: required for a per-person package (the default), OPTIONAL for a
-             *     flat-rate one — that vendor is never asked for a per-head number, so
-             *     demanding one would make the flat-rate wizard unsubmittable. `ValidateIf`
-             *     (not `IsOptional`) so a per-person body still gets the original
-             *     "should not be empty" 400 rather than falling through to the column's
-             *     NOT NULL and surfacing as a 500 (Gotcha #1, the reason this DTO exists).
-             *     The service defaults the absent value to 0.
+             * @description SPLIT-1847: OPTIONAL. Packages are priced as one total for the whole
+             *     booking (`flatRatePrice`), so no vendor is asked for a per-head rate. Still
+             *     accepted (and stored) so an older client that sends it is not rejected by
+             *     `forbidNonWhitelisted`; the service defaults an absent value to 0 because
+             *     the column is NOT NULL.
              */
-            pricePerPerson: number;
+            pricePerPerson?: number;
             /**
-             * @description SPLIT-1214: 'per_person' (default) | 'flat_rate'. Whether flat_rate is
-             *     ALLOWED here — it requires a staff-guided package — is not decidable from
-             *     this body alone on a partial update, so that invariant lives in the
-             *     service against the merged state (`pricingModeViolation`).
+             * @description SPLIT-1214/1840: 'flat_rate' is the only mode a package may be written in
+             *     (self-guided or staff-guided); omit it and the service applies it. An
+             *     explicit 'per_person' is refused with a 400 by the service.
              * @enum {string}
              */
             pricingMode?: "per_person" | "flat_rate";
@@ -12499,6 +13908,39 @@ export interface components {
             variant?: string;
             yearFrom?: number;
             yearTo?: number;
+        };
+        CreateGiftCardOrderDto: {
+            /**
+             * @description Face value in whole US dollars ($10 to $1,000 by default).
+             * @example 50
+             */
+            amount: number;
+            /**
+             * @description SPLIT-1868: the purchaser state (two letters), an early hint only. When it is on the blocked list the order is refused with GIFT_CARD_STATE_BLOCKED; the billing state Stripe collects is checked again when the payment lands, whatever is sent here.
+             * @example MN
+             */
+            billingState?: string;
+            /**
+             * @description When to email the recipient (UTC). Omit to send now; at most 365 days ahead.
+             * @example 2026-11-05T15:00:00.000Z
+             */
+            deliverAt?: string;
+            /** @example Happy birthday! Go rent something fun. */
+            message?: string;
+            /**
+             * Format: email
+             * @example alex@example.com
+             */
+            recipientEmail: string;
+            /** @example Alex */
+            recipientName?: string;
+            /** @example Jamie */
+            senderName: string;
+            /**
+             * @description SPLIT-1877: the purchaser IANA time zone, used only to print the scheduled delivery time on the receipt in their own time. An unknown value is dropped, never an error.
+             * @example America/Chicago
+             */
+            timeZone?: string;
         };
         CreateIncidentalChargeDto: {
             /** @description Amount requested from the renter (USD, > 0). The REAL ceiling is booking-relative and enforced server-side in fileCharge (SPLIT-1191). This 1,000,000 bound is only a fail-fast sanity check. */
@@ -12547,6 +13989,12 @@ export interface components {
             to?: string;
         };
         CreateLeadDto: {
+            /**
+             * @description SPLIT-1929: where the subscriber came from and their tracking consent.
+             *     Stored against the lead on capture; the Lead conversion is only reported
+             *     once the lead CONFIRMS its subscription (double opt-in).
+             */
+            attribution?: components["schemas"]["MarketingAttributionDto"];
             /** Format: email */
             email: string;
             interests?: string;
@@ -12624,6 +14072,10 @@ export interface components {
             quantity?: number;
             requiresBoaterLicense?: boolean;
             requiresIdVerification?: boolean;
+            slotDurationMinutes?: number;
+            /** @enum {string} */
+            slotMode?: "fixed" | "flexible";
+            slotPrice?: number;
             stayDetails?: components["schemas"]["StayDetailsDto"];
             subAttributes?: {
                 [key: string]: unknown;
@@ -12809,6 +14261,8 @@ export interface components {
              * @example 2026-06-20
              */
             endDate: string;
+            /** @description SPLIT-1945: absolute per-hour rate in USD for hourly rentals on the days this rule governs. Mutually exclusive with ratePct. */
+            hourlyRate?: number | null;
             /** @description Minimum nights required when this date is the CHECK-IN night. */
             minNights?: number | null;
             /** @description Vendor-facing label, e.g. "Summer peak". */
@@ -12822,6 +14276,8 @@ export interface components {
             priority: number;
             /** @description Percentage adjustment against the listing base rate. Mutually exclusive with nightlyRate. */
             ratePct?: number | null;
+            /** @description SPLIT-1948: absolute price per departure in USD for fixed-slot rentals on the days this rule governs. Mutually exclusive with ratePct. */
+            slotRate?: number | null;
             /**
              * Format: date
              * @description Inclusive first night the rule applies to.
@@ -12846,9 +14302,22 @@ export interface components {
             /** @enum {string} */
             type: "listing" | "user";
         };
+        CreateRewardProgramDto: {
+            isActive?: boolean;
+            minQualifyingSubtotal?: number | null;
+            minRedeemSubtotal?: number | null;
+            rentalsRequired: number;
+            rewardAmount: number;
+            rewardExpiryDays?: number | null;
+            /**
+             * Format: uuid
+             * @description The vendor (listing owner) to enrol.
+             */
+            vendorId: string;
+        };
         CreateRouteDto: {
             /** @enum {string} */
-            activityType: "other" | "road_cycling" | "gravel" | "ebike" | "mtb" | "hike" | "trail_run" | "atv_offroad" | "snowmobile" | "jet_ski" | "kayak_paddle" | "ski_tour";
+            activityType: "road_cycling" | "gravel" | "ebike" | "mtb" | "hike" | "trail_run" | "atv_offroad" | "snowmobile" | "jet_ski" | "kayak_paddle" | "ski_tour" | "other";
             cuePoints?: components["schemas"]["RouteCueDto"][];
             /** @enum {string} */
             difficulty?: "moderate" | "easy" | "challenging" | "expert";
@@ -12876,6 +14345,12 @@ export interface components {
         };
         CreateSavedTripDto: {
             activities: string[];
+            /**
+             * @description SPLIT-1929: where the visit came from and the visitor's tracking consent.
+             *     Recorded against the saved trip (never stored on the trip itself) and used
+             *     for the consent-gated Lead conversion.
+             */
+            attribution?: components["schemas"]["MarketingAttributionDto"];
             destination: string;
             duration?: number;
             endDate?: string;
@@ -12952,6 +14427,15 @@ export interface components {
              */
             acquisitionValue?: number;
             /**
+             * @description Fixed departure times for this unit (HH:MM, 24h, listing-local).
+             * @example [
+             *       "13:00",
+             *       "15:30",
+             *       "18:00"
+             *     ]
+             */
+            departureTimes?: string[] | null;
+            /**
              * @description Hull Identification Number (boats, jet skis / PWC).
              * @example YAM12345D404
              */
@@ -12987,6 +14471,12 @@ export interface components {
             year?: number;
         };
         CreateUserDto: {
+            /**
+             * @description SPLIT-1929: where the visitor came from (UTM, click ids, referrer) and
+             *     their tracking consent. Recorded best-effort AFTER the account exists; it
+             *     never changes what the account is and a bad value 400s at the pipe.
+             */
+            attribution?: components["schemas"]["MarketingAttributionDto"];
             dateOfBirth?: string;
             /** Format: email */
             email: string;
@@ -12994,10 +14484,12 @@ export interface components {
             lastName: string;
             marketingConsent?: boolean;
             password: string;
+            returnTo?: string;
             /** @enum {string} */
             role?: "renter" | "vendor" | "vendor_owner" | "vendor_manager" | "vendor_staff" | "crm_manager" | "admin";
             storeName?: string;
             termsAccepted?: boolean;
+            website?: string;
         };
         CreateVendorGearModelDto: {
             /** @enum {string} */
@@ -13027,6 +14519,10 @@ export interface components {
             description?: string;
             minAge?: number | null;
             name: string;
+        };
+        CreditStepUpDto: {
+            /** @description The account password. */
+            password: string;
         };
         DamageClaim: {
             /**
@@ -13404,6 +14900,12 @@ export interface components {
             updatedAt: string;
             vendorVerified: boolean;
         };
+        GearGuideAvailabilityDto: {
+            /** @description The GLOBAL switch: FEATURE_GEAR_GUIDE_ENABLED is true AND the gear_guide flag exists and is enabled. Every vendor surface follows it. */
+            enabled: boolean;
+            /** @description `enabled` AND the caller is inside the flag's renter rollout (a stable bucket of their user id). Whether a renter sees the guide on their bookings. */
+            renter: boolean;
+        };
         GearGuideGap: {
             answeredItem: components["schemas"]["GearKnowledgeItem"] | null;
             answeredItemId: string | null;
@@ -13439,6 +14941,19 @@ export interface components {
             /** Format: date-time */
             startedAt: string;
             turnsCount: number;
+        };
+        GearGuideTopicsDto: {
+            /** @description false: the guide is not open for this booking (see `reason`), and there are no topics. true: the topics and quirks follow. */
+            available: boolean;
+            /** @description Only when `available` is true. */
+            quirks?: components["schemas"]["QuirkChipDto"][];
+            /**
+             * @description Only when `available` is false.
+             * @enum {string}
+             */
+            reason?: "GEAR_GUIDE_DISABLED" | "GEAR_GUIDE_NOT_ELIGIBLE" | "GEAR_GUIDE_OUTSIDE_WINDOW";
+            /** @description Only when `available` is true. */
+            topics?: components["schemas"]["TopicChipDto"][];
         };
         GearGuideTurn: {
             /** @description Structured answer shown to the renter, when there is one. */
@@ -13615,6 +15130,10 @@ export interface components {
             suggestedAmount: number;
             used: number | null;
         };
+        GiftCardOrderDecisionDto: {
+            /** @example Dispute won in Stripe; the recipient is the buyer's sister. */
+            reason: string;
+        };
         GoogleSignInDto: {
             idToken: string;
             /**
@@ -13648,6 +15167,18 @@ export interface components {
              *     the RAW value here.
              */
             nonce?: string;
+        };
+        GrantRewardRentalsDto: {
+            /** @description Why (shown in the ledger). */
+            note: string;
+            /** Format: uuid */
+            programId: string;
+            rentals: number;
+            /**
+             * Format: uuid
+             * @description The customer to credit.
+             */
+            userId: string;
         };
         ImportICalDto: {
             /** Format: uri */
@@ -13754,6 +15285,11 @@ export interface components {
             type: "damage" | "fuel" | "cleaning" | "late_return" | "mileage" | "generator_hours" | "other";
             /** Format: date-time */
             updatedAt: string;
+            /**
+             * @description SPLIT-1192: not a column. Set on `GET /incidental-charges` and `GET .../:id`:
+             *     the caller is this booking's renter, whatever their role.
+             */
+            viewerIsRenter?: boolean;
         };
         IncidentalLineItemDto: {
             /** @description Ignored: the server recomputes round2(quantity x unitRate). */
@@ -13774,7 +15310,7 @@ export interface components {
         IncludedItemDto: {
             description?: string;
             /** @enum {string} */
-            icon: "map" | "storage" | "safety-gear" | "helmet" | "life-jacket" | "navigation" | "fuel" | "trailer" | "delivery" | "instruction" | "cooler" | "tools" | "pump" | "lock" | "charger" | "permit" | "guide" | "insurance";
+            icon: "storage" | "map" | "safety-gear" | "helmet" | "life-jacket" | "navigation" | "fuel" | "trailer" | "delivery" | "instruction" | "cooler" | "tools" | "pump" | "lock" | "charger" | "permit" | "guide" | "insurance";
             label: string;
         };
         InspectionChecklistItemDto: {
@@ -13855,6 +15391,7 @@ export interface components {
             } | null;
             gearModel?: components["schemas"]["GearModel"] | null;
             gearModelId: string | null;
+            hasRateRules: boolean;
             icalFeedToken: string | null;
             icalUrl: string;
             id: string;
@@ -13895,15 +15432,52 @@ export interface components {
              * Format: decimal
              * @example 195.00
              */
+            priceFromDay?: string | null;
+            /**
+             * Format: decimal
+             * @example 195.00
+             */
+            priceFromHour?: string | null;
+            /**
+             * Format: decimal
+             * @example 195.00
+             */
+            priceFromSlot?: string | null;
+            /**
+             * Format: decimal
+             * @example 195.00
+             */
             pricePerDay: string;
             /**
              * Format: decimal
              * @example 195.00
              */
             pricePerHour?: string | null;
+            /**
+             * Format: decimal
+             * @example 195.00
+             */
+            priceToDay?: string | null;
+            /**
+             * Format: decimal
+             * @example 195.00
+             */
+            priceToHour?: string | null;
+            /**
+             * Format: decimal
+             * @example 195.00
+             */
+            priceToSlot?: string | null;
             requiresBoaterLicense: boolean;
             requiresIdVerification: boolean;
             reviews: components["schemas"]["Review"][];
+            slotDurationMinutes: number | null;
+            slotMode: string;
+            /**
+             * Format: decimal
+             * @example 195.00
+             */
+            slotPrice?: string | null;
             /** @enum {string|null} */
             sponsorTier: "STARTER" | "FEATURED" | "PREMIUM" | null;
             /** Format: date-time */
@@ -14040,6 +15614,15 @@ export interface components {
              * @example 2026-06-20
              */
             endDate: string;
+            /**
+             * Format: decimal
+             * @description SPLIT-1945 — absolute per-HOUR rate for flexible hourly rentals on the days
+             *     this rule governs (overrides `listing.pricePerHour`). Independent of
+             *     {@link nightlyRate}: a BOTH listing's "Saturday" rule may carry a day rate
+             *     AND an hourly rate. Mutually exclusive with {@link ratePct}.
+             * @example 195.00
+             */
+            hourlyRate?: string | null;
             id: string;
             listing: components["schemas"]["Listing"];
             listingId: string;
@@ -14056,10 +15639,20 @@ export interface components {
             /** @description Explicit vendor escape hatch — highest term in the precedence ordering. */
             priority: number;
             /**
-             * @description Relative delta against `listing.pricePerDay`, in percent. −90..+500.
-             *     Mutually exclusive with {@link nightlyRate}.
+             * @description Relative delta against the listing base for whichever unit is being
+             *     priced, in percent. −90..+500. Mutually exclusive with every absolute
+             *     rate ({@link nightlyRate}, {@link hourlyRate}, {@link slotRate}).
              */
             ratePct: number | null;
+            /**
+             * Format: decimal
+             * @description SPLIT-1948 — absolute per-DEPARTURE price for fixed-slot rentals on the
+             *     days this rule governs (overrides `listing.slotPrice`). Exists so a
+             *     90-minute slot can cost exactly $425 without a fractional hourly rate.
+             *     Mutually exclusive with {@link ratePct}.
+             * @example 195.00
+             */
+            slotRate?: string | null;
             /** @enum {string} */
             source: "vendor" | "starter";
             /**
@@ -14086,6 +15679,7 @@ export interface components {
             acquisitionValue?: string | null;
             /** Format: date-time */
             createdAt: string;
+            departureTimes: string[] | null;
             hin: string | null;
             id: string;
             label: string;
@@ -14115,6 +15709,7 @@ export interface components {
             email: string;
             /** @example SecureP@ss1 */
             password: string;
+            website?: string;
         };
         LogoutDto: {
             /** @description The opaque refresh token of the session to sign out. The whole session is ended, every token rotated from it included. */
@@ -14189,6 +15784,22 @@ export interface components {
         };
         MarkNotReturnedDto: {
             note?: string;
+        };
+        MarketingAttributionDto: {
+            adConsent?: boolean;
+            analyticsConsent?: boolean;
+            fbclid?: string;
+            /** @description ISO date string: when the browser first saw this visitor. */
+            firstSeenAt?: string;
+            gclid?: string;
+            landingPage?: string;
+            referrer?: string;
+            ttclid?: string;
+            utmCampaign?: string;
+            utmContent?: string;
+            utmMedium?: string;
+            utmSource?: string;
+            utmTerm?: string;
         };
         MergeGearModelsDto: {
             /**
@@ -14289,10 +15900,61 @@ export interface components {
             message: string;
             recipientId: string;
             /** @enum {string} */
-            type: "NEW_MESSAGE" | "BOOKING_REQUEST" | "BOOKING_CONFIRMED" | "BOOKING_REJECTED" | "NEW_REVIEW" | "SEARCH_ALERT" | "PICKUP_REMINDER" | "RETURN_REMINDER" | "RISK_REVIEW" | "DAMAGE_CLAIM" | "DISPUTE_UPDATE" | "BOOKING_CANCELLED" | "BOOKING_DATE_CHANGED" | "BOOKING_OVERDUE" | "INSURANCE_EXPIRING" | "CALENDAR_SYNC" | "RESCHEDULE_PROPOSAL" | "KYC_APPROVED" | "KYC_REJECTED" | "KYC_INFO_REQUESTED" | "LISTING_PROMOTED" | "LISTING_PROMOTION_ENDED" | "VENDOR_APPLICATION_APPROVED" | "VENDOR_ONBOARDING_APPROVED" | "VENDOR_ONBOARDING_SUBMITTED" | "VENDOR_APPLICATION_RECEIVED" | "CHARGEBACK_DISPUTE" | "PACKAGE_STAFF_ASSIGNMENT_REQUESTED" | "PACKAGE_STAFF_ASSIGNMENT_APPROVED" | "PACKAGE_STAFF_ASSIGNMENT_REJECTED" | "LISTING_PUBLISHED_BY_STAFF" | "LISTING_VIDEO_UNAVAILABLE" | "GEAR_GUIDE_GAP" | "GEAR_GUIDE_READY" | "LISTING_VIDEO_ADDED_BY_STAFF" | "PAYOUT_ALERT" | "BOATER_LICENSE_REMINDER" | "INCIDENTAL_CHARGE";
+            type: "NEW_MESSAGE" | "BOOKING_REQUEST" | "BOOKING_CONFIRMED" | "BOOKING_REJECTED" | "NEW_REVIEW" | "SEARCH_ALERT" | "PICKUP_REMINDER" | "RETURN_REMINDER" | "RISK_REVIEW" | "DAMAGE_CLAIM" | "DISPUTE_UPDATE" | "BOOKING_CANCELLED" | "BOOKING_DATE_CHANGED" | "BOOKING_OVERDUE" | "INSURANCE_EXPIRING" | "CALENDAR_SYNC" | "RESCHEDULE_PROPOSAL" | "KYC_APPROVED" | "KYC_REJECTED" | "KYC_INFO_REQUESTED" | "LISTING_PROMOTED" | "REWARD_EARNED" | "LISTING_PROMOTION_ENDED" | "VENDOR_APPLICATION_APPROVED" | "VENDOR_ONBOARDING_APPROVED" | "VENDOR_ONBOARDING_SUBMITTED" | "VENDOR_APPLICATION_RECEIVED" | "CHARGEBACK_DISPUTE" | "PACKAGE_STAFF_ASSIGNMENT_REQUESTED" | "PACKAGE_STAFF_ASSIGNMENT_APPROVED" | "PACKAGE_STAFF_ASSIGNMENT_REJECTED" | "LISTING_PUBLISHED_BY_STAFF" | "LISTING_VIDEO_UNAVAILABLE" | "GEAR_GUIDE_GAP" | "GEAR_GUIDE_READY" | "LISTING_VIDEO_ADDED_BY_STAFF" | "PAYOUT_ALERT" | "BOATER_LICENSE_REMINDER" | "INCIDENTAL_CHARGE" | "GIFT_CARD_RECEIVED" | "GIFT_CARD_REVIEW_HOLD" | "GIFT_CARD_DELIVERED" | "GIFT_CARD_CLAIMED" | "GIFT_CARD_UNDELIVERABLE" | "GIFT_CARD_ACCOUNT_NOTICE" | "PAYOUT_UPDATE" | "PAYMENT_UPDATE" | "BOOKING_COMPLETED" | "REVIEW_REQUEST" | "LISTING_MODERATION" | "VENDOR_APPLICATION_REJECTED";
         };
         OAuthExchangeDto: {
             code: string;
+        };
+        OfflineTurnDto: {
+            /**
+             * Format: uuid
+             * @description A UUID the device generates per offline answer. Posting the same id again for the same booking records nothing new (the first post is kept), so a retry after a dropped connection is safe.
+             */
+            clientTurnId: string;
+            /** @description Milliseconds the device took to answer. */
+            latencyMs?: number;
+            question: string;
+            /**
+             * @description pack: a ready answer from the downloaded pack; model: the on-device model; procedure: a procedure card from the pack.
+             * @enum {string}
+             */
+            source: "pack" | "model" | "procedure";
+            /** @description The pack topic the answer came from, when there was one. */
+            topicSlug?: string;
+        };
+        OfflineTurnResultDto: {
+            /** Format: uuid */
+            clientTurnId: string;
+            /** @description True when this clientTurnId was already recorded. */
+            duplicate: boolean;
+            /**
+             * Format: uuid
+             * @description The assistant turn recording this answer (the first post of this clientTurnId, for a repeat). Usable with POST /gear-guide/turns/:id/feedback.
+             */
+            turnId: string;
+        };
+        OfflineTurnsDto: {
+            /**
+             * @description Which client answered. Default ios.
+             * @enum {string}
+             */
+            channel?: "ios" | "android" | "web" | "siri";
+            /**
+             * Format: uuid
+             * @description Add the turns to this session of the caller's for this booking. Omitted: a new session.
+             */
+            sessionId?: string;
+            /** @description In the order they were asked. clientTurnId is unique per post. */
+            turns: components["schemas"]["OfflineTurnDto"][];
+        };
+        OfflineTurnsResponseDto: {
+            /** @description Turns recorded by this post. */
+            accepted: number;
+            /** @description Turns already recorded by an earlier post. */
+            duplicates: number;
+            /** Format: uuid */
+            sessionId: string | null;
+            turns: components["schemas"]["OfflineTurnResultDto"][];
         };
         OtpSendDto: {
             /** @description The opaque login-challenge token. */
@@ -14347,6 +16009,8 @@ export interface components {
              * @description When the payout row was created.
              */
             createdAt: string;
+            /** @description SPLIT-1870: true while the payout is saved and waiting for funds to settle on our side (nothing for the vendor to do). */
+            delayed: boolean;
             /** @description Human-readable description, or null. */
             description?: string | null;
             /** @description Failure reason when the payout failed, or null. */
@@ -14375,6 +16039,11 @@ export interface components {
              * @enum {string}
              */
             status: "pending" | "processing" | "completed" | "failed" | "cancelled";
+            /**
+             * @description SPLIT-1870: "Delayed, no action needed" while `delayed` is true, otherwise null.
+             * @example Delayed, no action needed
+             */
+            statusNote: string | null;
         };
         PayoutDetailResponseDto: {
             payout: components["schemas"]["PayoutDetailDto"];
@@ -14405,6 +16074,8 @@ export interface components {
              * @description When the payout row was created.
              */
             createdAt: string;
+            /** @description SPLIT-1870: true while the payout is saved and waiting for funds to settle on our side (nothing for the vendor to do). */
+            delayed: boolean;
             /** @description Human-readable description, or null. */
             description?: string | null;
             /**
@@ -14431,6 +16102,11 @@ export interface components {
              * @enum {string}
              */
             status: "pending" | "processing" | "completed" | "failed" | "cancelled";
+            /**
+             * @description SPLIT-1870: "Delayed, no action needed" while `delayed` is true, otherwise null.
+             * @example Delayed, no action needed
+             */
+            statusNote: string | null;
         };
         PlanTripDto: {
             /**
@@ -14479,13 +16155,15 @@ export interface components {
             pending: number;
             /** @description Up to 200 reserved rows, oldest rental end date first (experience rows last). */
             reservedBreakdown: components["schemas"]["ReservedVendorPayoutRowDto"][];
-            /** @description How many rows the reservedVendorPayout/reservedTax sums cover. */
+            /** @description How many captured charges still await a vendor transfer (the rows reservedTax and the breakdown cover). */
             reservedCount: number;
-            /** @description SPLIT audit 2026-09-07 fix-3b: unremitted Stripe Tax collected on the SAME reserved rows, owed to a tax authority, never Splitt's to withdraw. */
+            /** @description SPLIT-1836: what Splitt owes on gift cards (every Splitt Credit balance plus the face value of paid-for cards nobody has claimed yet), in dollars. Kept in the balance: the credit-funded vendor payouts are paid from it (the reserve model). */
+            reservedGiftCardLiability: number;
+            /** @description SPLIT audit 2026-09-07 fix-3b: unremitted Stripe Tax collected on the captured charges still awaiting a vendor transfer (the breakdown's rows), owed to a tax authority, never Splitt's to withdraw. */
             reservedTax: number;
-            /** @description Sum of every untransferred vendor/host cut (rental + experience; SPLIT audit 2026-09-07 fix-1), over ALL rows (not just the capped breakdown below). */
+            /** @description What Splitt owes its payees: the sum of every vendor and experience-host ledger balance, floored at 0 per payee (SPLIT-1780). Shares kept on cancelled bookings and the remainder of a partial withdrawal count; shares already transferred do not. */
             reservedVendorPayout: number;
-            /** @description available minus reservedVendorPayout minus reservedTax minus inFlightPlatformPayout, clamped at zero. The ceiling the POST route enforces. */
+            /** @description available minus reservedVendorPayout minus reservedTax minus inFlightPlatformPayout minus reservedGiftCardLiability, clamped at zero. The ceiling the POST route enforces. */
             safeAmount: number;
             /** @description Always true on a 200. */
             success: boolean;
@@ -14555,6 +16233,8 @@ export interface components {
              * @enum {string}
              */
             reasonCode?: "early_return" | "unused_days" | "service_issue" | "goodwill" | "overcharge" | "other";
+            /** @description REQUIRED (SPLIT-1876; 400 without it). A client-generated id for THIS refund request: send a fresh UUID each time the refund form is submitted. A retry of the same request sends the same id and is answered with the refund it already made (no second refund, whatever the booking was paid with); two different refunds, even of the same amount minutes or months apart, send different ids and are both issued. Reusing an id with a different amount is a 409 (REFUND_REQUEST_ID_REUSED). */
+            requestId: string;
         };
         PromoCode: {
             code: string;
@@ -14698,6 +16378,10 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        QuirkChipDto: {
+            id: string;
+            title: string;
+        };
         QuoteBookingDto: {
             bringingPets?: boolean;
             deliveryRequested?: boolean;
@@ -14832,6 +16516,10 @@ export interface components {
         RejectBookingDto: {
             reason?: string;
         };
+        RejectGiftCardOrderDto: {
+            /** @example Card fingerprint seen on three accounts this week */
+            reason: string;
+        };
         RejectInsurancePolicyDto: {
             /** @description Reason for rejection, surfaced to the vendor. */
             rejectionReason: string;
@@ -14839,6 +16527,10 @@ export interface components {
         RejectVerificationDto: {
             /** @description Reason for rejection, surfaced to the user. */
             rejectionReason: string;
+        };
+        ReleaseCreditPayoutHoldDto: {
+            /** @example Dispute won; the booking was real and the vendor delivered. */
+            reason: string;
         };
         RenterBoaterLicenseDto: {
             expiresAt?: string | null;
@@ -14895,6 +16587,69 @@ export interface components {
             amount?: number;
             description?: string;
         };
+        RequestPayoutResponseDto: {
+            /**
+             * @description Of `notWithdrawnAmount`, dollars in a payout that is saved and will be sent automatically once funds settle.
+             * @example 0
+             */
+            delayedAmount: number;
+            /**
+             * @description Dollars asked for (or withdrawable, when no amount was given) that this request did not send, delayed ones included; they stay in the balance or in a saved payout. Server-computed.
+             * @example 28
+             */
+            notWithdrawnAmount: number;
+            /** @description The first payout of the request. Kept for compatibility: read `payouts` and the amounts for the whole outcome. */
+            payout: components["schemas"]["RequestedPayoutDto"];
+            /** @description Every payout this request minted or resumed (a card-funded one and a credit-funded one at most), card-funded first. */
+            payouts: components["schemas"]["RequestedPayoutDto"][];
+            /**
+             * @description Always true on success.
+             * @example true
+             */
+            success: boolean;
+            /**
+             * @description Dollars this request sent (the payouts that completed), server-computed.
+             * @example 60
+             */
+            withdrawnAmount: number;
+        };
+        RequestedPayoutDto: {
+            /**
+             * Format: decimal
+             * @description Gross payout amount (DECIMAL string).
+             * @example 195.00
+             */
+            amount: string;
+            /**
+             * Format: date-time
+             * @description When the payout row was created.
+             */
+            createdAt: string;
+            /** @description True while the payout is saved and waiting for funds to settle on our side (nothing for the vendor to do). */
+            delayed: boolean;
+            /** @description Payout id. */
+            id: string;
+            /**
+             * Format: decimal
+             * @description Net amount after fee (DECIMAL string).
+             * @example 195.00
+             */
+            netAmount: string;
+            /**
+             * @description Payout status.
+             * @enum {string}
+             */
+            status: "pending" | "processing" | "completed" | "failed" | "cancelled";
+            /**
+             * @description "Delayed, no action needed" while `delayed` is true, otherwise null.
+             * @example Delayed, no action needed
+             */
+            statusNote: string | null;
+        };
+        ResendVerificationDto: {
+            /** @description Safe in-app relative path to land on after verifying (starts with a single "/"). An unsafe value is silently dropped. */
+            returnTo?: string;
+        };
         ReservedVendorPayoutRowDto: {
             /** @description The rental booking or experience booking id the cut belongs to. See `bookingKind`. */
             bookingId: string;
@@ -14922,6 +16677,14 @@ export interface components {
             newPassword: string;
             /** @description Password reset token from email */
             token: string;
+        };
+        ResolveBouncedRefundDto: {
+            /** @example true */
+            guestAgreed?: boolean;
+            /** @enum {string} */
+            method: "outside_stripe" | "splitt_credit";
+            /** @example Bank transfer 2026-11-05, ref 88213 */
+            reference?: string;
         };
         ResolveClaimDto: {
             /** @description Amount approved to capture (required for approved/partial; ignored/forced to 0 for denied). */
@@ -14996,7 +16759,7 @@ export interface components {
         };
         RoutePoiDto: {
             /** @enum {string} */
-            kind: "fuel" | "water" | "trailhead" | "parking" | "viewpoint" | "restroom" | "camping" | "hazard" | "food" | "repair" | "rest" | "launch" | "custom";
+            kind: "rest" | "fuel" | "water" | "trailhead" | "parking" | "viewpoint" | "restroom" | "camping" | "hazard" | "food" | "repair" | "launch" | "custom";
             lat: number;
             lng: number;
             name: string;
@@ -15176,6 +16939,12 @@ export interface components {
         SetVisibilityDto: {
             isHidden: boolean;
         };
+        SettleGiftCardRefundDto: {
+            /** @example Stripe refuses another refund to this card. */
+            reason: string;
+            /** @example Bank transfer 2026-11-12, ref 88213 */
+            reference: string;
+        };
         SignVendorWaiverDto: {
             signature: string;
             /**
@@ -15283,6 +17052,11 @@ export interface components {
             description?: string;
             minAmount: number;
             rate: number;
+        };
+        TopicChipDto: {
+            exampleQuestions: string[];
+            slug: string;
+            title: string;
         };
         TrackConsentDto: {
             analytics: boolean;
@@ -15395,7 +17169,7 @@ export interface components {
             /** @enum {string} */
             metric: "LCP" | "CLS" | "INP" | "FCP" | "TTFB";
             /** @enum {string} */
-            route: "other" | "/" | "/rentals" | "/rentals/[id]" | "/packages" | "/packages/[id]" | "/checkout/[bookingId]" | "/checkout/success" | "/login" | "/register" | "/plan-a-trip" | "/blog" | "/about" | "/partners" | "/profile" | "/bookings" | "/favorites" | "/notifications";
+            route: "other" | "/" | "/bookings" | "/rentals" | "/rentals/[id]" | "/packages" | "/packages/[id]" | "/checkout/[bookingId]" | "/checkout/success" | "/login" | "/register" | "/plan-a-trip" | "/blog" | "/about" | "/partners" | "/profile" | "/favorites" | "/notifications";
             /**
              * @description The raw metric value in its native unit (ms for LCP/INP/FCP/TTFB,
              *     ×1000-scaled CLS — see `vitals-thresholds.ts`). Upper-bounded at one
@@ -15428,10 +17202,10 @@ export interface components {
             id: string;
             /**
              * Format: decimal
-             * @description Platform commission fee (DECIMAL string).
+             * @description Platform commission fee (DECIMAL string). Admin only.
              * @example 195.00
              */
-            platformFee: string;
+            platformFee?: string;
             /**
              * Format: date-time
              * @description When the transaction was processed, or null.
@@ -15452,13 +17226,13 @@ export interface components {
              * @description Transaction type.
              * @enum {string}
              */
-            type: "payment" | "refund" | "payout" | "platform_fee" | "deposit" | "deposit_release" | "deposit_claim" | "date_change" | "incidental";
+            type: "payment" | "refund" | "payout" | "platform_fee" | "deposit" | "deposit_release" | "deposit_claim" | "date_change" | "incidental" | "gift_card_purchase";
             /**
              * Format: decimal
-             * @description Vendor payout share (DECIMAL string).
+             * @description Vendor payout share (DECIMAL string). Admin only.
              * @example 195.00
              */
-            vendorPayout: string;
+            vendorPayout?: string;
         };
         TransactionDetailResponseDto: {
             /**
@@ -15505,7 +17279,7 @@ export interface components {
              * @description Transaction type.
              * @enum {string}
              */
-            type: "payment" | "refund" | "payout" | "platform_fee" | "deposit" | "deposit_release" | "deposit_claim" | "date_change" | "incidental";
+            type: "payment" | "refund" | "payout" | "platform_fee" | "deposit" | "deposit_release" | "deposit_claim" | "date_change" | "incidental" | "gift_card_purchase";
         };
         TransactionalOverrideDto: {
             bodyHtml: string;
@@ -15653,18 +17427,18 @@ export interface components {
              * @description Rental end (full ISO date-time).
              */
             endDate: string;
-            /** @description Projected net payout (server-computed number). */
+            /** @description Projected net payout (server-computed number). For a captured booking, what the payout cron will transfer: the recorded vendor shares net of refunds and chargebacks; else the estimate at the current commission. */
             expectedNetPayout: number;
             /**
              * Format: date-time
-             * @description Projected release date (booking end + 1 day, ISO date-time).
+             * @description Earliest payout release (ISO date-time): PAYOUT_HOLD_DAYS after the end of the rental day, or after the latest post-trip credit when later (the payout hold clock).
              */
             expectedReleaseDate: string;
             /** @description Gross booking amount (server-computed number). */
             grossAmount: number;
             /** @description Listing name (falls back to "Unknown"). */
             listingName: string;
-            /** @description Projected platform fee (server-computed number). */
+            /** @description Projected platform fee (server-computed number): the recorded fee of a captured booking, else the estimate at the current commission. */
             platformFee: number;
             /**
              * Format: date-time
@@ -15708,6 +17482,7 @@ export interface components {
             /** @enum {string} */
             contentFormat?: "text" | "html";
             excerpt?: string;
+            /** Format: uri */
             imageUrl?: string;
             /** @enum {string} */
             status?: "draft" | "published" | "archived";
@@ -15832,6 +17607,24 @@ export interface components {
             yearFrom?: number;
             yearTo?: number;
         };
+        UpdateGiftCardSettingsDto: {
+            credit_account_cap?: number;
+            credit_payout_min_lot_age_days?: number;
+            /** @description 1 pauses Splitt Credit spending, 0 turns it back on. */
+            credit_spend_paused?: number;
+            gift_card_30d_cap?: number;
+            /**
+             * @description SPLIT-1868: US states where gift cards are not sold, two-letter codes separated by commas. An empty string clears the list (nothing blocked).
+             * @example NY,CA
+             */
+            gift_card_blocked_states?: string;
+            gift_card_daily_cap?: number;
+            gift_card_max?: number;
+            gift_card_min?: number;
+            gift_card_new_account_days?: number;
+            gift_card_pii_retention_months?: number;
+            gift_card_review_amount?: number;
+        };
         UpdateInsurancePolicyDto: Record<string, never>;
         UpdateListingDto: {
             addOns?: components["schemas"]["AddOnDto"][];
@@ -15905,6 +17698,10 @@ export interface components {
             pricingType?: string;
             requiresBoaterLicense?: boolean;
             requiresIdVerification?: boolean;
+            slotDurationMinutes?: number;
+            /** @enum {string} */
+            slotMode?: "fixed" | "flexible";
+            slotPrice?: number;
             /** @enum {string} */
             status?: "draft" | "available" | "unavailable" | "rented" | "archived";
             stayDetails?: components["schemas"]["StayDetailsDto"];
@@ -16007,6 +17804,8 @@ export interface components {
              * @example 2026-06-20
              */
             endDate?: string;
+            /** @description SPLIT-1945: absolute per-hour rate in USD for hourly rentals on the days this rule governs. Mutually exclusive with ratePct. */
+            hourlyRate?: number | null;
             /** @description Minimum nights required when this date is the CHECK-IN night. */
             minNights?: number | null;
             /** @description Vendor-facing label, e.g. "Summer peak". */
@@ -16017,6 +17816,8 @@ export interface components {
             priority?: number;
             /** @description Percentage adjustment against the listing base rate. Mutually exclusive with nightlyRate; setting it clears any stored nightlyRate. */
             ratePct?: number | null;
+            /** @description SPLIT-1948: absolute price per departure in USD for fixed-slot rentals on the days this rule governs. Mutually exclusive with ratePct. */
+            slotRate?: number | null;
             /**
              * Format: date
              * @description Inclusive first night the rule applies to.
@@ -16037,6 +17838,14 @@ export interface components {
         UpdateReviewDto: {
             comment?: string;
             rating?: number;
+        };
+        UpdateRewardProgramDto: {
+            isActive?: boolean;
+            minQualifyingSubtotal?: number | null;
+            minRedeemSubtotal?: number | null;
+            rentalsRequired?: number;
+            rewardAmount?: number;
+            rewardExpiryDays?: number | null;
         };
         UpdateRouteDto: {
             /** Format: uuid */
@@ -16071,6 +17880,15 @@ export interface components {
              * @example 8499.99
              */
             acquisitionValue?: number;
+            /**
+             * @description Fixed departure times for this unit (HH:MM, 24h, listing-local).
+             * @example [
+             *       "13:00",
+             *       "15:30",
+             *       "18:00"
+             *     ]
+             */
+            departureTimes?: string[] | null;
             /**
              * @description Hull Identification Number (boats, jet skis / PWC).
              * @example YAM12345D404
@@ -16278,6 +18096,14 @@ export interface components {
              */
             entitlements: string[];
             firstName: string;
+            /**
+             * Format: date-time
+             * @description SPLIT-1812 (epic SPLIT-1811) — set when a gift card this user bought was
+             *     charged back and lost, or by an admin: the user may no longer BUY gift
+             *     cards. Claiming and spending credit are unaffected. Admin-clearable, audited.
+             */
+            giftCardBlockedAt: string | null;
+            giftCardBlockedReason: string | null;
             id: string;
             isEmailVerified: boolean;
             isPhoneVerified: boolean;
@@ -16422,7 +18248,6 @@ export interface components {
             twoFactorEnrolledAt: string | null;
             /** Format: date-time */
             updatedAt: string;
-            vendorId: string;
             /**
              * @description SPLIT-260: RENTER → VENDOR onboarding pipeline state. Defaults to
              *     NOT_STARTED. ACTIVE is required before a vendor may create listings.
@@ -16536,23 +18361,23 @@ export interface components {
              */
             holdDays: number;
             /**
-             * @description totalEarnings − totalPayouts (server-computed).
+             * @description totalEarnings (already net of refund clawbacks and retained chargeback debits) − totalPayouts, rounded to cents (server-computed).
              * @example 440.5
              */
             netEarnings: number;
             /**
              * Format: decimal
-             * @description The vendor's pending balance, straight off the User DECIMAL column (string; 0 when the vendor row is missing).
+             * @description Projected net payout of the vendor's still-active (confirmed / pending) bookings: the pendingBalance of GET /vendor/payouts/upcoming.
              * @example 195.00
              */
             pendingBalance: string;
             /**
-             * @description Sum of completed vendor-payout shares (server-computed).
+             * @description Everything credited to the vendor's balance (rental captures, extensions, post-trip charges, approved damage claims) net of refund clawbacks and retained chargebacks; the reconciliation ledger definition (server-computed).
              * @example 1240.5
              */
             totalEarnings: number;
             /**
-             * @description Sum of completed payouts already paid out (server-computed).
+             * @description Sum of the payouts whose money has left the balance: PROCESSING (an automatic booking transfer sent to Stripe) and COMPLETED (server-computed).
              * @example 800
              */
             totalPayouts: number;
@@ -16569,6 +18394,85 @@ export interface components {
              * @example true
              */
             success: boolean;
+        };
+        VendorReward: {
+            /**
+             * Format: decimal
+             * @example 195.00
+             */
+            amount: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            earnedAt: string;
+            /** Format: date-time */
+            expiresAt: string | null;
+            /**
+             * Format: date-time
+             * @description Set when the customer has been told this reward is about to expire.
+             */
+            expiryReminderSentAt: string | null;
+            id: string;
+            programId: string;
+            /**
+             * Format: decimal
+             * @description What the reward actually took off that booking (≤ `amount`).
+             * @example 195.00
+             */
+            redeemedAmount?: string | null;
+            /** Format: date-time */
+            redeemedAt: string | null;
+            redeemedBookingId: string | null;
+            /** @enum {string} */
+            status: "available" | "reserved" | "redeemed" | "voided" | "expired";
+            /** Format: date-time */
+            updatedAt: string;
+            userId: string;
+            vendorId: string;
+            voidReason: string | null;
+            /** @description Admin who voided it, and why (audit). */
+            voidedById: string | null;
+        };
+        VendorRewardProgram: {
+            /** Format: date-time */
+            createdAt: string;
+            /** @description The admin or vendor who created the program (audit). */
+            createdById: string | null;
+            id: string;
+            isActive: boolean;
+            /**
+             * Format: decimal
+             * @description A completed rental counts only when its rental subtotal reached this.
+             * @example 195.00
+             */
+            minQualifyingSubtotal?: string | null;
+            /**
+             * Format: decimal
+             * @description A reward can be redeemed only on a rental subtotal of at least this.
+             * @example 195.00
+             */
+            minRedeemSubtotal?: string | null;
+            /** @description Completed rentals needed to earn one reward. 1..50. */
+            rentalsRequired: number;
+            /**
+             * Format: decimal
+             * @description Dollars off the rental base when the reward is redeemed.
+             * @example 195.00
+             */
+            rewardAmount: string;
+            /** @description Days an earned reward stays redeemable. NULL = it does not expire. */
+            rewardExpiryDays: number | null;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description The vendor (listing owner) whose listings earn and redeem. One program each. */
+            vendorId: string;
+        };
+        VendorUpdateRewardProgramDto: {
+            minQualifyingSubtotal?: number | null;
+            minRedeemSubtotal?: number | null;
+            rentalsRequired?: number;
+            rewardAmount?: number;
+            rewardExpiryDays?: number | null;
         };
         VendorWaiver: {
             content: string;
@@ -16593,6 +18497,9 @@ export interface components {
         VideoEmbedInputDto: {
             /** Format: uri */
             url: string;
+        };
+        VoidRewardDto: {
+            reason: string;
         };
         WaiverAgreement: {
             bookingId: string | null;
@@ -17898,6 +19805,28 @@ export interface operations {
             };
         };
     };
+    AdminGearModelController_acceptManual: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                manualId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     AdminGearModelController_manualSignedUrl: {
         parameters: {
             query?: never;
@@ -18054,6 +19983,711 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    AdminGiftCardReportsController_liability: {
+        parameters: {
+            query?: {
+                /** @description First month, YYYY-MM. */
+                from?: string;
+                /** @description Last month, YYYY-MM. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGiftCardReportsController_liabilityCsv: {
+        parameters: {
+            query?: {
+                /** @description First month, YYYY-MM. */
+                from?: string;
+                /** @description Last month, YYYY-MM. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
+                };
+            };
+        };
+    };
+    AdminGiftCardReportsController_salesByState: {
+        parameters: {
+            query?: {
+                /** @description First month, YYYY-MM. */
+                from?: string;
+                /** @description Last month, YYYY-MM. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGiftCardReportsController_salesByStateCsv: {
+        parameters: {
+            query?: {
+                /** @description First month, YYYY-MM. */
+                from?: string;
+                /** @description Last month, YYYY-MM. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
+                };
+            };
+        };
+    };
+    AdminGiftCardSettingsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGiftCardSettingsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateGiftCardSettingsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGiftCardsController_accountDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGiftCardCreditController_cashOut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminCashOutDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGiftCardsController_accountLedger: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGiftCardCreditController_listAdjustments: {
+        parameters: {
+            query?: {
+                status?: "pending" | "approved" | "rejected" | "expired";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGiftCardCreditController_requestAdjustment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCreditAdjustmentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGiftCardCreditController_approveAdjustment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminGiftCardActionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGiftCardCreditController_rejectAdjustment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminGiftCardActionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGiftCardsController_cardDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGiftCardsController_freezeLot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminGiftCardActionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGiftCardsController_cardLedger: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGiftCardsController_unfreezeLot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminGiftCardActionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGiftCardsController_lookup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminGiftCardLookupDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGiftCardsController_orderDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGiftCardsController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGiftCardsController_refundAfterDispute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GiftCardOrderDecisionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGiftCardsController_changeRecipient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminChangeGiftCardRecipientDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGiftCardsController_retryRefund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GiftCardOrderDecisionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGiftCardsController_settleRefund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettleGiftCardRefundDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGiftCardsController_reissue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GiftCardOrderDecisionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGiftCardsController_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectGiftCardOrderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGiftCardsController_resend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminGiftCardActionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGiftCardsController_voidOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminGiftCardActionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGiftCardsController_listPayoutHolds: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminGiftCardsController_releasePayoutHold: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transactionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReleaseCreditPayoutHoldDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminGiftCardsController_reviewQueue: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18284,6 +20918,46 @@ export interface operations {
             };
         };
     };
+    AdminPackageRefundsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminPackageRefundsController_resolve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveBouncedRefundDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AdminPackageStaffController_list: {
         parameters: {
             query?: {
@@ -18355,6 +21029,23 @@ export interface operations {
                 limit?: number;
                 offset?: number;
             };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_getPayoutTotals: {
+        parameters: {
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -18646,6 +21337,69 @@ export interface operations {
             };
         };
     };
+    AdminRentalRefundsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminRentalRefundsController_resolveOwed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveBouncedRefundDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminRentalRefundsController_resolve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                refundRowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveBouncedRefundDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     PlatformReportController_getBusinessData: {
         parameters: {
             query: {
@@ -18768,6 +21522,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminRewardsController_grant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantRewardRentalsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminRewardsController_listPrograms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    AdminRewardsController_createProgram: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRewardProgramDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorRewardProgram"];
+                };
+            };
+        };
+    };
+    AdminRewardsController_updateProgram: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRewardProgramDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorRewardProgram"];
+                };
+            };
+        };
+    };
+    AdminRewardsController_ledger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminRewardsController_voidReward: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidRewardDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorReward"];
                 };
             };
         };
@@ -20289,6 +23175,8 @@ export interface operations {
             query?: {
                 /** @description Optional absolute URL (max 4096 chars) the browser is sent back to after the provider round-trip, with code=<one-time exchange code> set on success or error=<code> on most failures (its own query string is preserved; a missing, expired or replayed state cannot recover the target and lands on the frontend instead). It must match an allow-listed destination: the FRONTEND_URL origin on its /auth/callback path, or an entry of SOCIAL_AUTH_RETURN_ORIGINS (an origin, optionally pinned to a path prefix). Anything else redirects to /login?error=invalid_return_to without starting the flow. Omit for the default frontend /auth/callback redirect. */
                 return_to?: string;
+                /** @description Optional login-CSRF nonce generated by the web frontend and kept in its sessionStorage (base64url, 16 to 128 chars). It is stored on the one-time state row and echoed as client_state=<value> on the redirect to the frontend /auth/callback (success and error), never on a return_to target outside it, so the frontend can refuse an exchange code from a flow it did not start. A malformed value redirects to /login?error=invalid_client_state without starting the flow. Omit when not starting from the web frontend (e.g. the hosted MCP sign-in). */
+                client_state?: string;
             };
             header?: never;
             path?: never;
@@ -20349,6 +23237,8 @@ export interface operations {
             query?: {
                 /** @description Optional absolute URL (max 4096 chars) the browser is sent back to after the provider round-trip, with code=<one-time exchange code> set on success or error=<code> on most failures (its own query string is preserved; a missing, expired or replayed state cannot recover the target and lands on the frontend instead). It must match an allow-listed destination: the FRONTEND_URL origin on its /auth/callback path, or an entry of SOCIAL_AUTH_RETURN_ORIGINS (an origin, optionally pinned to a path prefix). Anything else redirects to /login?error=invalid_return_to without starting the flow. Omit for the default frontend /auth/callback redirect. */
                 return_to?: string;
+                /** @description Optional login-CSRF nonce generated by the web frontend and kept in its sessionStorage (base64url, 16 to 128 chars). It is stored on the one-time state row and echoed as client_state=<value> on the redirect to the frontend /auth/callback (success and error), never on a return_to target outside it, so the frontend can refuse an exchange code from a flow it did not start. A malformed value redirects to /login?error=invalid_client_state without starting the flow. Omit when not starting from the web frontend (e.g. the hosted MCP sign-in). */
+                client_state?: string;
             };
             header?: never;
             path?: never;
@@ -20783,6 +23673,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BookingVerification"];
+                };
+            };
+        };
+    };
+    BookingVerificationController_getChecklistPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                index: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The booking verification checklist photo bytes, served with the content type sniffed from the stored file (inline for a recognised image/PDF, attachment otherwise). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "image/gif": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                };
+            };
+        };
+    };
+    BookingVerificationController_getPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                index: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The booking verification photo bytes, served with the content type sniffed from the stored file (inline for a recognised image/PDF, attachment otherwise). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "image/gif": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
                 };
             };
         };
@@ -21611,6 +24555,29 @@ export interface operations {
             };
         };
     };
+    CampaignsController_audienceRecipients: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AudienceSegmentCriteriaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     CampaignsController_audienceSegments: {
         parameters: {
             query?: never;
@@ -21693,44 +24660,6 @@ export interface operations {
             };
         };
     };
-    CampaignsController_recordClick: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    CampaignsController_recordConversion: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     CampaignsController_duplicate: {
         parameters: {
             query?: never;
@@ -21749,25 +24678,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Campaign"];
                 };
-            };
-        };
-    };
-    CampaignsController_recordOpen: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };
@@ -22266,6 +25176,33 @@ export interface operations {
             };
         };
     };
+    ClaimsController_getEvidence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                index: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The claim evidence document bytes, served with the content type sniffed from the stored file (inline for a recognised image/PDF, attachment otherwise). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "image/gif": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                };
+            };
+        };
+    };
     ClaimsController_resolve: {
         parameters: {
             query?: never;
@@ -22316,6 +25253,27 @@ export interface operations {
             };
         };
     };
+    ClaimsController_settle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DamageClaim"];
+                };
+            };
+        };
+    };
     ContactController_submit: {
         parameters: {
             query?: never;
@@ -22334,6 +25292,71 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    CreditController_balance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CreditController_ledger: {
+        parameters: {
+            query?: {
+                /** @description The `nextCursor` of the previous page. */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CreditController_stepUp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreditStepUpDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -22474,6 +25497,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Dispute"];
+                };
+            };
+        };
+    };
+    DisputesController_getEvidence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                index: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The dispute evidence document bytes, served with the content type sniffed from the stored file (inline for a recognised image/PDF, attachment otherwise). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "image/gif": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
                 };
             };
         };
@@ -22901,6 +25951,23 @@ export interface operations {
             };
         };
     };
+    EmailTemplatesController_seedSeasonal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     EmailTemplatesController_testSend: {
         parameters: {
             query?: never;
@@ -22943,7 +26010,7 @@ export interface operations {
                         /** @example Booking Confirmed (renter) */
                         name: string;
                         /**
-                         * @description SPLIT-1367: true for the code-owned SECURITY emails (password reset, email verification, 2FA code, account-deletion code, password-changed notice, account-exists notice). Their bodies carry one-time secrets, so the override routes answer 403 for EVERY caller including ADMIN, and delivery ignores any stored row. Clients must hide the customise/pause actions for these. Reset-to-default (DELETE) stays available so a row written before this rule can still be cleared.
+                         * @description SPLIT-1367: true for a code-owned email. The override routes answer 403 for EVERY caller including ADMIN, and delivery ignores any stored row. Clients must hide the customise/pause actions for these. Reset-to-default (DELETE) stays available so a row written before the lock can still be cleared. SPLIT-1382: false for every email today (the security emails are editable again).
                          * @example false
                          */
                         nonOverridable: boolean;
@@ -22960,6 +26027,13 @@ export interface operations {
                         } | null;
                         /** @enum {string} */
                         persona: "renter" | "vendor" | "user" | "both";
+                        /**
+                         * @description SPLIT-1382: the one-time secrets this email delivers (the sign-in code, the account-deletion code, the reset and verification links). An override must show each one in its HTML body, as the whole href of a link or as a word on its own, and may not contain the sample value; otherwise the save is a 400 carrying `missingVariables` / `restrictedPlacements`. Seed an editor with these as `{{tokens}}` (preview `props`). Empty for every other email.
+                         * @example [
+                         *       "code"
+                         *     ]
+                         */
+                        requiredVariables: string[];
                         /** @description The DEFAULT builder subject rendered with sample data. */
                         sampleSubject: string;
                         trigger: string;
@@ -23249,6 +26323,8 @@ export interface operations {
                 lng?: number;
                 lat?: number;
                 location?: string;
+                /** @description Only this vendor's packages. */
+                vendorId?: string;
                 category?: "tours" | "stays" | "food" | "outdoor" | "arts" | "fitness" | "wellness" | "music" | "sports" | "workshop" | "photography" | "other";
             };
             header?: never;
@@ -24404,6 +27480,25 @@ export interface operations {
             };
         };
     };
+    GearGuideAskController_availabilityFor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearGuideAvailabilityDto"];
+                };
+            };
+        };
+    };
     GearGuideAskController_ask: {
         parameters: {
             query: {
@@ -24490,6 +27585,31 @@ export interface operations {
             };
         };
     };
+    GearGuideAskController_recordOffline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfflineTurnsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfflineTurnsResponseDto"];
+                };
+            };
+        };
+    };
     GearGuideAskController_topics: {
         parameters: {
             query?: never;
@@ -24506,7 +27626,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["GearGuideTopicsDto"];
                 };
             };
         };
@@ -25109,7 +28229,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BlobClientTokenRequestDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -25139,6 +28263,26 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    GearGuideController_withdrawManual: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                manualId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -25194,6 +28338,188 @@ export interface operations {
             };
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GiftCardRedeemController_claim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimGiftCardDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GiftCardsController_getConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GiftCardsController_listOrders: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GiftCardsController_createOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGiftCardOrderDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GiftCardsController_getOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GiftCardsController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GiftCardsController_resumeCheckout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GiftCardsController_changeRecipient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeGiftCardRecipientDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GiftCardsController_resend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -25365,6 +28691,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IncidentalCharge"];
+                };
+            };
+        };
+    };
+    IncidentalChargesController_getEvidence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                index: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The incidental charge evidence document bytes, served with the content type sniffed from the stored file (inline for a recognised image/PDF, attachment otherwise). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "image/gif": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
                 };
             };
         };
@@ -25599,6 +28952,8 @@ export interface operations {
     "ListingController_findAll[0]": {
         parameters: {
             query?: {
+                /** @description Only this vendor's listings. */
+                vendorId?: string;
                 search?: string;
                 category?: string;
                 /**
@@ -25766,6 +29121,8 @@ export interface operations {
     "ListingController_getFacets[0]": {
         parameters: {
             query?: {
+                /** @description Only this vendor's listings. */
+                vendorId?: string;
                 search?: string;
                 category?: string;
                 /**
@@ -26924,6 +30281,8 @@ export interface operations {
                 lng?: number;
                 lat?: number;
                 location?: string;
+                /** @description Only this vendor's packages. */
+                vendorId?: string;
                 category?: "tours" | "stays" | "food" | "outdoor" | "arts" | "fitness" | "wellness" | "music" | "sports" | "workshop" | "photography" | "other";
             };
             header?: never;
@@ -28288,6 +31647,8 @@ export interface operations {
     "ListingController_findAll[1]": {
         parameters: {
             query?: {
+                /** @description Only this vendor's listings. */
+                vendorId?: string;
                 search?: string;
                 category?: string;
                 /**
@@ -28455,6 +31816,8 @@ export interface operations {
     "ListingController_getFacets[1]": {
         parameters: {
             query?: {
+                /** @description Only this vendor's listings. */
+                vendorId?: string;
                 search?: string;
                 category?: string;
                 /**
@@ -29532,6 +32895,63 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    RewardsController_applicable: {
+        parameters: {
+            query: {
+                listingId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RewardsController_mine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    RewardsController_programForListing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -30832,7 +34252,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResendVerificationDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -31639,7 +35063,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RequestPayoutResponseDto"];
+                };
             };
         };
     };
@@ -31760,6 +35186,48 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    VendorRewardsController_overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    VendorRewardsController_updateProgram: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VendorUpdateRewardProgramDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorRewardProgram"];
+                };
             };
         };
     };
@@ -32134,7 +35602,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BlobClientTokenRequestDto"];
+            };
+        };
         responses: {
             201: {
                 headers: {

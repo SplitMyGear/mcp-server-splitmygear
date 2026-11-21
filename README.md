@@ -2,7 +2,7 @@
 
 The official MCP (Model Context Protocol) server for [Splitt](https://go-splitt.com), the outdoor gear rental marketplace. It lets AI assistants (ChatGPT, Claude, Cursor, Windsurf, custom agents) act for Splitt **renters** and **vendors**: search and book gear and experiences, manage bookings, message the other party, list and price gear, run a vendor's calendar and see payouts. Everything a person can do in the Splitt web app that makes sense for an agent, with the same permissions.
 
-- **219 tools**, filtered by who is signed in and what they granted (see [docs/mcp-tools.md](docs/mcp-tools.md))
+- **230 tools**, filtered by who is signed in and what they granted (see [docs/mcp-tools.md](docs/mcp-tools.md))
 - **Sign in with your Splitt account** from any OAuth-capable MCP client (OAuth 2.1 + PKCE; email one-time-code 2FA; Continue with Google / Apple)
 - **Scoped access**: clients may request a subset of 12 scopes (`read profile bookings favorites messaging reviews listings vendor_bookings experiences finance claims files`); the sign-in page shows exactly what the app will be able to do, and tools outside the granted scopes are neither listed nor callable
 - **Thin, stateless client of the Splitt backend REST API**: no database or payment credentials live here ([ADR 0001](docs/adr/0001-mcp-is-a-backend-rest-client.md), [ADR 0002](docs/adr/0002-oauth-login-for-mcp-clients.md))

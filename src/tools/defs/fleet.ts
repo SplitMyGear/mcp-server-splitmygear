@@ -7,10 +7,12 @@ import { z } from 'zod';
 import { defineTool, fail, fromResult } from '../registry';
 import { fleetTools as fleet } from '../fleet';
 import { dateError } from '../_shared';
-import { uuid, isoDate, httpsUrl, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, token } from './common';
+import { uuid, isoDate, httpsUrl, HHMM, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, token } from './common';
 
 /** Mirrors the backend's MAX_UNIT_YEAR (next year's models ship early). */
 const MAX_UNIT_YEAR = new Date().getFullYear() + 1;
+/** Mirrors the backend's MAX_DEPARTURES_PER_UNIT (listing/fixed-slots.ts). */
+const MAX_DEPARTURES_PER_UNIT = 24;
 
 /**
  * Units with a reference to their listing instead of the whole listing. Fleet
@@ -48,6 +50,15 @@ const unitFields = {
   model: z.string().min(1).max(64).optional(),
   year: z.number().int().min(1950).max(MAX_UNIT_YEAR).optional().describe('Model year.'),
   acquisitionValue: z.number().min(0).max(10000000).optional().describe('What the vendor paid for this unit, in USD (insurance/claims basis).'),
+  departureTimes: z
+    .array(z.string().regex(HHMM, 'Use HH:MM, 24-hour.'))
+    .max(MAX_DEPARTURES_PER_UNIT)
+    .nullable()
+    .optional()
+    .describe(
+      'Fixed-departure listings: the times this unit leaves each day, HH:MM 24-hour in the listing\'s local time, e.g. ["09:00", "13:00"] (at most 24). ' +
+        'Departures must be at least the listing\'s slotDurationMinutes apart and finish before midnight. Splitt removes duplicates and sorts them. Renters can only book these times. null or [] clears them.',
+    ),
 };
 
 // ── Reads ────────────────────────────────────────────────────────────────────
@@ -70,7 +81,7 @@ export const listFleetUnits = defineTool({
   title: 'List fleet units',
   description:
     'The physical units behind the vendor\'s listings, each with id, label, serial number, status, asset identity (VIN/HIN/registration, make, model, year), ' +
-    'accumulated rental hours, maintenance interval and last maintenance date. Pass listingId for one listing\'s units; omit it to get every listing the vendor owns with its units. ' +
+    'accumulated rental hours, maintenance interval, last maintenance date and, on a fixed-departure listing, departureTimes. Pass listingId for one listing\'s units; omit it to get every listing the vendor owns with its units. ' +
     'Unit ids from here feed update_fleet_unit, delete_fleet_unit, log_unit_maintenance, get_unit_maintenance_history and get_unit_stats.',
   access: 'vendor',
   scope: 'listings',
@@ -146,7 +157,7 @@ export const updateFleetUnit = defineTool({
   title: 'Update fleet unit',
   description:
     'Change one fleet unit: set status to "maintenance" or "retired" to pull it from bookable capacity, or back to "available"; or edit its label, serial number, notes, ' +
-    'maintenance interval and asset identity (VIN/HIN, registration, make, model, year, acquisitionValue). Only the fields you pass change. ' +
+    'maintenance interval and asset identity (VIN/HIN, registration, make, model, year, acquisitionValue), or, on a fixed-departure listing, set the unit\'s departureTimes (the times renters can book it). Only the fields you pass change. ' +
     'The "rented" status is managed by bookings and cannot be set here. Retiring keeps the unit and its history; use delete_fleet_unit only for units created by mistake.',
   access: 'vendor',
   scope: 'listings',
@@ -157,7 +168,7 @@ export const updateFleetUnit = defineTool({
   },
   annotations: WRITE_IDEMPOTENT,
   handler: async ({ unitId, ...rest }, ctx) => {
-    if (Object.values(rest).every((v) => v === undefined)) return fail('Pass at least one field to update (status, label, serialNumber, notes, ...).');
+    if (Object.values(rest).every((v) => v === undefined)) return fail('Pass at least one field to update (status, label, serialNumber, notes, departureTimes, ...).');
     return fromResult(await fleet.updateUnit(token(ctx), unitId, rest), withListingRefs);
   },
 });

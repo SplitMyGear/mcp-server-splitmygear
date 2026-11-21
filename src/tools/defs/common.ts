@@ -24,6 +24,8 @@ export const uuid = (what: string) => z.guid().describe(`The ${what} id (UUID).`
  */
 export const httpsUrl = (max: number, message?: string) => z.string().startsWith('https://', message).check(z.url()).max(max);
 export const isoDate = (what: string) => z.string().min(8).max(40).describe(`${what} as an ISO date, e.g. 2026-07-04 (or a full ISO timestamp).`);
+/** HH:MM, 24-hour (00:00 to 23:59), the backend's HHMM_REGEX. */
+export const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 export const pagination = {
   limit: z.number().int().min(1).max(100).optional().describe('Max items to return (1–100, default 50).'),
   offset: z.number().int().min(0).optional().describe('Items to skip, for paging (default 0).'),

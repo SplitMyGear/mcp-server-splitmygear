@@ -6,7 +6,7 @@
  */
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
 
-export type Result<T> = { ok: true; data: T } | { ok: false; error: string; status?: number };
+export type Result<T> = { ok: true; data: T } | { ok: false; error: string; status?: number; code?: string };
 
 export interface CallOptions {
   token?: string;
@@ -26,7 +26,7 @@ export async function call<T = unknown>(
   } catch (error) {
     if (error instanceof BackendApiError) {
       if (error.status === 504 && method !== 'GET') return { ok: false, error: UNCONFIRMED_WRITE, status: 504 };
-      return { ok: false, error: error.message, status: error.status };
+      return error.code ? { ok: false, error: error.message, status: error.status, code: error.code } : { ok: false, error: error.message, status: error.status };
     }
     return { ok: false, error: 'Unexpected error talking to Splitt' };
   }

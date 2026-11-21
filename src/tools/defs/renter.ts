@@ -14,7 +14,7 @@ import { contentTools } from '../content';
 import { dateRangeError } from '../_shared';
 import { confirmInWebApp, bookingConfirmUrl } from '../confirm-in-web';
 import { isVendorFamily } from '@/lib/roles';
-import { uuid, isoDate, pagination, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, PROTECTION_PLANS, UNTRUSTED_NOTE, token } from './common';
+import { uuid, isoDate, HHMM, pagination, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, PROTECTION_PLANS, UNTRUSTED_NOTE, token } from './common';
 
 // ── Account ──────────────────────────────────────────────────────────────────
 
@@ -115,13 +115,26 @@ export const createBooking = defineTool({
   description:
     'Create a rental booking for the signed-in renter. Splitt prices it server-side (same as get_booking_quote) and creates a DRAFT that is only confirmed once paid. ' +
     'By default this also opens Stripe Checkout and returns `paymentUrl`; give that link to the renter to complete payment (never collect card details yourself). ' +
+    'Day or night rentals: pass checkIn and checkOut. Hourly rentals: pass checkIn (the day) with startTime and endTime, and leave checkOut out. ' +
+    'Fixed-departure listings (slotMode fixed, e.g. boat tours) sell only their published departures: get them with list_departures, then pass checkIn and the departure\'s startTime ' +
+    '(endTime is filled in from the departure). Any other time is refused before anything is booked, with the departures still open that day. ' +
     'Check availability first. Vendors cannot book rentals.',
   access: 'renter',
   scope: 'bookings',
   inputSchema: {
     listingId: uuid('listing'),
-    checkIn: isoDate('Rental start date'),
-    checkOut: isoDate('Rental end date'),
+    checkIn: isoDate('Rental start date (the day of an hourly or fixed-departure booking)'),
+    checkOut: isoDate('Rental end date; leave out for an hourly or fixed-departure booking').optional(),
+    startTime: z
+      .string()
+      .regex(HHMM, 'Use HH:MM, 24-hour.')
+      .optional()
+      .describe('HH:MM, 24-hour, the listing\'s local time: the start of an hourly booking, or the departure time on a fixed-departure listing (from list_departures).'),
+    endTime: z
+      .string()
+      .regex(HHMM, 'Use HH:MM, 24-hour.')
+      .optional()
+      .describe('HH:MM, 24-hour: the end of an hourly booking (same day). On a fixed-departure listing leave it out; it is taken from the departure.'),
     protectionPlan: z.enum(PROTECTION_PLANS).optional().describe('Damage-protection plan (default none). Can be changed with set_booking_protection before paying.'),
     quantity: z.number().int().min(1).max(10).optional().describe('Units of this listing (default 1).'),
     numberOfGuests: z.number().int().min(1).max(200).optional(),
@@ -133,13 +146,18 @@ export const createBooking = defineTool({
   },
   annotations: WRITE,
   handler: async (args, ctx) => {
-    const err = dateRangeError(args.checkIn, args.checkOut);
-    if (err) return fail(err);
+    const timed = args.startTime !== undefined || args.endTime !== undefined;
+    if (!timed) {
+      if (args.checkOut === undefined) return fail('Pass checkOut (the return day), or startTime for an hourly or fixed-departure booking.');
+      const err = dateRangeError(args.checkIn, args.checkOut);
+      if (err) return fail(err);
+    }
     const result = await bookingTools.createBooking({ ...args, token: token(ctx) });
     if (!result.success) return fail(result.error ?? 'Failed to create booking');
     return ok({
       booking: result.booking,
       quote: result.quote,
+      departure: result.departure,
       paymentUrl: result.paymentUrl,
       paymentError: result.paymentError,
       nextStep: result.paymentUrl

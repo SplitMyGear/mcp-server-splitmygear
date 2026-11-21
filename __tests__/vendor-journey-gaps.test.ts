@@ -179,8 +179,10 @@ describe('stays and the "both" booking type can be created', () => {
     expect(result.isError).toBeUndefined();
   });
 
-  it('rate rules say they are for stays and send gear to dynamic pricing', () => {
-    expect(createRateRule.description).toMatch(/daily, hourly or both/);
+  it('rate rules work on gear too (SPLIT-1947) and say which rate fits which listing type', () => {
+    expect(createRateRule.description).toMatch(/every listing type/);
+    expect(createRateRule.description).toMatch(/nightlyRate is the price per day on daily and both listings/);
+    expect(createRateRule.description).toMatch(/slotRate is the price per departure/);
     expect(createRateRule.description).toContain('set_dynamic_pricing_config');
   });
 });

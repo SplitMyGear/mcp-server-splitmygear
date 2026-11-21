@@ -45,6 +45,17 @@ describe('backendRequest', () => {
     });
   });
 
+  it('keeps the backend error code when the envelope carries one (SPLIT-1949), and leaves it unset otherwise', async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse(false, 400, { statusCode: 400, message: 'This listing runs on fixed departure times. Choose one of the listed departures.', code: 'FIXED_SLOT_REQUIRED' }),
+    );
+    await expect(backendRequest('POST', '/bookings', { body: {} })).rejects.toMatchObject({ status: 400, code: 'FIXED_SLOT_REQUIRED' });
+    mockFetch.mockResolvedValueOnce(makeResponse(false, 400, { message: 'nope', code: 42 }));
+    const err = await backendRequest('POST', '/bookings', { body: {} }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(BackendApiError);
+    expect((err as BackendApiError).code).toBeUndefined();
+  });
+
   it('joins an array validation message', async () => {
     mockFetch.mockResolvedValue(makeResponse(false, 400, { message: ['a must be a UUID', 'b is required'] }));
     await expect(backendRequest('POST', '/bookings', { body: {} })).rejects.toThrow('a must be a UUID; b is required');
