@@ -12,6 +12,13 @@ import { isoDay, pageBlackouts, shiftDay, toInclusiveBlackout } from '../blackou
 import { uuid, isoDate, pagination, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, LISTING_CATEGORIES, CANCELLATION_POLICIES, UNTRUSTED_NOTE, token } from './common';
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Mirrors the backend's listing/fixed-slots.ts. */
+const SLOT_MODES = ['flexible', 'fixed'] as const;
+const SLOT_DURATION_MIN_MINUTES = 15;
+const SLOT_DURATION_MAX_MINUTES = 24 * 60;
+const SLOT_DURATION_STEP_MINUTES = 5;
+const SLOT_STAFF_NOTE = 'vendor_staff seats cannot change it (Splitt returns 403).';
 const stayTime = (what: string) =>
   z.string().regex(HHMM, 'Use HH:MM, 24-hour.').optional().describe(`Stays only: ${what}, HH:MM 24-hour, the listing's local time (a default for the category applies when left out).`);
 
@@ -73,7 +80,45 @@ const listingFields = {
     .describe('Replacement value in USD (drives protection pricing). Required for motorized categories: E-Bikes, Boating, Water Sports, RV and ATVs.'),
   weeklyDiscountPct: z.number().min(0).max(100).optional(),
   monthlyDiscountPct: z.number().min(0).max(100).optional(),
+  // SPLIT-1949 (backend SPLIT-1948): fixed departures. Coherence is checked by
+  // the backend on the merged row (assertFixedSlotConfig); all three are gated
+  // behind the change_pricing seat capability like the prices.
+  slotMode: z
+    .enum(SLOT_MODES)
+    .optional()
+    .describe(
+      'Hourly listings only. flexible (the default): the renter picks any start and end time. fixed: the renter can only book the departure times each fleet unit publishes ' +
+        '(set them with update_fleet_unit departureTimes), every rental lasts slotDurationMinutes and costs slotPrice. Switching to fixed needs bookingType hourly, slotDurationMinutes and slotPrice. ' +
+        'Not allowed on a stay. ' + SLOT_STAFF_NOTE,
+    ),
+  slotDurationMinutes: z
+    .number()
+    .int()
+    .min(SLOT_DURATION_MIN_MINUTES)
+    .max(SLOT_DURATION_MAX_MINUTES)
+    .multipleOf(SLOT_DURATION_STEP_MINUTES)
+    .optional()
+    .describe('Fixed departures: how long every rental lasts, 15 to 1440 minutes in 5-minute steps (e.g. 90). Each unit\'s departures must be at least this far apart. ' + SLOT_STAFF_NOTE),
+  slotPrice: z
+    .number()
+    .min(0)
+    .max(100_000)
+    .multipleOf(0.01)
+    .optional()
+    .describe('Fixed departures: the price of one departure in USD (per unit). Rate rules can override it per day with slotRate. ' + SLOT_STAFF_NOTE),
 };
+
+/** The fixed-departure fields a create or update sets, checked as far as the request alone allows (Splitt checks the merged listing). */
+function fixedSlotError(args: { slotMode?: 'flexible' | 'fixed'; bookingType?: string; slotDurationMinutes?: number; slotPrice?: number }, creating: boolean): string | null {
+  if (args.slotMode !== 'fixed') return null;
+  if (creating ? args.bookingType !== 'hourly' : args.bookingType !== undefined && args.bookingType !== 'hourly') {
+    return 'Fixed departures (slotMode fixed) are only available on hourly listings: set bookingType hourly.';
+  }
+  if (creating && args.slotDurationMinutes === undefined) return 'Fixed departures need slotDurationMinutes, how long every rental lasts (15 to 1440 minutes, in 5-minute steps).';
+  if (creating && !(typeof args.slotPrice === 'number' && args.slotPrice > 0)) return 'Fixed departures need slotPrice, the price of one departure (above 0).';
+  if (args.slotPrice !== undefined && !(args.slotPrice > 0)) return 'slotPrice must be above 0 on a fixed-departure listing.';
+  return null;
+}
 
 // ── Listings ─────────────────────────────────────────────────────────────────
 
@@ -99,7 +144,7 @@ export const createListing = defineTool({
   title: 'Create a listing',
   description:
     'Create a new listing (gear, or a stay with bookingType nightly) for the signed-in vendor. It starts as an UNPUBLISHED draft; review it, then call set_listing_published. ' +
-    'Required to create: name, description and a price in USD (pricePerDay, or pricePerHour for hourly gear); motorized categories (E-Bikes, Boating, Water Sports, RV, ATVs) also need estimatedValue. ' +
+    'Required to create: name, description and a price in USD (pricePerDay, or pricePerHour for hourly gear, or slotPrice with slotMode fixed); motorized categories (E-Bikes, Boating, Water Sports, RV, ATVs) also need estimatedValue. ' +
     'Publishing additionally needs a category, a location, a description of at least 20 characters and at least 3 photos (see set_listing_published). ' +
     'location is public: a city or area, never a street address. ' +
     'Creating can take up to about 30 seconds (Splitt writes a care guide and indexes the listing for search), and Splitt emails the vendor that the listing was received. ' +
@@ -121,6 +166,8 @@ export const createListing = defineTool({
   },
   annotations: WRITE,
   handler: async (args, ctx) => {
+    const slotError = fixedSlotError(args, true);
+    if (slotError) return fail(slotError);
     const priceError = missingPrice(args);
     if (priceError) return fail(priceError);
     if (args.bookingType === 'nightly') {
@@ -141,8 +188,10 @@ function optionalRangeError(startDate?: string, endDate?: string): string | null
 }
 
 /** The price a new listing of this booking type must carry, as a message, or null when it has it. */
-function missingPrice(args: { bookingType?: 'daily' | 'hourly' | 'both' | 'nightly'; pricePerDay?: number; pricePerHour?: number }): string | null {
+function missingPrice(args: { bookingType?: 'daily' | 'hourly' | 'both' | 'nightly'; pricePerDay?: number; pricePerHour?: number; slotMode?: 'flexible' | 'fixed' }): string | null {
   const { bookingType, pricePerDay, pricePerHour } = args;
+  // A fixed-departure listing is priced by slotPrice; Splitt derives the hourly equivalent itself.
+  if (bookingType === 'hourly' && args.slotMode === 'fixed') return null;
   if (bookingType === 'hourly') return pricePerHour === undefined ? 'An hourly listing needs pricePerHour.' : null;
   if (bookingType === 'both') return pricePerDay === undefined || pricePerHour === undefined ? 'bookingType both needs pricePerDay and pricePerHour.' : null;
   if (pricePerDay !== undefined) return null;
@@ -154,7 +203,9 @@ export const updateListing = defineTool({
   title: 'Update a listing',
   description:
     'Change any fields of one of the vendor\'s listings (only the fields you pass are changed). Use get_listing_details to see current values. ' +
-    'The number of units is not a listing field: use add_fleet_units and delete_fleet_unit. Changing the name or description can take up to about 30 seconds (Splitt re-indexes it for search).',
+    'The number of units is not a listing field: use add_fleet_units and delete_fleet_unit. ' +
+    'Fixed departures: set slotMode fixed with slotDurationMinutes and slotPrice on an hourly listing, then give each unit its departure times with update_fleet_unit (departureTimes); slotMode flexible switches back. ' +
+    'Changing the name or description can take up to about 30 seconds (Splitt re-indexes it for search).',
   access: 'vendor',
   scope: 'listings',
   inputSchema: {
@@ -175,6 +226,8 @@ export const updateListing = defineTool({
   annotations: WRITE_IDEMPOTENT,
   handler: async ({ listingId, ...rest }, ctx) => {
     if (Object.values(rest).every((v) => v === undefined)) return fail('Pass at least one field to update.');
+    const slotError = fixedSlotError(rest, false);
+    if (slotError) return fail(slotError);
     return fromResult(await vendorListingTools.updateListing(listingId, token(ctx), rest));
   },
 });

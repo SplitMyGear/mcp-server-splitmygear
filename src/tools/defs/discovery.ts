@@ -12,7 +12,8 @@ import { experienceCategorySchema } from '../experience-categories';
 import { BackendApiError } from '@/lib/backend-client';
 import { isVendorFamily } from '@/lib/roles';
 import { dateRangeError } from '../_shared';
-import { uuid, isoDate, READ, LISTING_CATEGORIES, PROTECTION_PLANS, UNTRUSTED_NOTE } from './common';
+import { FIXED_SLOT_REQUIRED, fixedSlotRequiredMessage, loadDayDepartures } from '../fixed-slots';
+import { uuid, isoDate, HHMM, READ, LISTING_CATEGORIES, PROTECTION_PLANS, UNTRUSTED_NOTE } from './common';
 
 export const searchListings = defineTool({
   name: 'search_listings',
@@ -20,6 +21,7 @@ export const searchListings = defineTool({
   description:
     'Search Splitt gear rentals (tents, bikes, kayaks, skis, RVs, cameras…) by natural-language query and/or filters. ' +
     'Returns one summary row per match: id, name, category, prices, location, rating, the vendor (owner), image count, first image and a short descriptionPreview. ' +
+    'A listing whose price changes by day (the vendor set weekday or seasonal rates) also has fromPrice, e.g. "from $45/day": the lowest rate it can be booked at; get_booking_quote gives the exact price for given dates. ' +
     'Use `query` for plain English ("lightweight 2-person tent near Seattle under $40/day"); combine with structured filters to narrow. ' +
     'Follow up with get_listing_details for full info and check_availability / get_booking_quote before booking. ' +
     UNTRUSTED_NOTE,
@@ -69,7 +71,8 @@ export const checkAvailability = defineTool({
   description:
     'Check whether a listing is free for a rental. checkIn is the first day; checkOut is the return day and is not part of the rental ' +
     '(checkIn 2027-03-01, checkOut 2027-03-03 covers Mar 1 and 2, and Mar 3 stays free), so checkOut must be after checkIn. ' +
-    'Returns available:true/false with a short reason. Use before creating a booking.',
+    'Returns available:true/false with a short reason. Use before creating a booking. ' +
+    'For an hourly or fixed-departure listing this answers for whole days only: use get_listing_calendar (busyWindows) or list_departures to pick a time.',
   access: 'public',
   scope: 'read',
   inputSchema: {
@@ -90,7 +93,10 @@ export const getListingCalendar = defineTool({
   name: 'get_listing_calendar',
   title: 'Get availability calendar',
   description:
-    'Day-by-day availability for a listing from `from` to `to`, both days included (max 92 days); use it to suggest alternative dates when the requested ones are taken.',
+    'Day-by-day availability for a listing from `from` to `to`, both days included (max 92 days); use it to suggest alternative dates when the requested ones are taken. ' +
+    'Each day has isAvailable and remainingUnits; hourly listings add busyWindows (HH:MM ranges already taken) and pricePerHour (that day\'s hourly rate after the vendor\'s rate rules); ' +
+    'fixed-departure listings add fixedSlots instead: every departure of the day as { startTime, endTime, remainingUnits, available, price } (price per unit for that day). ' +
+    'For one day\'s departures, list_departures is shorter.',
   access: 'public',
   scope: 'read',
   inputSchema: { listingId: uuid('listing'), from: isoDate('First day of the window'), to: isoDate('Last day of the window (included)') },
@@ -140,16 +146,21 @@ export const getBookingQuote = defineTool({
   name: 'get_booking_quote',
   title: 'Get a price quote',
   description:
-    'Server-authoritative price breakdown for a rental BEFORE booking: nightly rates, discounts, protection premium, add-ons, delivery, fees, deposit and total. ' +
+    'Server-authoritative price breakdown for a rental BEFORE booking: the same Splitt quote the website shows, so the totals match for the same listing and dates. ' +
+    'It has per-day rates (nightlyRates lists the days a vendor rate rule priced, with the rule name), discounts, protection premium, add-ons, delivery, fees, deposit and total; ' +
+    'an hourly or fixed-departure quote also has dayRate { unit (hour or slot), rate, ruleName }: the rate that governs that day. ' +
     'Works only for a published, Splitt-approved listing: a draft, unpublished, or moderation-pending/rejected listing answers not found, even for its own vendor. ' +
     'No booking is created. Use it to show the renter what they will pay; create_booking uses the same pricing. ' +
-    'startDate is the first day and endDate the return day, which is not charged (2027-03-01 to 2027-03-03 is 2 days or nights).',
+    'Day or night rentals: startDate is the first day and endDate the return day, which is not charged (2027-03-01 to 2027-03-03 is 2 days or nights). ' +
+    'Hourly rentals: startDate is the day, with startTime and endTime; leave endDate out. Fixed-departure listings: startDate and the departure\'s startTime and endTime from list_departures.',
   access: 'public',
   scope: 'read',
   inputSchema: {
     listingId: uuid('listing'),
-    startDate: isoDate('First day of the rental'),
-    endDate: isoDate('Return day (not charged)'),
+    startDate: isoDate('First day of the rental (the day of an hourly or fixed-departure rental)'),
+    endDate: isoDate('Return day (not charged); leave out for an hourly or fixed-departure rental').optional(),
+    startTime: z.string().regex(HHMM, 'Use HH:MM, 24-hour.').optional().describe('HH:MM, 24-hour, listing-local: start of an hourly rental, or the departure time on a fixed-departure listing.'),
+    endTime: z.string().regex(HHMM, 'Use HH:MM, 24-hour.').optional().describe('HH:MM, 24-hour: end of an hourly rental, or the departure\'s return time (list_departures).'),
     quantity: z.number().int().min(1).max(10).optional().describe('Units of this listing (default 1).'),
     numberOfGuests: z.number().int().min(1).max(200).optional(),
     protectionPlan: z.enum(PROTECTION_PLANS).optional().describe('Damage-protection plan to price in.'),
@@ -158,10 +169,29 @@ export const getBookingQuote = defineTool({
     bringingPets: z.boolean().optional(),
   },
   annotations: READ,
-  handler: async (args, ctx) => {
-    const err = dateRangeError(args.startDate, args.endDate);
-    if (err) return fail(err);
-    const result = await bookingTools.getQuote(args);
+  handler: async ({ endDate, ...args }, ctx) => {
+    const timed = args.startTime !== undefined || args.endTime !== undefined;
+    let day: string | null = null;
+    if (timed) {
+      if (args.startTime === undefined || args.endTime === undefined) return fail('An hourly or fixed-departure quote needs both startTime and endTime (list_departures gives both for a departure).');
+      day = isoDay(args.startDate);
+      if (!day) return fail(`Invalid startDate: "${args.startDate}". Use the day of the rental as YYYY-MM-DD.`);
+      if (endDate !== undefined && isoDay(endDate) !== day) return fail('An hourly or fixed-departure rental is a single day: leave endDate out or set it to startDate.');
+      if (args.endTime <= args.startTime) return fail('endTime must be after startTime (an hourly rental ends the same day).');
+    } else {
+      if (endDate === undefined) return fail('Pass endDate (the return day), or startTime and endTime for an hourly or fixed-departure rental.');
+      const err = dateRangeError(args.startDate, endDate);
+      if (err) return fail(err);
+    }
+    // An hourly window is stored as one day: endDate = startDate, as the web sends it.
+    const result = await bookingTools.getQuote(timed ? { ...args, startDate: day as string, endDate: day as string } : { ...args, endDate: endDate as string });
+    if (!result.ok && result.code === FIXED_SLOT_REQUIRED) {
+      // The listing runs on fixed departures: say which ones are open that day.
+      const target = day ?? isoDay(args.startDate);
+      const departures = target ? await loadDayDepartures(args.listingId, target) : null;
+      const slots = departures?.ok && departures.data.fixed ? departures.data.slots : undefined;
+      return fail(fixedSlotRequiredMessage(slots ? target : null, slots, args.quantity ?? 1));
+    }
     // POST /bookings/quote is anonymous-only and 404s a vendor's own unpublished
     // or unapproved listing; without this hint that reads as a bug, not a status
     // to fix (SPLIT-1608).
@@ -169,6 +199,30 @@ export const getBookingQuote = defineTool({
       return fail(`${withStatusHint(result.error, result.status)} ${QUOTE_MODERATION_HINT}`);
     }
     return fromResult(result);
+  },
+});
+
+export const listDepartures = defineTool({
+  name: 'list_departures',
+  title: 'List departure times',
+  description:
+    'The departures of a fixed-departure listing (slotMode fixed, e.g. a boat tour that leaves at 09:00 and 13:00) on one day: each with startTime, endTime, remainingUnits, available and price ' +
+    '(per unit, that day\'s price after the vendor\'s rate rules). Only these departures can be quoted or booked: pass the chosen startTime to get_booking_quote / create_booking. ' +
+    'Answers fixedDepartures false for a listing that does not run on fixed departures (book those by day, or by hour with any startTime/endTime).',
+  access: 'public',
+  scope: 'read',
+  inputSchema: { listingId: uuid('listing'), date: isoDate('The day to list departures for (YYYY-MM-DD, the listing\'s local day)') },
+  annotations: READ,
+  handler: async ({ listingId, date }) => {
+    const day = isoDay(date);
+    if (!day) return fail(`Invalid date: "${date}". Use YYYY-MM-DD.`);
+    const result = await loadDayDepartures(listingId, day);
+    if (!result.ok) return fail(withStatusHint(result.error, result.status));
+    if (!result.data.fixed) {
+      return ok({ date: day, fixedDepartures: false, note: 'This listing does not run on fixed departures; any window it is available for can be booked.' });
+    }
+    const { slots } = result.data;
+    return ok({ date: day, fixedDepartures: true, departures: slots, openCount: slots.filter((s) => s.available).length });
   },
 });
 
@@ -246,6 +300,7 @@ export const discoveryTools = [
   getListingDetails,
   checkAvailability,
   getListingCalendar,
+  listDepartures,
   getSimilarListings,
   getListingReviews,
   getBookingQuote,

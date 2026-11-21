@@ -38,6 +38,10 @@
       "description": "Get availability calendar"
     },
     {
+      "name": "list_departures",
+      "description": "List departure times"
+    },
+    {
       "name": "get_similar_listings",
       "description": "Find similar gear"
     },
@@ -611,7 +615,7 @@
     },
     {
       "name": "list_rate_rules",
-      "description": "List seasonal rate rules"
+      "description": "List rate rules"
     },
     {
       "name": "create_rate_rule",

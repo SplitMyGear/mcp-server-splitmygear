@@ -1,5 +1,5 @@
 /**
- * Vendor pricing tools: seasonal rate rules and dynamic pricing. Visible to
+ * Vendor pricing tools: rate rules (day, hour and departure rates, seasons) and dynamic pricing. Visible to
  * the vendor family only. Every pricing MUTATION additionally requires the
  * `change_pricing` vendor-seat capability on the backend (SPLIT-1369): owner
  * and manager seats have it, `vendor_staff` seats get a 403. Reads stay open
@@ -12,9 +12,19 @@ import { dateError, dateRangeError } from '../_shared';
 import { uuid, isoDate, READ, WRITE, WRITE_IDEMPOTENT, DESTRUCTIVE, LISTING_CATEGORIES, token } from './common';
 
 const STAFF_NOTE = 'Vendor owner and manager seats can change pricing; vendor_staff seats cannot (Splitt returns 403).';
-const NIGHTLY_NOTE =
-  'Seasonal rate rules apply to stays only (bookingType nightly); Splitt refuses them on gear listings (daily, hourly or both). ' +
-  'To price gear by weekday, season or demand, use dynamic pricing instead: set_dynamic_pricing_config (applyWeekendPremium, applySeasonalPricing), preview_dynamic_price, apply_dynamic_pricing.';
+/**
+ * SPLIT-1947 (backend SPLIT-1945/1948): rate rules are no longer stay-only.
+ * Which rate a rule may carry depends on the listing (RateRuleService
+ * .assertRuleFitsListing); Splitt refuses a field the listing cannot use.
+ */
+const RULES_NOTE =
+  'Rate rules work on every listing type: a weekday rate is a long range with a weekdayMask (e.g. every Saturday), a date override is a one-day range [D, D+1). ' +
+  'Which rate a rule may carry depends on the listing: nightlyRate is the price per day on daily and both listings (per night on a stay); hourlyRate is the price per hour on hourly and both listings ' +
+  'that do not run on fixed departures; slotRate is the price per departure on a fixed-departure listing; ratePct (a percentage of the base rate) works on any listing. ' +
+  'minNights and apply_starter_seasons are for stays (bookingType nightly) only. Splitt refuses a rate the listing cannot use. ' +
+  'A rule never changes a booking already made; quotes (get_booking_quote) and search (fromPrice) pick it up at once. ' +
+  'Automatic demand-based pricing is separate: set_dynamic_pricing_config (applyWeekendPremium, applySeasonalPricing).';
+const STAY_ONLY_NOTE = 'Starter seasons are for stays (bookingType nightly) only; Splitt refuses them on gear listings.';
 
 /** Rate rules may legitimately span several years (e.g. a multi-year "always" rule). */
 const MAX_RULE_SPAN_DAYS = 366 * 5;
@@ -35,7 +45,23 @@ const rateRuleFields = {
     .multipleOf(0.01)
     .nullable()
     .optional()
-    .describe('Absolute per-night rate in USD (up to 2 decimals). Mutually exclusive with ratePct; null (update only) clears it.'),
+    .describe('Absolute rate in USD (up to 2 decimals): per day on a daily or both listing, per night on a stay. Not on an hourly listing. Mutually exclusive with ratePct; null (update only) clears it.'),
+  hourlyRate: z
+    .number()
+    .min(0.01)
+    .max(100_000)
+    .multipleOf(0.01)
+    .nullable()
+    .optional()
+    .describe('Absolute rate per hour in USD on the days the rule covers, for hourly or both listings without fixed departures. May be set together with nightlyRate; mutually exclusive with ratePct; null (update only) clears it.'),
+  slotRate: z
+    .number()
+    .min(0.01)
+    .max(100_000)
+    .multipleOf(0.01)
+    .nullable()
+    .optional()
+    .describe('Absolute price per departure in USD on the days the rule covers, for fixed-departure listings only (e.g. 425 for a 90-minute tour on Saturdays). Mutually exclusive with ratePct; null (update only) clears it.'),
   ratePct: z
     .number()
     .int()
@@ -43,7 +69,7 @@ const rateRuleFields = {
     .max(500)
     .nullable()
     .optional()
-    .describe('Whole-number percentage adjustment of the listing base rate, -90 to 500 (e.g. 25 = +25%, -15 = 15% off). Mutually exclusive with nightlyRate; null (update only) clears it.'),
+    .describe('Whole-number percentage adjustment of the listing base rate (per day, hour or departure, whichever is priced), -90 to 500 (e.g. 25 = +25%, -15 = 15% off). Mutually exclusive with nightlyRate, hourlyRate and slotRate; null (update only) clears it.'),
   minNights: z
     .number()
     .int()
@@ -51,13 +77,19 @@ const rateRuleFields = {
     .max(90)
     .nullable()
     .optional()
-    .describe('Minimum nights required when a date in the range is the check-in night (1-90). A rule may carry only this and no rate.'),
+    .describe('Stays only: minimum nights required when a date in the range is the check-in night (1-90). A rule may carry only this and no rate.'),
   priority: z.number().int().min(0).max(1000).optional().describe('Override tier 0-1000 (default 0); a higher priority wins when rules overlap.'),
 };
 
-function rateXorError(nightlyRate: number | null | undefined, ratePct: number | null | undefined): string | null {
+type RateFields = { nightlyRate?: number | null; hourlyRate?: number | null; slotRate?: number | null; ratePct?: number | null };
+
+/** Mirrors the backend's RateXorConstraint: the absolute rates combine freely, a percentage excludes all of them. */
+function rateXorError(input: RateFields): string | null {
   const isSet = (v: number | null | undefined): boolean => v !== null && v !== undefined;
-  if (isSet(nightlyRate) && isSet(ratePct)) return 'nightlyRate and ratePct are mutually exclusive: set an absolute nightly rate OR a percentage adjustment, not both.';
+  const absolute = (['nightlyRate', 'hourlyRate', 'slotRate'] as const).filter((k) => isSet(input[k]));
+  if (absolute.length && isSet(input.ratePct)) {
+    return `${absolute.join(', ')} and ratePct are mutually exclusive: set absolute rates OR a percentage adjustment, not both.`;
+  }
   return null;
 }
 
@@ -65,11 +97,11 @@ function rateXorError(nightlyRate: number | null | undefined, ratePct: number | 
 
 export const listRateRules = defineTool({
   name: 'list_rate_rules',
-  title: 'List seasonal rate rules',
+  title: 'List rate rules',
   description:
-    'Seasonal rate rules on one of the vendor\'s listings: each rule has an id (for update_rate_rule / delete_rate_rule), name, startDate (inclusive), endDate (EXCLUSIVE: the first night it no longer applies), ' +
-    'optional weekdayMask, nightlyRate OR ratePct, minNights, priority and source (vendor = hand-authored, starter = from apply_starter_seasons). ' +
-    'Use it before changing pricing on a stay listing. ' + NIGHTLY_NOTE,
+    'Rate rules (day rates, weekday rates, date overrides, seasons) on one of the vendor\'s listings: each rule has an id (for update_rate_rule / delete_rate_rule), name, startDate (inclusive), endDate (EXCLUSIVE: the first day it no longer applies), ' +
+    'optional weekdayMask, nightlyRate / hourlyRate / slotRate OR ratePct, minNights, priority and source (vendor = hand-authored, starter = from apply_starter_seasons). ' +
+    'Money fields come back as decimal strings. Use it before changing a listing\'s pricing. ' + RULES_NOTE,
   access: 'vendor',
   scope: 'listings',
   inputSchema: { listingId: uuid('listing') },
@@ -81,23 +113,24 @@ export const createRateRule = defineTool({
   name: 'create_rate_rule',
   title: 'Create a rate rule',
   description:
-    'Add a seasonal rate rule to one of the vendor\'s nightly listings: a date range (endDate is EXCLUSIVE, so a single night is [D, D+1)) with either an absolute nightlyRate or a ratePct adjustment of the base rate (never both), ' +
-    'optionally narrowed to certain weekdays and/or carrying a minNights requirement. Returns the created rule with its id. A listing may hold at most 400 rules. ' +
-    NIGHTLY_NOTE + ' ' + STAFF_NOTE,
+    'Add a rate rule to one of the vendor\'s listings: a date range (endDate is EXCLUSIVE, so a single day is [D, D+1)) with absolute rates (nightlyRate, hourlyRate, slotRate) or a ratePct adjustment of the base rate (never both), ' +
+    'optionally narrowed to certain weekdays and, on a stay, carrying a minNights requirement. Example: Saturdays at $60/day all next year is startDate 2027-01-01, endDate 2028-01-01, weekdayMask [6], nightlyRate 60. ' +
+    'When rules overlap, the higher priority wins, then the more specific rule. Returns the created rule with its id. A listing may hold at most 400 rules. ' +
+    RULES_NOTE + ' ' + STAFF_NOTE,
   access: 'vendor',
   scope: 'listings',
   inputSchema: {
     listingId: uuid('listing'),
     name: z.string().min(1).max(80).describe('Vendor-facing label, e.g. "Summer peak" or "Holiday weekends".'),
-    startDate: isoDate('Inclusive first night the rule applies to'),
-    endDate: isoDate('EXCLUSIVE end: the first night the rule no longer applies to'),
+    startDate: isoDate('Inclusive first day (night, on a stay) the rule applies to'),
+    endDate: isoDate('EXCLUSIVE end: the first day the rule no longer applies to'),
     ...rateRuleFields,
   },
   annotations: WRITE,
   handler: async ({ listingId, ...input }, ctx) => {
     const rangeErr = dateRangeError(input.startDate, input.endDate, MAX_RULE_SPAN_DAYS);
     if (rangeErr) return fail(rangeErr);
-    const xorErr = rateXorError(input.nightlyRate, input.ratePct);
+    const xorErr = rateXorError(input);
     if (xorErr) return fail(xorErr);
     return fromResult(await pricingRulesApi.createRateRule(token(ctx), listingId, input));
   },
@@ -107,16 +140,16 @@ export const updateRateRule = defineTool({
   name: 'update_rate_rule',
   title: 'Update a rate rule',
   description:
-    'Change fields of an existing seasonal rate rule (by its id from list_rate_rules). Only the fields you pass change. ' +
-    'Setting nightlyRate clears any stored ratePct and vice versa; pass null to clear weekdayMask, nightlyRate, ratePct or minNights. ' +
-    'If you change only one of startDate/endDate, Splitt re-checks the merged range (endDate must stay after startDate). Returns the updated rule. ' + STAFF_NOTE,
+    'Change fields of an existing rate rule (by its id from list_rate_rules). Only the fields you pass change. ' +
+    'Setting any absolute rate (nightlyRate, hourlyRate, slotRate) clears a stored ratePct, and setting ratePct clears all three; pass null to clear weekdayMask, nightlyRate, hourlyRate, slotRate, ratePct or minNights. ' +
+    'If you change only one of startDate/endDate, Splitt re-checks the merged range (endDate must stay after startDate), and it re-checks that the rule\'s rates still fit the listing. Returns the updated rule. ' + STAFF_NOTE,
   access: 'vendor',
   scope: 'listings',
   inputSchema: {
     ruleId: uuid('rate rule'),
     name: z.string().min(1).max(80).optional().describe('New vendor-facing label.'),
-    startDate: isoDate('New inclusive first night').optional(),
-    endDate: isoDate('New EXCLUSIVE end (first night the rule no longer applies to)').optional(),
+    startDate: isoDate('New inclusive first day').optional(),
+    endDate: isoDate('New EXCLUSIVE end (first day the rule no longer applies to)').optional(),
     ...rateRuleFields,
   },
   annotations: WRITE_IDEMPOTENT,
@@ -129,7 +162,7 @@ export const updateRateRule = defineTool({
       const single = input.startDate !== undefined ? dateError('startDate', input.startDate) : input.endDate !== undefined ? dateError('endDate', input.endDate) : null;
       if (single) return fail(single);
     }
-    const xorErr = rateXorError(input.nightlyRate, input.ratePct);
+    const xorErr = rateXorError(input);
     if (xorErr) return fail(xorErr);
     return fromResult(await pricingRulesApi.updateRateRule(token(ctx), ruleId, input));
   },
@@ -139,7 +172,7 @@ export const deleteRateRule = defineTool({
   name: 'delete_rate_rule',
   title: 'Delete a rate rule',
   description:
-    'Permanently delete one seasonal rate rule (by its id from list_rate_rules) from the vendor\'s listing. Existing bookings keep their agreed price; only future quotes change. ' +
+    'Permanently delete one rate rule (by its id from list_rate_rules) from the vendor\'s listing. Existing bookings keep their agreed price; only future quotes change. ' +
     'Confirm with the user first. ' + STAFF_NOTE,
   access: 'vendor',
   scope: 'listings',
@@ -154,7 +187,7 @@ export const applyStarterSeasons = defineTool({
   description:
     'One-click starter pack: creates about a dozen percentage-based seasonal rules (peak, shoulder and holiday periods) for one calendar year on a nightly listing, tagged source=starter so they stay distinguishable from the vendor\'s own rules. ' +
     'year must be the current year or up to 3 years ahead. With replaceExisting=true the listing\'s existing STARTER rules for that year are deleted and regenerated first (hand-authored rules are never touched); without it, re-applying adds duplicates. ' +
-    'Confirm with the user before running it. Returns the created rules. ' + NIGHTLY_NOTE + ' ' + STAFF_NOTE,
+    'Confirm with the user before running it. Returns the created rules. ' + STAY_ONLY_NOTE + ' For gear, add day rates with create_rate_rule. ' + STAFF_NOTE,
   access: 'vendor',
   scope: 'listings',
   inputSchema: {

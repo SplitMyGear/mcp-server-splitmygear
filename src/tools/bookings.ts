@@ -1,6 +1,8 @@
 import { backendRequest, BackendApiError } from '@/lib/backend-client';
 import type { GetResponse, PostResponse, PutResponse } from '@/lib/api-contract';
 import { call, compact, qs, type Result } from './_shared';
+import { isoDay } from './blackout-dates';
+import { FIXED_SLOT_REQUIRED, fixedSlotRequiredMessage, loadDayDepartures, pickDeparture, type FixedSlot } from './fixed-slots';
 
 /**
  * Booking tools call the SplitMyGear backend REST API (/api/v1) forwarding the
@@ -30,6 +32,27 @@ const MAX_RENTAL_DAYS = 365;
 
 function toMessage(error: unknown, fallback: string): string {
   return error instanceof BackendApiError ? error.message : fallback;
+}
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * SPLIT-1949: the window of a booking that is priced by the hour (a flexible
+ * hourly booking or a fixed departure). The backend stores such a booking as
+ * ONE day plus an HH:MM start and end, and the web sends it as
+ * `startDate = endDate = day` (FixedSlotBookingForm), so the MCP does too.
+ * Returns the day, or a message saying why the input is not a usable window.
+ */
+function timedWindowError(checkIn: string, checkOut: string | undefined, startTime?: string, endTime?: string): { day: string } | { error: string } {
+  const day = isoDay(checkIn);
+  if (!day) return { error: `Invalid checkIn date: "${checkIn}". Use the day of the rental as YYYY-MM-DD (e.g. 2026-07-01).` };
+  if (checkOut !== undefined && isoDay(checkOut) !== day) {
+    return { error: 'A booking with startTime/endTime is a single day: leave checkOut out or set it to the same day as checkIn.' };
+  }
+  for (const [name, value] of [['startTime', startTime], ['endTime', endTime]] as const) {
+    if (value !== undefined && !HHMM.test(value)) return { error: `${name} must be HH:MM, 24-hour (e.g. 09:30).` };
+  }
+  return { day };
 }
 
 /**
@@ -88,7 +111,12 @@ export const bookingTools = {
   async createBooking(data: {
     listingId: string;
     checkIn: string;
-    checkOut: string;
+    /** Required for a day/night booking; omitted (or equal to checkIn) for an hourly or fixed-departure one. */
+    checkOut?: string;
+    /** HH:MM: the start of an hourly booking, or the departure of a fixed-departure listing. */
+    startTime?: string;
+    /** HH:MM: the end of an hourly booking. Derived from the departure on a fixed-departure listing. */
+    endTime?: string;
     token: string;
     protectionPlan?: 'none' | 'basic' | 'standard' | 'premier';
     quantity?: number;
@@ -98,19 +126,61 @@ export const bookingTools = {
     promoCode?: string;
     bringingPets?: boolean;
     withPaymentLink?: boolean;
-  }): Promise<{ success: boolean; booking?: CreatedBooking; quote?: unknown; paymentUrl?: string; paymentError?: string; error?: string }> {
+  }): Promise<{ success: boolean; booking?: CreatedBooking; quote?: unknown; departure?: FixedSlot; paymentUrl?: string; paymentError?: string; error?: string }> {
     if (!data.token) return { success: false, error: AUTH_REQUIRED };
-    const dateError = validateBookingDates(data.checkIn, data.checkOut);
-    if (dateError) return { success: false, error: dateError };
+    const timed = data.startTime !== undefined || data.endTime !== undefined;
+    let day: string | null;
+    if (timed) {
+      const window = timedWindowError(data.checkIn, data.checkOut, data.startTime, data.endTime);
+      if ('error' in window) return { success: false, error: window.error };
+      day = window.day;
+    } else {
+      if (data.checkOut === undefined) return { success: false, error: 'Pass checkOut (the return day), or startTime for an hourly or fixed-departure booking.' };
+      const dateError = validateBookingDates(data.checkIn, data.checkOut);
+      if (dateError) return { success: false, error: dateError };
+      day = isoDay(data.checkIn);
+    }
+    const quantity = data.quantity ?? 1;
+    let startTime = data.startTime;
+    let endTime = data.endTime;
+    let departure: FixedSlot | undefined;
+    let departures: FixedSlot[] | undefined;
     try {
+      // SPLIT-1949: a fixed-departure listing sells only its published
+      // departures. Check the first day's departures BEFORE any write, exactly
+      // as the web booking form does, so an off-grid window is never sent.
+      // The backend refuses one anyway (FIXED_SLOT_REQUIRED); this turns that
+      // refusal into a list of the departures that are still open.
+      const dayInfo = day ? await loadDayDepartures(data.listingId, day, 8_000) : null;
+      if (dayInfo?.ok && dayInfo.data.fixed) {
+        departures = dayInfo.data.slots;
+        const picked = pickDeparture(day as string, departures, startTime, endTime, quantity);
+        if (!picked.ok) return { success: false, error: picked.error };
+        departure = picked.slot;
+        startTime = picked.slot.startTime;
+        endTime = picked.slot.endTime;
+      } else if (timed && !dayInfo?.ok) {
+        // Fail closed: without the calendar the MCP cannot tell a fixed
+        // departure from a free hourly window, so it does not guess.
+        return { success: false, error: `Could not load this listing's availability for ${day} to check the time you picked, so nothing was booked. Try again in a moment.` };
+      } else if (timed) {
+        if (!startTime || !endTime) return { success: false, error: 'An hourly booking needs both startTime and endTime (HH:MM, 24-hour).' };
+        if (endTime <= startTime) return { success: false, error: 'endTime must be after startTime (an hourly booking ends the same day).' };
+      }
+      const isTimed = startTime !== undefined && endTime !== undefined;
+      const startDate = isTimed ? (day as string) : data.checkIn;
+      const endDate = isTimed ? (day as string) : (data.checkOut as string);
+
       let totalPrice = 1;
       let quote: unknown;
-      // Three sequential backend calls must fit the function's 30 s budget:
-      // quote 8 s + create 12 s + checkout 8 s.
+      // Four sequential backend calls must fit the MCP endpoint's 60 s budget:
+      // departures 8 s + quote 8 s + create 12 s + checkout 8 s.
       const quoteResult = await this.getQuote({
         listingId: data.listingId,
-        startDate: data.checkIn,
-        endDate: data.checkOut,
+        startDate,
+        endDate,
+        startTime: isTimed ? startTime : undefined,
+        endTime: isTimed ? endTime : undefined,
         quantity: data.quantity,
         numberOfGuests: data.numberOfGuests,
         protectionPlan: data.protectionPlan,
@@ -118,6 +188,9 @@ export const bookingTools = {
         deliveryRequested: data.deliveryRequested,
         bringingPets: data.bringingPets,
       }, 8_000);
+      if (!quoteResult.ok && quoteResult.code === FIXED_SLOT_REQUIRED) {
+        return { success: false, error: fixedSlotRequiredMessage(day, departures, quantity) };
+      }
       if (quoteResult.ok) {
         quote = quoteResult.data;
         const total = Number((quoteResult.data as { total?: unknown })?.total);
@@ -129,8 +202,10 @@ export const bookingTools = {
         timeoutMs: 12_000,
         body: compact({
           listingId: data.listingId,
-          startDate: data.checkIn,
-          endDate: data.checkOut,
+          startDate,
+          endDate,
+          startTime: isTimed ? startTime : undefined,
+          endTime: isTimed ? endTime : undefined,
           totalPrice,
           protectionPlan: data.protectionPlan,
           quantity: data.quantity,
@@ -142,23 +217,37 @@ export const bookingTools = {
         }),
       });
 
-      if (!data.withPaymentLink) return { success: true, booking, quote };
+      const created = departure ? { booking, quote, departure } : { booking, quote };
+      if (!data.withPaymentLink) return { success: true, ...created };
       const bookingId = (booking as { id?: string })?.id;
-      if (!bookingId) return { success: true, booking, quote, paymentError: 'Booking created but no id was returned; cannot open checkout.' };
+      if (!bookingId) return { success: true, ...created, paymentError: 'Booking created but no id was returned; cannot open checkout.' };
       const checkout = await this.createCheckoutSession(bookingId, data.token, 8_000);
       return checkout.ok
-        ? { success: true, booking, quote, paymentUrl: checkout.data.checkoutUrl }
-        : { success: true, booking, quote, paymentError: checkout.error };
+        ? { success: true, ...created, paymentUrl: checkout.data.checkoutUrl }
+        : { success: true, ...created, paymentError: checkout.error };
     } catch (error) {
+      if (error instanceof BackendApiError && error.code === FIXED_SLOT_REQUIRED) {
+        return { success: false, error: fixedSlotRequiredMessage(day, departures, quantity) };
+      }
       return { success: false, error: toMessage(error, 'Failed to create booking') };
     }
   },
 
-  /** Public, server-authoritative price breakdown (no booking is created). */
+  /**
+   * Public, server-authoritative price breakdown (no booking is created): the
+   * same `POST /bookings/quote` the web checkout shows, so the MCP and the web
+   * quote the same total for the same listing and window. Rate rules are
+   * applied server-side; the answer carries `nightlyRates` (per-day lines a
+   * rule governed) and, for an hourly or fixed-departure window, `dayRate`
+   * ({ unit: 'hour' | 'slot', rate, ruleName }). An hourly window is one day
+   * with `startTime`/`endTime` and `endDate` equal to `startDate`.
+   */
   getQuote(input: {
     listingId: string;
     startDate: string;
     endDate: string;
+    startTime?: string;
+    endTime?: string;
     quantity?: number;
     numberOfGuests?: number;
     protectionPlan?: string;

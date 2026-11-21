@@ -26,6 +26,13 @@ export interface FleetUnitInput {
   model?: string;
   year?: number;
   acquisitionValue?: number;
+  /**
+   * SPLIT-1949 (backend SPLIT-1948): this unit's fixed departure times (HH:MM,
+   * listing-local), used when the listing runs on fixed departures. `null` or
+   * `[]` clears them. The backend dedupes, sorts and checks them against the
+   * listing's slot length (FleetService.createUnit / updateUnit).
+   */
+  departureTimes?: string[] | null;
 }
 
 /** `UpdateUnitDto`: the create fields plus `status`. */

@@ -41,6 +41,12 @@ export interface ListingInput {
   monthlyDiscountPct?: number;
   quantity?: number;
   attributes?: Record<string, unknown>;
+  /** SPLIT-1948: 'fixed' sells only the departures each fleet unit publishes (hourly listings only). */
+  slotMode?: 'flexible' | 'fixed';
+  /** SPLIT-1948: how long every fixed-departure rental lasts, 15..1440 minutes in 5-minute steps. */
+  slotDurationMinutes?: number;
+  /** SPLIT-1948: price of one departure in USD. */
+  slotPrice?: number;
 }
 
 export const vendorListingTools = {
