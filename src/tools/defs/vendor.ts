@@ -601,7 +601,7 @@ const experienceFields = {
   whatsIncluded: z.array(z.string().max(120)).max(30).optional(),
   whatToBring: z.array(z.string().max(120)).max(30).optional(),
   requirements: z.string().max(2000).optional(),
-  cancellationPolicy: z.string().max(500).optional(),
+  cancellationPolicy: z.enum(CANCELLATION_POLICIES).optional(),
   imageUrls: z.array(z.url().max(2048)).max(20).optional(),
   guidanceType: z
     .enum(['self_guided', 'staff_guided'])
