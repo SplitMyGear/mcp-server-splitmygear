@@ -510,6 +510,16 @@ describe('create_experience and update_experience: one total for the whole booki
     }
   });
 
+  it('accepts only a platform cancellation term, never free text (SPLIT-1957)', () => {
+    for (const cancellationPolicy of ['flexible', 'flexible_72h', 'moderate', 'strict', 'non_refundable']) {
+      expect(createShape.safeParse({ ...base, flatRatePrice: 150, cancellationPolicy }).success).toBe(true);
+      expect(updateShape.safeParse({ experienceId: EXPERIENCE, cancellationPolicy }).success).toBe(true);
+    }
+    const prose = 'Full refund if you cancel 3 days ahead';
+    expect(createShape.safeParse({ ...base, flatRatePrice: 150, cancellationPolicy: prose }).success).toBe(false);
+    expect(updateShape.safeParse({ experienceId: EXPERIENCE, cancellationPolicy: prose }).success).toBe(false);
+  });
+
   it('rejects an unknown guidanceType', () => {
     expect(createShape.safeParse({ ...base, flatRatePrice: 150, guidanceType: 'robot_guided' }).success).toBe(false);
   });
